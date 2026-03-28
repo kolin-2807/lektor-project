@@ -16,6 +16,14 @@ class Discipline(models.Model):
     )
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
+    language = models.CharField(
+        max_length=10,
+        choices=[
+            ("kaz", "Kazakh"),
+            ("rus", "Russian"),
+        ],
+        default="kaz"
+    )
 
     def __str__(self):
         return self.title
