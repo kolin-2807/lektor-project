@@ -1,0 +1,26 @@
+from django.db import models
+from academics.models import Discipline
+
+
+class Material(models.Model):
+    CATEGORY_CHOICES = [
+        ("lecture", "Дәріс"),
+        ("practice", "Практикалық жұмыс"),
+        ("lab", "Зертханалық жұмыс"),
+        ("sowj", "СОӨЖ"),
+        ("syllabus", "Силлабус"),
+    ]
+
+    discipline = models.ForeignKey(
+        Discipline,
+        on_delete=models.CASCADE,
+        related_name="materials"
+    )
+    title = models.CharField(max_length=255)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    cloud_url = models.URLField()
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.title
