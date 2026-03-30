@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Satbayev Edu Assistant</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-logo">
+            <img src="./assets/images/lektor_logo.png" alt="Lektor logo" />
+          </div>
+
+          <div class="brand-text">
+            <button class="role-title-btn" id="roleTitleBtn" type="button">
+              <span id="brandRoleTitle">Оқытушы</span>
+              <span class="role-title-arrow">▾</span>
+            </button>
+
+            <div class="role-menu hidden" id="roleMenu">
+              <button class="role-menu-item active" data-role-value="kaz" type="button">Оқытушы</button>
+              <button class="role-menu-item" data-role-value="rus" type="button">Лектор</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button class="profile-avatar-btn" id="profileBtn" type="button" aria-label="profile">
+            <div class="avatar" id="topAvatar">КЕ</div>
+          </button>
+
+          <div class="profile-dropdown" id="profileDropdown">
+            <div class="profile-card-top">
+              <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
+              <div class="profile-main">
+                <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
+                <span id="dropdownRole">ст.преподаватель</span>
+                <span id="dropdownEmail">kalaman@university.kz</span>
+              </div>
+            </div>
+
+            <div class="profile-actions">
+              <button id="editProfileBtn" type="button">Профильді өңдеу</button>
+              <button id="logoutBtn" type="button">Шығу</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="page">
+      <section id="homeView">
+        <div class="home-stage" id="courseStage">
+          <div class="section-title-wrap"></div>
+          <section class="course-grid" id="courseGrid"></section>
+        </div>
+
+        <div class="home-stage hidden" id="disciplineStage">
+          <div class="section-head-inline section-head-inline-compact">
+            <button class="back-chip-btn" id="courseBackBtn" type="button">← Артқа</button>
+          </div>
+
+          <section class="cards-grid" id="cardsGrid"></section>
+        </div>
+      </section>
+
+      <section id="subjectView" class="hidden">
+        <section class="subject-shell">
+          <div class="subject-nav-row">
+            <div class="subject-tabs">
+              <button class="tab-btn active" type="button" data-tab="materials">Материалдар</button>
+              <button class="tab-btn" type="button" data-tab="test">Тест</button>
+              <button class="tab-btn" type="button" data-tab="results">Нәтижелер</button>
+            </div>
+          </div>
+
+          <div class="subject-cover-top" id="subjectCoverTop">
+            <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
+
+            <div class="subject-cover-copy">
+              <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
+              <p id="subjectCourse">3 курс</p>
+            </div>
+
+            <div class="subject-cover-edit">
+              <button class="cover-btn" id="changeCoverBtn" type="button">Өңдеу</button>
+              <input class="hidden-file" id="coverFileInput" type="file" accept="image/*" />
+            </div>
+          </div>
+
+          <div class="subject-pane active" id="materialsPane">
+            <div class="materials-type-row" id="typeRow"></div>
+
+            <div class="materials-layout">
+              <div class="materials-left">
+                <div class="materials-upload-bar">
+                  <div class="materials-upload-top">
+                    <div class="materials-upload-copy">
+                      <strong>Папка жүктеу</strong>
+                      <span>Лекция материалдарын папкамен жүктеп, тізімге автоматты түрде қосыңыз.</span>
+                    </div>
+                    <button class="upload-folder-btn" id="uploadFolderBtn" type="button">Папка таңдау</button>
+                    <input class="hidden-file" id="folderInput" type="file" webkitdirectory directory multiple />
+                  </div>
+                  <div class="materials-upload-meta">
+                    <div class="materials-upload-pill" id="folderStatus">Папка әлі жүктелмеген</div>
+                    <div class="materials-upload-pill" id="folderCount">0 файл</div>
+                  </div>
+                </div>
+                <div class="materials-list" id="materialsList"></div>
+              </div>
+
+              <div class="materials-right">
+                <div class="material-preview" id="materialPreview"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="subject-pane" id="testPane">
+            <div class="test-shell">
+              <div class="test-toolbar">
+                <div class="test-input-card">
+                  <label for="questionCountInput">Сұрақ саны</label>
+                  <input id="questionCountInput" type="number" min="5" max="50" value="20" />
+                </div>
+
+                <div class="test-input-card">
+                  <label for="testDurationInput">Уақыт (мин)</label>
+                  <input id="testDurationInput" type="number" min="5" max="120" value="15" />
+                </div>
+
+                <div class="test-actions-row">
+                  <button class="action-btn primary" id="generateTestBtn" type="button">AI тест құру</button>
+                  <button class="action-btn soft" id="openJoinBtn" type="button" disabled>Қосылуды ашу</button>
+                  <button class="action-btn soft" id="startTestBtn" type="button" disabled>Тестті бастау</button>
+                </div>
+              </div>
+
+              <div class="test-grid">
+                <div class="test-card">
+                  <div class="section-head">
+                    <h3>Тест күйі</h3>
+                    <span class="pill" id="testStatusPill">Дайын емес</span>
+                  </div>
+
+                  <div class="test-empty-box" id="testEmptyBox">
+                    Алдымен материал бойынша AI тест құрып алыңыз.
+                  </div>
+
+                  <div class="test-ready-box" id="testReadyBox">
+                    <div class="test-ready-title">Тест дайын</div>
+
+                    <div class="mini-chip-wrap">
+                      <div class="mini-chip" id="readyQuestionsChip">20 сұрақ</div>
+                      <div class="mini-chip" id="readyDurationChip">15 минут</div>
+                      <div class="mini-chip" id="readyTopicChip">Тақырып</div>
+                    </div>
+
+                    <div class="test-bottom-actions">
+                      <button class="small-btn primary" id="viewTestBtn" type="button">Тестті қарау</button>
+                      <button class="small-btn" id="regenerateBtn" type="button">Қайта құру</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="session-card">
+                  <div class="section-head">
+                    <h3>Сессия</h3>
+                    <span class="pill" id="sessionStatusPill">Белсенді емес</span>
+                  </div>
+
+                  <div class="session-empty-box" id="sessionEmptyBox">
+                    Қосылуды ашқаннан кейін студенттер осы жерде көрінеді.
+                  </div>
+
+                  <div class="session-ready-box" id="sessionReadyBox">
+                    <button class="participants-toggle" id="participantsToggleBtn" type="button">
+                      <span>Қосылғандар</span>
+                      <strong id="participantsCountLabel">0 студент</strong>
+                    </button>
+
+                    <div class="participants-list" id="participantsList"></div>
+
+                    <div class="session-actions">
+                      <button class="small-btn primary" id="showQrBtn" type="button">QR ашу</button>
+                      <button class="small-btn" id="openResultsFromTestBtn" type="button" style="display:none;">Нәтижелерге өту</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="subject-pane" id="resultsPane">
+            <div class="results-shell">
+              <div class="results-list-card" id="resultsListCard">
+                <div class="results-list-head">
+                  <h3>Нәтижелер</h3>
+                  <span class="pill" id="reportsCountPill">0 репорт</span>
+                </div>
+
+                <div class="report-list-wrap" id="reportListWrap"></div>
+              </div>
+
+              <div class="report-detail-card hidden" id="reportDetailCard">
+                <div class="report-detail-head">
+                  <div class="report-detail-title-wrap">
+                    <div class="report-detail-title" id="reportDetailTitle"></div>
+                    <input class="title-input" id="reportTitleInput" type="text" />
+                    <div class="report-detail-sub" id="reportDetailSub"></div>
+                  </div>
+
+                  <div class="report-detail-actions">
+                    <button class="icon-btn" id="renameReportBtn" type="button">✎</button>
+                    <button class="icon-btn" id="reportMenuBtn" type="button">⋯</button>
+                    <button class="close-btn" id="closeReportBtn" type="button">×</button>
+
+                    <div class="actions-menu" id="reportActionsMenu">
+                      <button class="delete-action" id="deleteReportBtn" type="button">Жою</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="delete-bar" id="reportDeleteBar">
+                  <div>Осы репортты жойғыңыз келе ме?</div>
+                  <div class="delete-actions">
+                    <button class="small-btn" id="cancelDeleteReportBtn" type="button">Бас тарту</button>
+                    <button class="small-btn primary" id="confirmDeleteReportBtn" type="button">Жою</button>
+                  </div>
+                </div>
+
+                <div class="report-detail-body">
+                  <div class="inner-tabs">
+                    <button class="inner-tab active" type="button" data-results-tab="analytics">Аналитика</button>
+                    <button class="inner-tab" type="button" data-results-tab="participants">Қатысушылар</button>
+                    <button class="inner-tab" type="button" data-results-tab="questions">Сұрақтар</button>
+                  </div>
+
+                  <div class="results-pane active" id="analyticsResultsPane">
+                    <div class="analytics-top">
+                      <div class="analytics-card" id="analyticsCard"></div>
+                      <div class="stats-card" id="statsCard"></div>
+                    </div>
+
+                    <div class="hardest-card" id="hardestCard"></div>
+                  </div>
+
+                  <div class="results-pane" id="participantsResultsPane">
+                    <div class="participants-lines" id="participantsLines"></div>
+                  </div>
+
+                  <div class="results-pane" id="questionsResultsPane">
+                    <div class="questions-list-wrap" id="questionsListWrap"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="voice-assistant">
+      <div class="voice-panel" id="voicePanel">
+        <div class="voice-top">
+          <button class="voice-close" id="closeVoiceBtn" type="button">×</button>
+        </div>
+
+        <div class="voice-core-wrap">
+          <div class="voice-rings">
+            <div class="ring r1"></div>
+            <div class="ring r2"></div>
+            <div class="ring r3"></div>
+            <div class="voice-core" id="voiceCore" title="Түртіп тыңдауды бастау"></div>
+          </div>
+
+          <div class="voice-bars">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+
+          <div class="voice-status" id="voiceStatus">Дайын</div>
+        </div>
+      </div>
+
+      <button class="voice-dock" id="openVoiceBtn" type="button" aria-label="AI assistant">
+        <svg viewBox="0 0 24 24">
+          <path d="M5 14V10"></path>
+          <path d="M9 18V6"></path>
+          <path d="M13 20V4"></path>
+          <path d="M17 17V7"></path>
+          <path d="M21 13V11"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-backdrop" id="profileModal">
+      <div class="profile-modal-box">
+        <div class="profile-modal-top">
+          <h3>Профильді өңдеу</h3>
+          <button class="profile-modal-close" data-close-modal="profileModal" type="button">×</button>
+        </div>
+
+        <div class="profile-modal-head">
+          <div class="avatar-edit" id="avatarEditPreview">КЕ</div>
+
+          <div class="profile-head-copy">
+            <h4 id="profileModalNameText">Каламан Ерболат Тлеуханұлы</h4>
+            <p id="profileModalRoleText">ст.преподаватель</p>
+          </div>
+        </div>
+
+        <input class="hidden-file" id="avatarFileInput" type="file" accept="image/*" />
+
+        <div class="edit-grid">
+          <div class="edit-field">
+            <label for="profileUsernameInput">Username</label>
+            <input id="profileUsernameInput" type="text" value="kalaman_erbolat" />
+          </div>
+
+          <div class="edit-field">
+            <label for="profileEmailInput">Email</label>
+            <input id="profileEmailInput" type="text" readonly />
+          </div>
+
+          <div class="edit-field">
+            <label for="profileBioInput">Био</label>
+            <textarea id="profileBioInput">Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.</textarea>
+          </div>
+        </div>
+
+        <div class="profile-modal-actions">
+          <button class="save-btn" id="saveProfileBtn" type="button">Сақтау</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="testModal">
+      <div class="modal-box large">
+        <div class="modal-top">
+          <h3 id="testModalTitle">Тест</h3>
+          <button class="modal-close" data-close-modal="testModal" type="button">×</button>
+        </div>
+
+        <div class="test-bottom-actions" style="margin-bottom:16px;">
+          <button class="small-btn" id="editTestBtn" type="button">Өңдеу</button>
+          <button class="small-btn primary hidden" id="saveTestBtn" type="button">Сақтау</button>
+        </div>
+
+        <div class="question-edit-list" id="testQuestionsContainer"></div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="qrModal">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-top">
+          <h3>QR арқылы қосылу</h3>
+          <button class="modal-close" data-close-modal="qrModal" type="button">×</button>
+        </div>
+
+        <div style="display:grid;justify-items:center;gap:14px;">
+          <img id="qrImage" alt="QR code" style="width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;" />
+          <div class="pill open" id="qrCodeLabel">Тестке қосылу</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="playerDetailModal">
+      <div class="modal-box large">
+        <div class="modal-top">
+          <h3 id="playerDetailTitle">Қатысушы</h3>
+          <button class="modal-close" data-close-modal="playerDetailModal" type="button">×</button>
+        </div>
+
+        <div class="player-detail-meta" id="playerDetailMeta"></div>
+        <div class="player-answer-list" id="playerAnswerList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/app.js"></script>
+</body>
+</html>

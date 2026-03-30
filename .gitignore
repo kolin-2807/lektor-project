@@ -1,0 +1,8 @@
+backend/.env
+backend/assistant_edge.mp3
+backend/voices.txt
+backend/ai_services/piper_models/assistant_reply.wav
+**/__pycache__/
+*.pyc
+backend/ai_services/piper_models/*.onnx
+backend/ai_services/piper_models/*.onnx.json
