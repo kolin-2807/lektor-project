@@ -70,14 +70,8 @@
 
       <section id="subjectView" class="hidden">
         <section class="subject-shell">
-          <div class="subject-nav-row">
-            <div class="subject-tabs">
-              <button class="tab-btn active" type="button" data-tab="materials">Материалдар</button>
-              <button class="tab-btn" type="button" data-tab="test">Тест</button>
-              <button class="tab-btn" type="button" data-tab="results">Нәтижелер</button>
-            </div>
-          </div>
 
+          <!-- ЖОҒАРЫҒА КӨТЕРІЛГЕН SUBJECT HEADER -->
           <div class="subject-cover-top" id="subjectCoverTop">
             <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
 
@@ -92,173 +86,91 @@
             </div>
           </div>
 
-          <div class="subject-pane active" id="materialsPane">
-            <div class="materials-type-row" id="typeRow"></div>
+          <!-- ЖАҢА БАСҚАРУ ПАНЕЛІ -->
+          <div class="subject-control-panel" id="subjectControlPanel">
+            <div class="control-select-card">
+              <label for="materialTypeSelect">Материал түрі</label>
+              <select id="materialTypeSelect">
+                <option value="lecture">Дәріс</option>
+                <option value="lab">Зертхана</option>
+                <option value="practice">Практика</option>
+                <option value="siw">СӨЖ</option>
+                <option value="syllabus">Силлабус</option>
+              </select>
+            </div>
 
-            <div class="materials-layout">
-              <div class="materials-left">
-                <div class="materials-upload-bar">
-                  <div class="materials-upload-top">
-                    <div class="materials-upload-copy">
-                      <strong>Папка жүктеу</strong>
-                      <span>Лекция материалдарын папкамен жүктеп, тізімге автоматты түрде қосыңыз.</span>
-                    </div>
-                    <button class="upload-folder-btn" id="uploadFolderBtn" type="button">Папка таңдау</button>
-                    <input class="hidden-file" id="folderInput" type="file" webkitdirectory directory multiple />
-                  </div>
-                  <div class="materials-upload-meta">
-                    <div class="materials-upload-pill" id="folderStatus">Папка әлі жүктелмеген</div>
-                    <div class="materials-upload-pill" id="folderCount">0 файл</div>
-                  </div>
-                </div>
-                <div class="materials-list" id="materialsList"></div>
-              </div>
+            <div class="control-select-card">
+              <label for="topicSelect">Тақырып</label>
+              <select id="topicSelect">
+                <option value="">Тақырыпты таңдаңыз</option>
+              </select>
+            </div>
 
-              <div class="materials-right">
-                <div class="material-preview" id="materialPreview"></div>
-              </div>
+            <div class="control-actions-row">
+              <button class="action-btn primary" id="openMaterialBtn" type="button">Материал</button>
+              <button class="action-btn" id="generateTestBtn" type="button" disabled>Тест жасау</button>
+              <button class="action-btn" id="openQrBtn" type="button" disabled>Тест (QR)</button>
+              <button class="action-btn" id="openResultsBtn" type="button" disabled>Нәтижелер</button>
             </div>
           </div>
 
-          <div class="subject-pane" id="testPane">
-            <div class="test-shell">
-              <div class="test-toolbar">
-                <div class="test-input-card">
-                  <label for="questionCountInput">Сұрақ саны</label>
-                  <input id="questionCountInput" type="number" min="5" max="50" value="20" />
+          <!-- БІР ПАРАҚТЫҢ ІШІНДЕГІ НЕГІЗГІ КОНТЕНТ АЙМАҒЫ -->
+          <div class="subject-content-board">
+
+              <!-- MATERIAL VIEW -->
+              <div class="content-view active" id="materialsPane">
+                <div class="content-view-head">
+                  <div></div>
+
+                  <div class="content-view-actions">
+                    <button class="small-btn" id="openMaterialFullscreenBtn" type="button">Толық экран</button>
+                  </div>
                 </div>
 
-                <div class="test-input-card">
-                  <label for="testDurationInput">Уақыт (мин)</label>
-                  <input id="testDurationInput" type="number" min="5" max="120" value="15" />
-                </div>
-
-                <div class="test-actions-row">
-                  <button class="action-btn primary" id="generateTestBtn" type="button">AI тест құру</button>
-                  <button class="action-btn soft" id="openJoinBtn" type="button" disabled>Қосылуды ашу</button>
-                  <button class="action-btn soft" id="startTestBtn" type="button" disabled>Тестті бастау</button>
+                <div class="material-preview-wrap">
+                  <div class="material-preview" id="materialPreview"></div>
                 </div>
               </div>
 
-              <div class="test-grid">
-                <div class="test-card">
-                  <div class="section-head">
-                    <h3>Тест күйі</h3>
-                    <span class="pill" id="testStatusPill">Дайын емес</span>
-                  </div>
-
-                  <div class="test-empty-box" id="testEmptyBox">
-                    Алдымен материал бойынша AI тест құрып алыңыз.
-                  </div>
-
-                  <div class="test-ready-box" id="testReadyBox">
-                    <div class="test-ready-title">Тест дайын</div>
-
-                    <div class="mini-chip-wrap">
-                      <div class="mini-chip" id="readyQuestionsChip">20 сұрақ</div>
-                      <div class="mini-chip" id="readyDurationChip">15 минут</div>
-                      <div class="mini-chip" id="readyTopicChip">Тақырып</div>
-                    </div>
-
-                    <div class="test-bottom-actions">
-                      <button class="small-btn primary" id="viewTestBtn" type="button">Тестті қарау</button>
-                      <button class="small-btn" id="regenerateBtn" type="button">Қайта құру</button>
-                    </div>
-                  </div>
+              <!-- TEST VIEW -->
+              <div class="content-view hidden" id="testPane">
+                <div class="content-view-head compact-test-head">
+                  <p id="testInfoText" class="test-ready-inline"></p>
                 </div>
 
-                <div class="session-card">
-                  <div class="section-head">
-                    <h3>Сессия</h3>
-                    <span class="pill" id="sessionStatusPill">Белсенді емес</span>
-                  </div>
+                <div class="test-qr-board">
+                  <div class="test-qr-card">
+                    <img
+                      id="qrImageInline"
+                      alt="QR code"
+                      style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"
+                    />
 
-                  <div class="session-empty-box" id="sessionEmptyBox">
-                    Қосылуды ашқаннан кейін студенттер осы жерде көрінеді.
-                  </div>
-
-                  <div class="session-ready-box" id="sessionReadyBox">
-                    <button class="participants-toggle" id="participantsToggleBtn" type="button">
-                      <span>Қосылғандар</span>
-                      <strong id="participantsCountLabel">0 студент</strong>
-                    </button>
-
-                    <div class="participants-list" id="participantsList"></div>
-
-                    <div class="session-actions">
-                      <button class="small-btn primary" id="showQrBtn" type="button">QR ашу</button>
-                      <button class="small-btn" id="openResultsFromTestBtn" type="button" style="display:none;">Нәтижелерге өту</button>
+                    <div class="test-qr-actions">
+                      <button class="small-btn primary" id="openTestDirectBtn" type="button">Тестті ашу</button>
+                      <button class="small-btn" id="showQrBtn" type="button">QR ашу</button>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div class="subject-pane" id="resultsPane">
-            <div class="results-shell">
-              <div class="results-list-card" id="resultsListCard">
-                <div class="results-list-head">
-                  <h3>Нәтижелер</h3>
-                  <span class="pill" id="reportsCountPill">0 репорт</span>
-                </div>
-
-                <div class="report-list-wrap" id="reportListWrap"></div>
-              </div>
-
-              <div class="report-detail-card hidden" id="reportDetailCard">
-                <div class="report-detail-head">
-                  <div class="report-detail-title-wrap">
-                    <div class="report-detail-title" id="reportDetailTitle"></div>
-                    <input class="title-input" id="reportTitleInput" type="text" />
-                    <div class="report-detail-sub" id="reportDetailSub"></div>
-                  </div>
-
-                  <div class="report-detail-actions">
-                    <button class="icon-btn" id="renameReportBtn" type="button">✎</button>
-                    <button class="icon-btn" id="reportMenuBtn" type="button">⋯</button>
-                    <button class="close-btn" id="closeReportBtn" type="button">×</button>
-
-                    <div class="actions-menu" id="reportActionsMenu">
-                      <button class="delete-action" id="deleteReportBtn" type="button">Жою</button>
-                    </div>
+              <!-- RESULTS VIEW -->
+              <div class="content-view hidden" id="resultsPane">
+                <div class="content-view-head">
+                  <div>
                   </div>
                 </div>
 
-                <div class="delete-bar" id="reportDeleteBar">
-                  <div>Осы репортты жойғыңыз келе ме?</div>
-                  <div class="delete-actions">
-                    <button class="small-btn" id="cancelDeleteReportBtn" type="button">Бас тарту</button>
-                    <button class="small-btn primary" id="confirmDeleteReportBtn" type="button">Жою</button>
-                  </div>
-                </div>
-
-                <div class="report-detail-body">
-                  <div class="inner-tabs">
-                    <button class="inner-tab active" type="button" data-results-tab="analytics">Аналитика</button>
-                    <button class="inner-tab" type="button" data-results-tab="participants">Қатысушылар</button>
-                    <button class="inner-tab" type="button" data-results-tab="questions">Сұрақтар</button>
-                  </div>
-
-                  <div class="results-pane active" id="analyticsResultsPane">
-                    <div class="analytics-top">
-                      <div class="analytics-card" id="analyticsCard"></div>
-                      <div class="stats-card" id="statsCard"></div>
-                    </div>
-
-                    <div class="hardest-card" id="hardestCard"></div>
-                  </div>
-
-                  <div class="results-pane" id="participantsResultsPane">
-                    <div class="participants-lines" id="participantsLines"></div>
-                  </div>
-
-                  <div class="results-pane" id="questionsResultsPane">
-                    <div class="questions-list-wrap" id="questionsListWrap"></div>
-                  </div>
+                <div class="results-sheet-wrap">
+                  <iframe
+                    id="resultsSheetFrame"
+                    title="Test results sheet"
+                    src=""
+                    style="width:100%;min-height:720px;border:0;border-radius:24px;background:#fff;"
+                  ></iframe>
                 </div>
               </div>
-            </div>
+
           </div>
         </section>
       </section>
@@ -362,7 +274,7 @@
         </div>
 
         <div style="display:grid;justify-items:center;gap:14px;">
-          <img id="qrImage" alt="QR code" style="width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;" />
+          <img id="qrImageInline" alt="QR code" style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"/>
           <div class="pill open" id="qrCodeLabel">Тестке қосылу</div>
         </div>
       </div>

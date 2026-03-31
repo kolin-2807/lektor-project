@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .models import Result, TestSession
 from .models import Result
 
 
@@ -17,3 +18,7 @@ class ResultSerializer(serializers.ModelSerializer):
             "discipline",
             "discipline_title",
         ]
+class TestSessionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestSession
+        fields = "__all__"

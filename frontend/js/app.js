@@ -17,9 +17,9 @@ let selectedCourseNumber = null;
 
 const typeOrder = [
   { key: "lecture", label: "Дәріс" },
-  { key: "practice", label: "Практикалық жұмыс" },
-  { key: "lab", label: "Зертханалық жұмыс" },
-  { key: "sowj", label: "СӨЖ" },
+  { key: "practice", label: "Практика" },
+  { key: "lab", label: "Зертхана" },
+  { key: "siw", label: "СӨЖ" },
   { key: "syllabus", label: "Силлабус" }
 ];
 
@@ -52,67 +52,34 @@ const backBtn = document.getElementById("backBtn");
 const subjectCoverTop = document.getElementById("subjectCoverTop");
 const subjectTitle = document.getElementById("subjectTitle");
 const subjectCourse = document.getElementById("subjectCourse");
-const typeRow = document.getElementById("typeRow");
-const materialsList = document.getElementById("materialsList");
-const materialPreview = document.getElementById("materialPreview");
-const uploadFolderBtn = document.getElementById("uploadFolderBtn");
-const folderInput = document.getElementById("folderInput");
-const folderStatus = document.getElementById("folderStatus");
-const folderCount = document.getElementById("folderCount");
 const changeCoverBtn = document.getElementById("changeCoverBtn");
 const coverFileInput = document.getElementById("coverFileInput");
 
 const materialsPane = document.getElementById("materialsPane");
 const testPane = document.getElementById("testPane");
 const resultsPane = document.getElementById("resultsPane");
-const tabButtons = document.querySelectorAll("[data-tab]");
 
-const questionCountInput = document.getElementById("questionCountInput");
-const testDurationInput = document.getElementById("testDurationInput");
+const materialTypeSelect = document.getElementById("materialTypeSelect");
+const topicSelect = document.getElementById("topicSelect");
+const openMaterialBtn = document.getElementById("openMaterialBtn");
 const generateTestBtn = document.getElementById("generateTestBtn");
-const openJoinBtn = document.getElementById("openJoinBtn");
-const startTestBtn = document.getElementById("startTestBtn");
-const testStatusPill = document.getElementById("testStatusPill");
-const sessionStatusPill = document.getElementById("sessionStatusPill");
-const testEmptyBox = document.getElementById("testEmptyBox");
-const sessionEmptyBox = document.getElementById("sessionEmptyBox");
-const testReadyBox = document.getElementById("testReadyBox");
-const sessionReadyBox = document.getElementById("sessionReadyBox");
-const readyQuestionsChip = document.getElementById("readyQuestionsChip");
-const readyDurationChip = document.getElementById("readyDurationChip");
-const readyTopicChip = document.getElementById("readyTopicChip");
-const viewTestBtn = document.getElementById("viewTestBtn");
-const regenerateBtn = document.getElementById("regenerateBtn");
-const participantsToggleBtn = document.getElementById("participantsToggleBtn");
-const participantsCountLabel = document.getElementById("participantsCountLabel");
-const participantsList = document.getElementById("participantsList");
-const showQrBtn = document.getElementById("showQrBtn");
-const openResultsFromTestBtn = document.getElementById("openResultsFromTestBtn");
+const openQrBtn = document.getElementById("openQrBtn");
+const openResultsBtn = document.getElementById("openResultsBtn");
 
-const resultsListCard = document.getElementById("resultsListCard");
-const reportDetailCard = document.getElementById("reportDetailCard");
-const reportsCountPill = document.getElementById("reportsCountPill");
-const reportListWrap = document.getElementById("reportListWrap");
-const reportDetailTitle = document.getElementById("reportDetailTitle");
-const reportTitleInput = document.getElementById("reportTitleInput");
-const reportDetailSub = document.getElementById("reportDetailSub");
-const renameReportBtn = document.getElementById("renameReportBtn");
-const reportMenuBtn = document.getElementById("reportMenuBtn");
-const closeReportBtn = document.getElementById("closeReportBtn");
-const reportActionsMenu = document.getElementById("reportActionsMenu");
-const deleteReportBtn = document.getElementById("deleteReportBtn");
-const reportDeleteBar = document.getElementById("reportDeleteBar");
-const cancelDeleteReportBtn = document.getElementById("cancelDeleteReportBtn");
-const confirmDeleteReportBtn = document.getElementById("confirmDeleteReportBtn");
-const resultsTabButtons = document.querySelectorAll("[data-results-tab]");
-const analyticsResultsPane = document.getElementById("analyticsResultsPane");
-const participantsResultsPane = document.getElementById("participantsResultsPane");
-const questionsResultsPane = document.getElementById("questionsResultsPane");
-const analyticsCard = document.getElementById("analyticsCard");
-const statsCard = document.getElementById("statsCard");
-const hardestCard = document.getElementById("hardestCard");
-const participantsLines = document.getElementById("participantsLines");
-const questionsListWrap = document.getElementById("questionsListWrap");
+const materialPreview = document.getElementById("materialPreview");
+const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscreenBtn");
+
+const testInfoText = document.getElementById("testInfoText");
+const qrImageInline = document.getElementById("qrImageInline");
+const openTestDirectBtn = document.getElementById("openTestDirectBtn");
+const showQrBtn = document.getElementById("showQrBtn");
+
+const resultsInfoText = document.getElementById("resultsInfoText") || { textContent: "" };
+const resultsSheetFrame = document.getElementById("resultsSheetFrame");
+const openResultsSheetBtn = document.getElementById("openResultsSheetBtn") || {
+  disabled: true,
+  addEventListener() {}
+};
 
 const openVoiceBtn = document.getElementById("openVoiceBtn");
 const closeVoiceBtn = document.getElementById("closeVoiceBtn");
@@ -150,18 +117,45 @@ let isListening = false;
 let selectedSubject = null;
 let activeType = "lecture";
 let selectedMaterialId = null;
-let activeSubjectTab = "materials";
+let activeSubjectPanel = "materials";
 
 let generatedQuestions = [];
-let participantsData = [];
-let reportsData = [];
-let selectedReportId = null;
-let currentResultsInnerTab = "analytics";
-let isEditingReportTitle = false;
+let currentTestSession = null;
 let isEditingTest = false;
 
+let mediaRecorder = null;
+let recordedChunks = [];
+
 function normalizeMaterialType(type) {
-  return type;
+  const normalized = String(type || "").toLowerCase().trim();
+
+  const map = {
+    lecture: "lecture",
+    lesson: "lecture",
+    lection: "lecture",
+    дәріс: "lecture",
+
+    practice: "practice",
+    practical: "practice",
+    практикалық: "practice",
+    практика: "practice",
+
+    lab: "lab",
+    laboratory: "lab",
+    зертхана: "lab",
+    зертханалық: "lab",
+
+    sowj: "siw",
+    siw: "siw",
+    сөж: "siw",
+    срс: "siw",
+    self: "siw",
+
+    syllabus: "syllabus",
+    силлабус: "syllabus"
+  };
+
+  return map[normalized] || normalized || "lecture";
 }
 
 async function fetchJSON(url) {
@@ -170,6 +164,33 @@ async function fetchJSON(url) {
     throw new Error(`Request failed: ${response.status}`);
   }
   return response.json();
+}
+
+async function loadTestSessionsForMaterial(materialId) {
+  try {
+    const sessions = await fetchJSON(`${API_BASE}/results/test-sessions/?material=${materialId}`);
+    return sessions;
+  } catch (error) {
+    console.error("Test sessions жүктеу қатесі:", error);
+    return [];
+  }
+}
+
+async function getLatestSessionForSelectedMaterial() {
+  const material = getSelectedMaterial();
+
+  if (!material) {
+    currentTestSession = null;
+    return null;
+  }
+
+  if (currentTestSession && Number(currentTestSession.material) === Number(material.id)) {
+    return currentTestSession;
+  }
+
+  const sessions = await loadTestSessionsForMaterial(material.id);
+  currentTestSession = sessions[0] || null;
+  return currentTestSession;
 }
 
 function getInitials(name) {
@@ -200,16 +221,16 @@ function getBadgeClass(type) {
   if (type === "lecture") return "badge-lecture";
   if (type === "practice") return "badge-practice";
   if (type === "lab") return "badge-lab";
-  if (type === "self") return "badge-self";
+  if (type === "siw") return "badge-self";
   return "badge-syllabus";
 }
 
 function getTypeLabel(type) {
   const map = {
     lecture: "Дәріс",
-    practice: "Практикалық жұмыс",
-    lab: "Зертханалық жұмыс",
-    sowj: "СӨЖ",
+    practice: "Практика",
+    lab: "Зертхана",
+    siw: "СӨЖ",
     syllabus: "Силлабус"
   };
   return map[type] || "Материал";
@@ -403,20 +424,24 @@ function renderDisciplineCards() {
   }
 }
 
-function switchSubjectTab(tabName) {
-  activeSubjectTab = tabName;
+function switchSubjectPanel(panelName) {
+  activeSubjectPanel = panelName;
 
-  tabButtons.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.tab === tabName);
-  });
+  materialsPane.classList.add("hidden");
+  testPane.classList.add("hidden");
+  resultsPane.classList.add("hidden");
 
-  materialsPane.classList.toggle("active", tabName === "materials");
-  testPane.classList.toggle("active", tabName === "test");
-  resultsPane.classList.toggle("active", tabName === "results");
+  if (panelName === "materials") {
+    materialsPane.classList.remove("hidden");
+  }
 
-  if (tabName === "materials") renderMaterialsArea();
-  if (tabName === "test") renderTestView();
-  if (tabName === "results") renderResultsList();
+  if (panelName === "test") {
+    testPane.classList.remove("hidden");
+  }
+
+  if (panelName === "results") {
+    resultsPane.classList.remove("hidden");
+  }
 }
 
 async function loadMaterialsForSubject(subjectId) {
@@ -429,7 +454,10 @@ async function loadMaterialsForSubject(subjectId) {
       typeLabel: getTypeLabel(normalizeMaterialType(item.category)),
       title: item.title,
       desc: item.description || "Материал сипаттамасы жоқ",
-      fileUrl: item.cloud_url
+      fileUrl: item.cloud_url,
+      formUrl: item.form_url || "",
+      resultsSheetUrl: item.results_sheet_url || "",
+      createdAt: item.created_at || ""
     }));
   } catch (error) {
     console.error("Материалдарды жүктеу қатесі:", error);
@@ -451,22 +479,24 @@ async function openSubject(subject) {
   selectedMaterialId = firstMaterial ? firstMaterial.id : null;
 
   resetTestState();
-  await loadReportsForSubject();
 
   homeView.classList.add("hidden");
   subjectView.classList.remove("hidden");
 
   renderSubjectHeader();
-  updateFolderInfo();
-  switchSubjectTab("materials");
+  populateMaterialTypeSelect();
+  populateTopicSelect();
+  clearMaterialPreview();
+  renderTestBlock(false);
+  renderResultsBlock();
+  switchSubjectPanel("materials");
 }
 
 function showHome() {
   subjectView.classList.add("hidden");
   homeView.classList.remove("hidden");
   selectedSubject = null;
-  activeSubjectTab = "materials";
-  updateFolderInfo();
+  activeSubjectPanel = "materials";
 }
 
 function getTypeMaterials() {
@@ -481,6 +511,12 @@ function ensureSelectedMaterial() {
   }
 }
 
+function getSelectedMaterial() {
+  const list = getTypeMaterials();
+  ensureSelectedMaterial();
+  return list.find(m => m.id === selectedMaterialId) || null;
+}
+
 function renderSubjectHeader() {
   if (!selectedSubject) return;
 
@@ -492,165 +528,88 @@ function renderSubjectHeader() {
   `;
 }
 
-function inferMaterialType(parts, fileName) {
-  const text = [...parts, fileName].join(" ").toLowerCase();
-  if (/(силлабус|syllabus)/.test(text)) return "syllabus";
-  if (/(зертхана|лаборат|lab)/.test(text)) return "lab";
-  if (/(практик|practice)/.test(text)) return "practice";
-  if (/(сөж|срс|self)/.test(text)) return "self";
-  return "lecture";
-}
+function populateMaterialTypeSelect() {
+  if (!materialTypeSelect || !selectedSubject) return;
 
-function getPreviewKind(file) {
-  const ext = file.name.split(".").pop()?.toLowerCase() || "";
-  if (["png","jpg","jpeg","gif","webp","bmp","svg"].includes(ext)) return "image";
-  if (ext === "pdf") return "pdf";
-  if (["mp4","webm","ogg","mov"].includes(ext)) return "video";
-  if (["mp3","wav","oga","m4a"].includes(ext)) return "audio";
-  if (["txt","md","csv","json","xml","html","css","js","ts"].includes(ext)) return "text";
-  return "file";
-}
+  const existingTypes = typeOrder.filter(type =>
+    selectedSubject.materials.some(m => m.type === type.key)
+  );
 
-function getFileIcon(fileName) {
-  const ext = fileName.split(".").pop()?.toLowerCase() || "";
-  if (ext === "pdf") return "📕";
-  if (["doc","docx"].includes(ext)) return "📘";
-  if (["ppt","pptx"].includes(ext)) return "📙";
-  if (["xls","xlsx","csv"].includes(ext)) return "📗";
-  if (["png","jpg","jpeg","gif","webp","svg"].includes(ext)) return "🖼️";
-  if (["mp4","webm","ogg","mov"].includes(ext)) return "🎬";
-  if (["mp3","wav","m4a"].includes(ext)) return "🎵";
-  return "📄";
-}
+  materialTypeSelect.innerHTML = existingTypes.map(type => `
+    <option value="${type.key}" ${type.key === activeType ? "selected" : ""}>${type.label}</option>
+  `).join("");
 
-function updateFolderInfo(files = []) {
-  if (!folderStatus || !folderCount) return;
-  if (!selectedSubject) {
-    folderStatus.textContent = "Алдымен пәнді ашыңыз";
-    folderCount.textContent = "0 файл";
-    return;
-  }
-  if (!files.length) {
-    const uploaded = selectedSubject.materials.filter(item => item.isUploaded).length;
-    folderStatus.textContent = uploaded ? "Жүктелген материалдар дайын" : "Папка әлі жүктелмеген";
-    folderCount.textContent = `${uploaded} файл`;
-    return;
-  }
-  const rootName = files[0].webkitRelativePath.split("/")[0] || "Папка";
-  folderStatus.textContent = `${rootName} папкасы жүктелді`;
-  folderCount.textContent = `${files.length} файл`;
-}
-
-async function readTextFile(file) {
-  try {
-    return await file.text();
-  } catch (e) {
-    return "";
+  if (!existingTypes.length) {
+    materialTypeSelect.innerHTML = `<option value="lecture">Дәріс</option>`;
+    activeType = "lecture";
   }
 }
 
-async function handleFolderUpload(fileList) {
-  if (!selectedSubject || !fileList?.length) return;
+function populateTopicSelect() {
+  if (!topicSelect) return;
 
-  const files = [...fileList].filter(file => file.size > 0 || file.name);
-  if (!files.length) return;
-
-  const uploadedMaterials = [];
-
-  for (const file of files) {
-    const segments = (file.webkitRelativePath || file.name).split("/").filter(Boolean);
-    const fileName = file.name;
-    const folderParts = segments.slice(1, -1);
-    const inferredType = inferMaterialType(folderParts, fileName);
-    const baseTitle = fileName.replace(/\.[^.]+$/, "");
-    const previewKind = getPreviewKind(file);
-    const fileUrl = URL.createObjectURL(file);
-    const textContent = previewKind === "text" ? await readTextFile(file) : "";
-
-    uploadedMaterials.push({
-      id: Date.now() + uploadedMaterials.length + Math.floor(Math.random() * 1000),
-      type: inferredType,
-      typeLabel: getTypeLabel(inferredType),
-      title: baseTitle,
-      desc: folderParts.length ? folderParts.join(" / ") : "Жүктелген материал",
-      fileUrl,
-      fileName,
-      fileSize: file.size,
-      previewKind,
-      textContent,
-      isUploaded: true
-    });
-  }
-
-  selectedSubject.materials = [...selectedSubject.materials, ...uploadedMaterials];
-  const existingType = typeOrder.find(t => uploadedMaterials.some(m => m.type === t.key));
-  if (existingType) activeType = existingType.key;
-  selectedMaterialId = uploadedMaterials[0]?.id || selectedMaterialId;
-  updateFolderInfo(files);
-  renderMaterialsArea();
-}
-
-function renderTypeTabs() {
-  typeRow.innerHTML = "";
-
-  if (!selectedSubject) return;
-
-  typeOrder.forEach(type => {
-    const count = selectedSubject.materials.filter(m => m.type === type.key).length;
-    if (!count) return;
-
-    const btn = document.createElement("button");
-    btn.className = "type-chip" + (activeType === type.key ? " active" : "");
-    btn.type = "button";
-    btn.textContent = type.label;
-
-    btn.addEventListener("click", () => {
-      activeType = type.key;
-      ensureSelectedMaterial();
-      renderMaterialsArea();
-
-      if (activeSubjectTab === "test") {
-        renderTestView();
-      }
-    });
-
-    typeRow.appendChild(btn);
-  });
-}
-
-function renderMaterialsList() {
   const list = getTypeMaterials();
   ensureSelectedMaterial();
-  materialsList.innerHTML = "";
 
   if (!list.length) {
-    materialsList.innerHTML = `<div class="empty-state">Материал табылмады.</div>`;
+    topicSelect.innerHTML = `<option value="">Тақырып табылмады</option>`;
     return;
   }
 
-  list.forEach((item, index) => {
-    const row = document.createElement("div");
-    row.className = "material-row" + (item.id === selectedMaterialId ? " active" : "");
+  topicSelect.innerHTML = list.map(item => `
+    <option value="${item.id}" ${item.id === selectedMaterialId ? "selected" : ""}>${escapeHtml(item.title)}</option>
+  `).join("");
+}
 
-    row.innerHTML = `
-      <div class="material-index">${index + 1}</div>
-      <div class="material-main">
-        <strong>${item.title}</strong>
-      </div>
-      <div class="material-badge ${getBadgeClass(item.type)}">${item.typeLabel}</div>
-    `;
+function getPreviewKindFromUrl(url) {
+  const clean = String(url || "").toLowerCase().split("?")[0].split("#")[0];
+  const ext = clean.split(".").pop() || "";
 
-    row.addEventListener("click", () => {
-      selectedMaterialId = item.id;
-      renderMaterialsArea();
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+  if (["mp4", "webm", "ogg", "mov"].includes(ext)) return "video";
+  if (["mp3", "wav", "oga", "m4a"].includes(ext)) return "audio";
+  return "external";
+}
 
-      if (activeSubjectTab === "test") {
-        renderTestView();
-      }
-    });
+function clearMaterialPreview() {
+  materialPreview.innerHTML = `
+    <div class="empty-state">Материалды ашыңыз</div>
+  `;
+}
 
-    materialsList.appendChild(row);
-  });
+function renderMaterialPreview() {
+  const item = getSelectedMaterial();
+
+  if (!item) {
+    materialPreview.innerHTML = `<div class="empty-state">Материалды таңдаңыз.</div>`;
+    return;
+  }
+
+  let previewInner = `<img src="${selectedSubject.coverImage}" alt="preview" />`;
+  const kind = getPreviewKindFromUrl(item.fileUrl);
+
+  if (item.fileUrl) {
+    if (kind === "pdf" || kind === "external") {
+      previewInner = `<iframe src="${item.fileUrl}" loading="lazy"></iframe>`;
+    } else if (kind === "image") {
+      previewInner = `<img src="${item.fileUrl}" alt="${escapeHtml(item.title)}" />`;
+    } else if (kind === "video") {
+      previewInner = `<video src="${item.fileUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#0a1020;border-radius:18px;"></video>`;
+    } else if (kind === "audio") {
+      previewInner = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;"><audio src="${item.fileUrl}" controls style="width:min(560px,100%);"></audio></div>`;
+    }
+  }
+
+  materialPreview.innerHTML = `
+    <div class="preview-box">
+      ${previewInner}
+    </div>
+
+    <div class="preview-type ${getBadgeClass(item.type)}">${item.typeLabel}</div>
+    <div class="preview-title">${escapeHtml(item.title)}</div>
+    <div class="preview-actions"></div>
+  `;
 }
 
 async function openPreviewFullscreen() {
@@ -671,97 +630,404 @@ async function openPreviewFullscreen() {
   }
 }
 
-function renderMaterialPreview() {
-  const list = getTypeMaterials();
-  const item = list.find(m => m.id === selectedMaterialId);
+function resetTestState() {
+  generatedQuestions = [];
+  currentTestSession = null;
+  isEditingTest = false;
+  updateActionButtonsState();
+}
 
-  if (!item) {
-    materialPreview.innerHTML = `<div class="empty-state">Материалды таңдаңыз.</div>`;
+function updateActionButtonsState() {
+  const material = getSelectedMaterial();
+  const isLecture = material?.type === "lecture";
+  const hasGeneratedTest = generatedQuestions.length > 0;
+  const hasSessionLink = !!currentTestSession?.form_url;
+  const hasResultsSheet =
+    !!currentTestSession?.results_sheet_url || !!material?.resultsSheetUrl;
+
+  generateTestBtn.disabled = !isLecture;
+  openQrBtn.disabled = !hasGeneratedTest || !hasSessionLink;
+  openResultsBtn.disabled = !hasResultsSheet;
+}
+
+function buildInlineQrUrl(value) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value || "Satbayev Edu Assistant")}`;
+}
+
+function renderTestBlock(showQrInline = false) {
+  const material = getSelectedMaterial();
+
+  if (!material) {
+    testInfoText.textContent = "";
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    showQrBtn.disabled = true;
+    updateActionButtonsState();
     return;
   }
 
-  let previewInner = `<img src="${selectedSubject.coverImage}" alt="preview" />`;
+  const isLecture = material.type === "lecture";
 
-  if (item.fileUrl) {
-    const isExternalUrl = /^https?:\/\//i.test(item.fileUrl);
+  if (!isLecture) {
+    testInfoText.textContent = "Тест тек дәріс үшін қолжетімді.";
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    showQrBtn.disabled = true;
+    updateActionButtonsState();
+    return;
+  }
 
-    if (isExternalUrl) {
-      previewInner = `<iframe src="${item.fileUrl}" loading="lazy"></iframe>`;
-    } else if (item.previewKind === "pdf") {
-      previewInner = `<iframe src="${item.fileUrl}" loading="lazy"></iframe>`;
-    } else if (item.previewKind === "image") {
-      previewInner = `<img src="${item.fileUrl}" alt="${item.title}" />`;
-    } else if (item.previewKind === "video") {
-      previewInner = `<video src="${item.fileUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#0a1020;border-radius:18px;"></video>`;
-    } else if (item.previewKind === "audio") {
-      previewInner = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;"><audio src="${item.fileUrl}" controls style="width:min(560px,100%);"></audio></div>`;
-    } else if (item.previewKind === "text") {
-      previewInner = `<div style="height:100%;overflow:auto;padding:18px;border-radius:18px;background:#0b1322;"><pre style="margin:0;white-space:pre-wrap;color:#eef2ff;font:13px/1.65 Consolas,monospace;">${escapeHtml(item.textContent || "Мәтінді оқу мүмкін болмады.")}</pre></div>`;
-    } else {
-      previewInner = `
-        <div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;">
-          <div>
-            <div style="font-size:64px;margin-bottom:10px;">${getFileIcon(item.fileName || item.title)}</div>
-            <div style="font-size:18px;font-weight:800;color:#fff;margin-bottom:8px;">${item.fileName || item.title}</div>
-            <div style="font-size:13px;color:#a9b7cb;margin-bottom:14px;">Бұл формат браузерде тікелей preview бермеуі мүмкін.</div>
-            <a href="${item.fileUrl}" download="${item.fileName || item.title}" class="action-btn primary" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">Файлды жүктеу</a>
+  if (!generatedQuestions.length) {
+    testInfoText.textContent = "";
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    showQrBtn.disabled = true;
+    updateActionButtonsState();
+    return;
+  }
+
+  testInfoText.textContent = `Тест дайын болды · ${generatedQuestions.length} сұрақ`;
+
+  const formUrl = currentTestSession?.form_url;
+
+  if (!formUrl) {
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    showQrBtn.disabled = true;
+    updateActionButtonsState();
+    return;
+  }
+
+  if (showQrInline) {
+    qrImageInline.src = buildInlineQrUrl(formUrl);
+    qrImageInline.style.display = "block";
+  } else {
+    qrImageInline.style.display = "none";
+  }
+
+  openTestDirectBtn.disabled = false;
+  showQrBtn.disabled = false;
+
+  updateActionButtonsState();
+}
+
+function convertGoogleSheetToEmbed(url) {
+  if (!url) return "";
+  if (url.includes("/pubhtml")) return url;
+  if (url.includes("/edit")) return url.replace("/edit", "/preview");
+  return url;
+}
+
+async function renderResultsBlock() {
+  const material = getSelectedMaterial();
+
+  if (!material) {
+    resultsInfoText.textContent = "Алдымен материал таңдаңыз.";
+    resultsSheetFrame.srcdoc = "";
+    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    updateActionButtonsState();
+    return;
+  }
+
+  resultsInfoText.textContent = "Тест нәтижелері жүктеліп жатыр...";
+  resultsSheetFrame.srcdoc = "";
+  openResultsSheetBtn.disabled = true;
+  updateActionButtonsState();
+
+  try {
+    const latestSession = await getLatestSessionForSelectedMaterial();
+
+    if (!latestSession) {
+      resultsInfoText.textContent = "Бұл материал үшін әлі тест сессиясы жоқ.";
+      resultsSheetFrame.srcdoc = "";
+      openResultsSheetBtn.disabled = true;
+      updateActionButtonsState();
+      return;
+    }
+
+    const sheetUrl = latestSession.results_sheet_url || "";
+    const responsesResponse = await fetch(`${API_BASE}/results/test-sessions/${latestSession.id}/responses/`);
+
+    if (!responsesResponse.ok) {
+      throw new Error(`Responses request failed: ${responsesResponse.status}`);
+    }
+
+    const data = await responsesResponse.json();
+    const responses = data.responses || [];
+
+    if (!responses.length) {
+      resultsInfoText.textContent = "Студент жауаптары әлі жоқ.";
+      resultsSheetFrame.srcdoc = `
+        <html>
+          <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h3>Нәтижелер әлі жоқ</h3>
+            <p>Студенттер бұл тестті әлі тапсырмаған.</p>
+          </body>
+        </html>
+      `;
+      openResultsSheetBtn.disabled = !sheetUrl;
+      updateActionButtonsState();
+      return;
+    }
+
+    const responseCardsHtml = responses.map((response, index) => {
+      const studentName = response.student_name || "Name not provided";
+      /*
+      const studentName = answers[0]?.textAnswers?.answers?.[0]?.value || "Аты көрсетілмеген";
+
+      const answerItemsHtml = answers.slice(1).map((answer, answerIndex) => {
+        const value = answer?.textAnswers?.answers?.[0]?.value || "Жауап жоқ";
+        return `<li><strong>${answerIndex + 1}-сұрақ:</strong> ${value}</li>`;
+      }).join("");
+
+      */
+      const answerItemsHtml = (response.answers || []).map((answer, answerIndex) => {
+        const questionLabel = answer?.question || `${answerIndex + 1}`;
+        const value = answer?.value || "Р–Р°СѓР°Рї Р¶РѕТ›";
+        return `<li><strong>${escapeHtml(questionLabel)}:</strong> ${escapeHtml(value)}</li>`;
+      }).join("");
+      response.lastSubmittedTime = response.submitted_at || response.lastSubmittedTime;
+
+      return `
+        <div style="border:1px solid #dbe4f0; border-radius:12px; padding:16px; margin-bottom:16px; background:#ffffff;">
+          <div style="font-size:18px; font-weight:700; margin-bottom:8px;">
+            ${index + 1}. ${escapeHtml(studentName)}
           </div>
-        </div>`;
+          <div style="font-size:13px; color:#667085; margin-bottom:12px;">
+            Жіберілген уақыты: ${new Date(response.lastSubmittedTime).toLocaleString()}
+          </div>
+          <ol style="padding-left:20px; margin:0;">
+            ${answerItemsHtml}
+          </ol>
+        </div>
+      `;
+    }).join("");
+
+    resultsInfoText.textContent = `Results: ${data.response_count || responses.length}`;
+    resultsSheetFrame.srcdoc = `
+      <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc;">
+          <h2 style="margin-top:0;">${escapeHtml(data.title)}</h2>
+          <div style="margin-bottom:16px; color:#475467;">
+            Барлық студент жауаптары
+          </div>
+          ${responseCardsHtml}
+        </body>
+      </html>
+    `;
+
+    openResultsSheetBtn.disabled = !sheetUrl;
+    updateActionButtonsState();
+  } catch (error) {
+    console.error("RESULTS LOAD ERROR:", error);
+    resultsInfoText.textContent = "Нәтижелерді жүктеу кезінде қате шықты.";
+    resultsSheetFrame.srcdoc = "";
+    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    updateActionButtonsState();
+  }
+}
+
+async function openResultsSheetDirect() {
+  const latestSession = await getLatestSessionForSelectedMaterial();
+  const sessionId = latestSession?.id;
+  const sheetUrl = latestSession?.results_sheet_url || "";
+
+  if (!sheetUrl) {
+    alert("Нәтижелер кестесінің сілтемесі әлі дайын емес.");
+    return;
+  }
+
+  if (sessionId) {
+    try {
+      const syncResponse = await fetch(`${API_BASE}/results/test-sessions/${sessionId}/responses/`);
+
+      if (!syncResponse.ok) {
+        throw new Error(`Results sync failed: ${syncResponse.status}`);
+      }
+
+      const syncData = await syncResponse.json();
+      currentTestSession = {
+        ...latestSession,
+        ...syncData,
+        id: sessionId
+      };
+    } catch (error) {
+      console.error("RESULTS SHEET SYNC ERROR:", error);
+      alert("Нәтижелерді жаңарту кезінде қате шықты.");
+      return;
     }
   }
 
-  materialPreview.innerHTML = `
-    <div class="preview-box">
-      ${previewInner}
-    </div>
-
-    <div class="preview-type ${getBadgeClass(item.type)}">${item.typeLabel}</div>
-    <div class="preview-title">${item.title}</div>
-
-    <div class="preview-actions">
-      <button class="action-btn" id="fullscreenPreviewBtn" type="button">Толық экран</button>
-      <button class="action-btn primary" id="createAiTestBtn" type="button">AI тест құру</button>
-    </div>
-  `;
-
-  document.getElementById("fullscreenPreviewBtn").addEventListener("click", openPreviewFullscreen);
-  document.getElementById("createAiTestBtn").addEventListener("click", () => {
-    switchSubjectTab("test");
-  });
+  window.open(sheetUrl, "_blank");
 }
 
-function renderMaterialsArea() {
-  renderTypeTabs();
-  renderMaterialsList();
-  renderMaterialPreview();
+async function renderResultsBlock() {
+  const material = getSelectedMaterial();
+
+  resultsSheetFrame.src = "about:blank";
+  resultsSheetFrame.srcdoc = "";
+
+  if (!material) {
+    resultsInfoText.textContent = "Алдымен материал таңдаңыз.";
+    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    updateActionButtonsState();
+    return;
+  }
+
+  resultsInfoText.textContent = "Тест нәтижелері жүктеліп жатыр...";
+  openResultsSheetBtn.disabled = true;
+  updateActionButtonsState();
+
+  try {
+    const latestSession = await getLatestSessionForSelectedMaterial();
+
+    if (!latestSession) {
+      resultsInfoText.textContent = "Бұл материал үшін әлі тест сессиясы жоқ.";
+      openResultsSheetBtn.disabled = true;
+      updateActionButtonsState();
+      return;
+    }
+
+    const sheetUrl = latestSession.results_sheet_url || "";
+    const responsesResponse = await fetch(`${API_BASE}/results/test-sessions/${latestSession.id}/responses/`);
+
+    if (!responsesResponse.ok) {
+      throw new Error(`Responses request failed: ${responsesResponse.status}`);
+    }
+
+    const data = await responsesResponse.json();
+    const responses = data.responses || [];
+
+    if (!responses.length) {
+      resultsInfoText.textContent = "Студент жауаптары әлі жоқ.";
+      resultsSheetFrame.srcdoc = `
+        <html>
+          <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h3>Нәтижелер әлі жоқ</h3>
+            <p>Студенттер бұл тестті әлі тапсырмаған.</p>
+          </body>
+        </html>
+      `;
+      openResultsSheetBtn.disabled = !sheetUrl;
+      updateActionButtonsState();
+      return;
+    }
+
+    const rowsHtml = responses.map((response, index) => {
+      const submittedAt = response.submitted_at
+        ? new Date(response.submitted_at).toLocaleString()
+        : "-";
+
+      return `
+        <tr>
+          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${index + 1}</td>
+          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${escapeHtml(response.student_name || "Аты көрсетілмеген")}</td>
+          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;font-weight:700;">${escapeHtml(response.score_label || "-")}</td>
+          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${escapeHtml(submittedAt)}</td>
+        </tr>
+      `;
+    }).join("");
+
+    resultsInfoText.textContent = `Табылды: ${data.response_count || responses.length} жауап`;
+    resultsSheetFrame.srcdoc = `
+      <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc; color:#0f172a;">
+          <h2 style="margin-top:0; margin-bottom:8px;">${escapeHtml(data.title)}</h2>
+          <table style="width:100%; border-collapse:collapse; background:#ffffff; border-radius:14px; overflow:hidden;">
+            <thead style="background:#e2e8f0; text-align:left;">
+              <tr>
+                <th style="padding:12px 14px;">#</th>
+                <th style="padding:12px 14px;">Аты-жөні</th>
+                <th style="padding:12px 14px;">Балл</th>
+                <th style="padding:12px 14px;">Уақыты</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    openResultsSheetBtn.disabled = !sheetUrl;
+    updateActionButtonsState();
+  } catch (error) {
+    console.error("RESULTS LOAD ERROR:", error);
+    resultsInfoText.textContent = "Нәтижелерді жүктеу кезінде қате шықты.";
+    resultsSheetFrame.src = "about:blank";
+    resultsSheetFrame.srcdoc = "";
+    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    updateActionButtonsState();
+  }
 }
 
-function resetTestState() {
-  generatedQuestions = [];
-  participantsData = [];
-  selectedReportId = null;
-  currentResultsInnerTab = "analytics";
-  isEditingReportTitle = false;
-  isEditingTest = false;
+async function openResultsSheetDirect() {
+  switchSubjectPanel("results");
 
-  testStatusPill.textContent = "Дайын емес";
-  testStatusPill.className = "pill";
+  const latestSession = await getLatestSessionForSelectedMaterial();
+  const sessionId = latestSession?.id;
+  const sheetUrl = latestSession?.results_sheet_url || "";
 
-  sessionStatusPill.textContent = "Белсенді емес";
-  sessionStatusPill.className = "pill";
+  if (!sheetUrl) {
+    alert("Нәтижелер кестесінің сілтемесі әлі дайын емес.");
+    return;
+  }
 
-  testEmptyBox.style.display = "flex";
-  sessionEmptyBox.style.display = "flex";
-  testReadyBox.classList.remove("show");
-  sessionReadyBox.classList.remove("show");
+  if (sessionId) {
+    try {
+      const syncResponse = await fetch(`${API_BASE}/results/test-sessions/${sessionId}/responses/`);
 
-  openJoinBtn.disabled = true;
-  startTestBtn.disabled = true;
-  openResultsFromTestBtn.style.display = "none";
+      if (!syncResponse.ok) {
+        throw new Error(`Results sync failed: ${syncResponse.status}`);
+      }
 
-  participantsList.classList.remove("show");
-  participantsList.innerHTML = "";
-  participantsCountLabel.textContent = "0 студент";
+      const syncData = await syncResponse.json();
+      currentTestSession = {
+        ...latestSession,
+        ...syncData,
+        id: sessionId
+      };
+    } catch (error) {
+      console.error("RESULTS SHEET SYNC ERROR:", error);
+      alert("Нәтижелерді жаңарту кезінде қате шықты.");
+      return;
+    }
+  }
+
+  resultsInfoText.textContent = "Google Sheet осы жерде ашылды.";
+  resultsSheetFrame.srcdoc = "";
+  resultsSheetFrame.src = convertGoogleSheetToEmbed(sheetUrl);
+  openResultsSheetBtn.disabled = false;
+  updateActionButtonsState();
+}
+
+function openTestDirect() {
+  if (!generatedQuestions.length) return;
+
+  const formUrl = currentTestSession?.form_url;
+
+  if (!formUrl) {
+    alert("Тест формасының сілтемесі әлі дайын емес.");
+    return;
+  }
+
+  window.open(formUrl, "_blank");
+}
+
+function showQr() {
+  if (!generatedQuestions.length) return;
+
+  const formUrl = currentTestSession?.form_url;
+
+  if (!formUrl) {
+    alert("QR үшін тест формасының сілтемесі әлі дайын емес.");
+    return;
+  }
+
+  qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(formUrl)}`;
+  qrCodeLabel.textContent = "Тестке қосылу";
+  openModal(qrModal);
 }
 
 function makeQuestion(index, topicTitle) {
@@ -788,20 +1054,20 @@ function makeQuestion(index, topicTitle) {
 }
 
 async function createAiQuestions() {
-  const currentMaterial =
-    selectedSubject?.materials.find(m => m.id === selectedMaterialId) ||
-    selectedSubject?.materials[0];
+  const currentMaterial = getSelectedMaterial();
 
-  const duration = Math.max(5, Math.min(120, Number(testDurationInput.value) || 15));
-  testDurationInput.value = duration;
-
-  if (currentMaterial?.type !== "lecture") {
-    alert("AI тест тек дәріс материалы бойынша жасалады.");
+  if (!currentMaterial) {
+    alert("Алдымен материал таңдаңыз.");
     return;
   }
 
-  testStatusPill.textContent = "AI тест жасалып жатыр...";
-  testStatusPill.className = "pill";
+  if (currentMaterial.type !== "lecture") {
+    alert("Тест жасау тек дәріс материалы бойынша қолжетімді.");
+    return;
+  }
+
+  generateTestBtn.disabled = true;
+  testInfoText.textContent = "AI тест жасалып жатыр...";
 
   try {
     const response = await fetch(`${API_BASE}/materials/${currentMaterial.id}/generate-test/`, {
@@ -812,10 +1078,11 @@ async function createAiQuestions() {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+      throw new Error(`AI test request failed: ${response.status}`);
     }
 
     const data = await response.json();
+
     generatedQuestions = data.test.map((item, index) => ({
       id: index + 1,
       question: item.question,
@@ -823,183 +1090,42 @@ async function createAiQuestions() {
       answer: ["A", "B", "C", "D"].indexOf(item.answer)
     }));
 
-    questionCountInput.value = generatedQuestions.length;
+    const sessionResponse = await fetch(`${API_BASE}/results/test-sessions/create-from-ai/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        material_id: currentMaterial.id,
+        questions: generatedQuestions.map((q) => ({
+          question: q.question,
+          options: q.options,
+          correct_answer: q.options[q.answer] || "",
+          correct_option_index: q.answer
+        }))
+      })
+    });
 
-    testStatusPill.textContent = "Тест дайын";
-    testStatusPill.className = "pill ready";
-    sessionStatusPill.textContent = "Белсенді емес";
-    sessionStatusPill.className = "pill";
+    if (!sessionResponse.ok) {
+      throw new Error(`Test session create failed: ${sessionResponse.status}`);
+    }
 
-    testEmptyBox.style.display = "none";
-    testReadyBox.classList.add("show");
-    sessionEmptyBox.style.display = "flex";
-    sessionReadyBox.classList.remove("show");
+    const sessionData = await sessionResponse.json();
+    currentTestSession = {
+      ...sessionData,
+      material: currentMaterial.id
+    };
 
-    readyQuestionsChip.textContent = `${generatedQuestions.length} сұрақ`;
-    readyDurationChip.textContent = `${duration} минут`;
-    readyTopicChip.textContent = currentMaterial.title;
-
-    openJoinBtn.disabled = false;
-    startTestBtn.disabled = true;
-    openResultsFromTestBtn.style.display = "none";
-
-    participantsData = [];
-    participantsList.innerHTML = "";
-    participantsList.classList.remove("show");
-    participantsCountLabel.textContent = "0 студент";
+    renderTestBlock(false);
+    switchSubjectPanel("test");
   } catch (error) {
     console.error("AI тест жасау қатесі:", error);
+    testInfoText.textContent = "AI тест жасау кезінде қате шықты.";
     alert("AI тест жасау кезінде қате шықты.");
-    testStatusPill.textContent = "Қате";
-    testStatusPill.className = "pill";
+  } finally {
+    generateTestBtn.disabled = false;
+    updateActionButtonsState();
   }
-}
-
-function renderTestView() {
-  updateTestGenerationAvailability();
-
-  if (!generatedQuestions.length) {
-    testEmptyBox.style.display = "flex";
-    testReadyBox.classList.remove("show");
-  }
-}
-
-function updateTestGenerationAvailability() {
-  const currentMaterial =
-    selectedSubject?.materials.find(m => m.id === selectedMaterialId) ||
-    selectedSubject?.materials[0];
-
-  const canGenerate = currentMaterial && currentMaterial.type === "lecture";
-
-  generateTestBtn.disabled = !canGenerate;
-
-  if (!canGenerate) {
-    generateTestBtn.title = "AI тест тек дәріс материалы бойынша жасалады";
-  } else {
-    generateTestBtn.title = "";
-  }
-}
-
-function makeParticipants() {
-  return [
-    { name: "Айдана Н.", group: "ИС-21-1" },
-    { name: "Еркебұлан С.", group: "ИС-21-1" },
-    { name: "Мирас К.", group: "ИС-21-2" },
-    { name: "Аружан Т.", group: "ИС-21-2" },
-    { name: "Нұрдәулет М.", group: "ИС-21-3" },
-    { name: "Диас А.", group: "ИС-21-3" }
-  ];
-}
-
-function renderSessionParticipants() {
-  participantsList.innerHTML = "";
-
-  participantsData.forEach(person => {
-    const item = document.createElement("div");
-    item.className = "participant-mini";
-    item.innerHTML = `
-      <div class="participant-mini-avatar">${getInitials(person.name)}</div>
-      <div class="participant-mini-name">${person.name}</div>
-    `;
-    participantsList.appendChild(item);
-  });
-
-  participantsCountLabel.textContent = `${participantsData.length} студент`;
-}
-
-function openJoinSession() {
-  if (!generatedQuestions.length) return;
-
-  participantsData = makeParticipants();
-
-  sessionStatusPill.textContent = "Қосылу ашық";
-  sessionStatusPill.className = "pill open";
-
-  testStatusPill.textContent = "Қосылу ашық";
-  testStatusPill.className = "pill open";
-
-  sessionEmptyBox.style.display = "none";
-  sessionReadyBox.classList.add("show");
-  renderSessionParticipants();
-
-  startTestBtn.disabled = false;
-}
-
-function buildGeneratedReport() {
-  const currentMaterial = selectedSubject?.materials.find(m => m.id === selectedMaterialId) || selectedSubject?.materials[0];
-  const questionCount = generatedQuestions.length;
-  const duration = Number(testDurationInput.value) || 15;
-
-  const results = [
-    { name: "Айдана Н.", group: "ИС-21-1", score: questionCount - 1, maxScore: questionCount, percent: Math.round(((questionCount - 1) / questionCount) * 100) },
-    { name: "Еркебұлан С.", group: "ИС-21-1", score: questionCount - 4, maxScore: questionCount, percent: Math.round(((questionCount - 4) / questionCount) * 100) },
-    { name: "Мирас К.", group: "ИС-21-2", score: questionCount - 3, maxScore: questionCount, percent: Math.round(((questionCount - 3) / questionCount) * 100) },
-    { name: "Аружан Т.", group: "ИС-21-2", score: questionCount - 6, maxScore: questionCount, percent: Math.round(((questionCount - 6) / questionCount) * 100) },
-    { name: "Нұрдәулет М.", group: "ИС-21-3", score: questionCount - 5, maxScore: questionCount, percent: Math.round(((questionCount - 5) / questionCount) * 100) },
-    { name: "Диас А.", group: "ИС-21-3", score: questionCount - 5, maxScore: questionCount, percent: Math.round(((questionCount - 5) / questionCount) * 100) }
-  ];
-
-  const percents = results.map(item => item.percent);
-
-  const analytics = generatedQuestions.map((q, i) => {
-    const correctPercent = Math.max(45, 84 - i * 2);
-    return {
-      questionId: i + 1,
-      question: q.question,
-      correctAnswer: q.options[q.answer],
-      correctPercent,
-      wrongPercent: 100 - correctPercent
-    };
-  });
-
-  const hardest = analytics.reduce((min, item) =>
-    item.correctPercent < min.correctPercent ? item : min
-  , analytics[0]);
-
-  return {
-    id: Date.now(),
-    title: `${selectedSubject.title} → ${currentMaterial.typeLabel === "Дәріс" ? "Дәріс 1" : currentMaterial.typeLabel + " 1"}`,
-    discipline: selectedSubject.title,
-    lessonLabel: currentMaterial.typeLabel === "Дәріс" ? "Дәріс 1" : currentMaterial.typeLabel + " 1",
-    participantCount: results.length,
-    averageScore: Math.round(percents.reduce((a, b) => a + b, 0) / percents.length),
-    highestScore: Math.max(...percents),
-    lowestScore: Math.min(...percents),
-    questionCount,
-    duration,
-    results,
-    questions: generatedQuestions.map((q, i) => ({
-      id: i + 1,
-      question: q.question,
-      options: q.options,
-      answer: q.answer
-    })),
-    analytics,
-    hardest
-  };
-}
-
-function startTestSession() {
-  if (!generatedQuestions.length || !participantsData.length) return;
-
-  sessionStatusPill.textContent = "Тест жүріп жатыр";
-  sessionStatusPill.className = "pill live";
-
-  testStatusPill.textContent = "Тест жүріп жатыр";
-  testStatusPill.className = "pill live";
-
-  setTimeout(() => {
-    const report = buildGeneratedReport();
-    reportsData.unshift(report);
-
-    sessionStatusPill.textContent = "Аяқталды";
-    sessionStatusPill.className = "pill done";
-
-    testStatusPill.textContent = "Тест аяқталды";
-    testStatusPill.className = "pill done";
-
-    openResultsFromTestBtn.style.display = "inline-flex";
-  }, 4000);
 }
 
 function renderQuestionModal(editMode = false) {
@@ -1017,11 +1143,11 @@ function renderQuestionModal(editMode = false) {
     if (editMode) {
       card.innerHTML = `
         <h4>${qIndex + 1}-сұрақ</h4>
-        <textarea class="edit-textarea" data-question-index="${qIndex}">${q.question}</textarea>
+        <textarea class="edit-textarea" data-question-index="${qIndex}">${escapeHtml(q.question)}</textarea>
         ${q.options.map((option, oIndex) => `
           <div class="edit-option-row">
             <div class="edit-letter">${String.fromCharCode(65 + oIndex)}</div>
-            <input class="edit-input" data-question-index="${qIndex}" data-option-index="${oIndex}" value="${option.replace(/"/g, "&quot;")}" />
+            <input class="edit-input" data-question-index="${qIndex}" data-option-index="${oIndex}" value="${escapeHtml(option)}" />
             <label class="correct-radio-wrap">
               <input type="radio" name="correct-${qIndex}" value="${oIndex}" ${q.answer === oIndex ? "checked" : ""} />
             </label>
@@ -1031,7 +1157,7 @@ function renderQuestionModal(editMode = false) {
     } else {
       card.innerHTML = `
         <h4>${qIndex + 1}-сұрақ</h4>
-        <div style="color:#fff;line-height:1.6;margin-bottom:12px;">${q.question}</div>
+        <div style="color:#fff;line-height:1.6;margin-bottom:12px;">${escapeHtml(q.question)}</div>
         <div style="display:grid;gap:8px;">
           ${q.options.map((option, oIndex) => `
             <div style="
@@ -1053,7 +1179,7 @@ function renderQuestionModal(editMode = false) {
                 display:flex;align-items:center;justify-content:center;
                 font-size:11px;font-weight:800;flex-shrink:0;
               ">${String.fromCharCode(65 + oIndex)}</div>
-              <div>${option}</div>
+              <div>${escapeHtml(option)}</div>
             </div>
           `).join("")}
         </div>
@@ -1084,222 +1210,6 @@ function saveEditedQuestions() {
   renderQuestionModal(false);
 }
 
-function showQr() {
-  qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`Satbayev Edu Assistant | ${selectedSubject?.title || "Пән"}`)}`;
-  qrCodeLabel.textContent = "Тестке қосылу";
-  openModal(qrModal);
-}
-
-async function loadReportsForSubject() {
-  if (!selectedSubject) {
-    reportsData = [];
-    return;
-  }
-
-  try {
-    const results = await fetchJSON(`${API_BASE}/results/?discipline_id=${selectedSubject.id}`);
-
-    reportsData = results.map(item => ({
-      id: item.id,
-      title: item.title,
-      discipline: item.discipline_title,
-      lessonLabel: "Тест нәтижесі",
-      participantCount: item.participant_count,
-      averageScore: item.average_score,
-      highestScore: item.highest_score,
-      lowestScore: 0,
-      questionCount: 0,
-      duration: 0,
-      results: [],
-      questions: [],
-      analytics: [],
-      hardest: {
-        question: "Әзірге жоқ",
-        correctPercent: 0
-      }
-    }));
-  } catch (error) {
-    console.error("Нәтижелерді жүктеу қатесі:", error);
-    reportsData = [];
-  }
-}
-
-function renderResultsList() {
-  reportsCountPill.textContent = `${reportsData.length} репорт`;
-  reportListWrap.innerHTML = "";
-
-  resultsListCard.classList.remove("hidden");
-  reportDetailCard.classList.add("hidden");
-  reportDeleteBar.classList.remove("show");
-  reportActionsMenu.classList.remove("show");
-
-  reportsData.forEach(report => {
-    const row = document.createElement("div");
-    row.className = "report-row";
-    row.innerHTML = `<div class="report-row-title">${report.title}</div>`;
-    row.addEventListener("click", () => openReportDetail(report.id));
-    reportListWrap.appendChild(row);
-  });
-
-  if (!reportsData.length) {
-    reportListWrap.innerHTML = `<div class="empty-state">Әзірге репорттар жоқ.</div>`;
-  }
-}
-
-function openReportDetail(reportId) {
-  selectedReportId = reportId;
-  currentResultsInnerTab = "analytics";
-  isEditingReportTitle = false;
-  renderReportDetail();
-}
-
-function getSelectedReport() {
-  return reportsData.find(item => item.id === selectedReportId) || null;
-}
-
-function renderReportDetail() {
-  const report = getSelectedReport();
-  if (!report) return;
-
-  resultsListCard.classList.add("hidden");
-  reportDetailCard.classList.remove("hidden");
-    reportActionsMenu.classList.remove("show");
-  reportDeleteBar.classList.remove("show");
-
-  reportDetailTitle.style.display = isEditingReportTitle ? "none" : "block";
-  reportTitleInput.style.display = isEditingReportTitle ? "block" : "none";
-
-  reportDetailTitle.textContent = report.title;
-  reportTitleInput.value = report.title;
-  reportDetailSub.textContent = `${report.discipline} • ${report.lessonLabel} • ${report.participantCount} студент`;
-
-  resultsTabButtons.forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.resultsTab === currentResultsInnerTab);
-  });
-
-  analyticsResultsPane.classList.toggle("active", currentResultsInnerTab === "analytics");
-  participantsResultsPane.classList.toggle("active", currentResultsInnerTab === "participants");
-  questionsResultsPane.classList.toggle("active", currentResultsInnerTab === "questions");
-
-  renderAnalytics(report);
-  renderParticipants(report);
-  renderQuestions(report);
-}
-
-function renderAnalytics(report) {
-  analyticsCard.innerHTML = `
-    <div class="ring-wrap">
-      <div class="result-ring" style="--score:${report.averageScore}">
-        <div class="result-ring-value">${report.averageScore}%</div>
-      </div>
-      <div class="ring-caption">орташа нәтиже</div>
-    </div>
-  `;
-
-  statsCard.innerHTML = `
-    <div class="stats-card-title">Қысқаша статистика</div>
-    <div class="stats-grid">
-      <div class="stats-mini"><span>Қатысушылар</span><strong>${report.participantCount}</strong></div>
-      <div class="stats-mini"><span>Сұрақтар</span><strong>${report.questionCount}</strong></div>
-      <div class="stats-mini"><span>Уақыт</span><strong>${report.duration} мин</strong></div>
-      <div class="stats-mini"><span>Ең жоғары</span><strong>${report.highestScore}%</strong></div>
-    </div>
-  `;
-
-  hardestCard.innerHTML = `
-    <div class="hardest-card-title">Ең қиын сұрақ</div>
-    <div class="hardest-question">${report.hardest.question}</div>
-    <div class="hardest-meta">${report.lessonLabel} бойынша дұрыс жауап беру көрсеткіші ${report.hardest.correctPercent}%.</div>
-  `;
-}
-
-function renderParticipants(report) {
-  participantsLines.innerHTML = "";
-
-  report.results.forEach((item, index) => {
-    const row = document.createElement("div");
-    row.className = "participant-line";
-    row.innerHTML = `
-      <div class="participant-line-name">${item.name}</div>
-      <div class="participant-line-right">
-        <span>${item.group}</span>
-        <span>${item.score}/${item.maxScore}</span>
-        <span>${item.percent}%</span>
-      </div>
-    `;
-    row.addEventListener("click", () => openPlayerDetail(report.id, index));
-    participantsLines.appendChild(row);
-  });
-}
-
-function renderQuestions(report) {
-  questionsListWrap.innerHTML = "";
-
-  report.analytics.forEach((item, index) => {
-    const card = document.createElement("div");
-    card.className = "question-card";
-    card.innerHTML = `
-      <div class="question-top">
-        <div>
-          <div class="question-name">${index + 1}-сұрақ</div>
-          <div class="question-meta">
-            <span>Дұрыс ${item.correctPercent}%</span>
-            <span>Қате ${item.wrongPercent}%</span>
-          </div>
-        </div>
-      </div>
-
-      <div style="font-size:14px;color:#edf2f9;line-height:1.65;margin-bottom:12px;">
-        ${item.question}
-      </div>
-
-      <div class="progress-line">
-        <span>Дұрыс</span>
-        <div class="progress-track"><div class="progress-fill" style="width:${item.correctPercent}%"></div></div>
-        <strong>${item.correctPercent}%</strong>
-      </div>
-
-      <div class="progress-line wrong">
-        <span>Қате</span>
-        <div class="progress-track"><div class="progress-fill" style="width:${item.wrongPercent}%"></div></div>
-        <strong>${item.wrongPercent}%</strong>
-      </div>
-
-      <div class="correct-answer">Дұрыс жауап: ${item.correctAnswer}</div>
-    `;
-    questionsListWrap.appendChild(card);
-  });
-}
-
-function openPlayerDetail(reportId, playerIndex) {
-  const report = reportsData.find(item => item.id === reportId);
-  if (!report) return;
-  const player = report.results[playerIndex];
-  if (!player) return;
-
-  playerDetailTitle.textContent = player.name;
-  playerDetailMeta.innerHTML = `
-    <span>${player.group}</span>
-    <span>${player.score}/${player.maxScore}</span>
-    <span>${player.percent}%</span>
-  `;
-
-  playerAnswerList.innerHTML = report.questions.map((question, i) => {
-    const correct = ((playerIndex + i + 1) % 3 !== 0);
-    return `
-      <div class="player-answer-card ${correct ? "correct" : "wrong"}">
-        <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:8px;">${i + 1}-сұрақ</div>
-        <div style="font-size:14px;line-height:1.65;color:#edf2f9;margin-bottom:8px;">${question.question}</div>
-        <div style="font-size:13px;color:${correct ? "#c6fff3" : "#ffd2ef"};font-weight:700;">
-          ${correct ? "Жауабы дұрыс" : "Жауабы қате"}
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  openModal(playerDetailModal);
-}
-
 function setVoiceState(state, text) {
   voiceCore.classList.remove("listening");
   if (state === "listening") {
@@ -1308,177 +1218,15 @@ function setVoiceState(state, text) {
   voiceStatus.textContent = text;
 }
 
-function processVoiceCommand(text) {
-  const query = text.toLowerCase();
+function normalizeVoiceText(text) {
+  if (!text) return "";
 
-  if (!selectedSubject) {
-    const found = subjects.find(item => query.includes(item.title.toLowerCase()));
-    if (found) {
-      openSubject(found);
-      return;
-    }
-
-    return;
-  }
-
-  if (query.includes("артқа")) {
-    showHome();
-    return;
-  }
-
-  if (query.includes("материал")) {
-    switchSubjectTab("materials");
-    return;
-  }
-
-  if (
-    query.includes("тест жаса") ||
-    query.includes("тест құр") ||
-    query.includes("ai тест жаса") ||
-    query.includes("осы материал бойынша тест жаса")
-  ) {
-    switchSubjectTab("test");
-    createAiQuestions();
-    return;
-  }
-
-  if (query.includes("тест")) {
-    switchSubjectTab("test");
-    return;
-  }
-
-  if (query.includes("нәтиже")) {
-    switchSubjectTab("results");
-    return;
-  }
-
-  if (
-    query.includes("қосылуды аш") ||
-    query.includes("қосылу аш") ||
-    query.includes("qr көрсет") ||
-    query.includes("qr аш")
-  ) {
-    switchSubjectTab("test");
-    openJoinSession();
-
-    if (query.includes("qr")) {
-      showQr();
-    }
-    return;
-  }
-
-  if (
-    query.includes("тестті баста") ||
-    query.includes("тесті баста")
-  ) {
-    switchSubjectTab("test");
-    startTestSession();
-    return;
-  }
-
-  if (query.includes("дәріс")) activeType = "lecture";
-  else if (query.includes("практикалық")) activeType = "practice";
-  else if (query.includes("зертханалық")) activeType = "lab";
-  else if (query.includes("сөж")) activeType = "self";
-  else if (query.includes("силлабус")) activeType = "syllabus";
-
-  const list = getTypeMaterials();
-  if (list.length) selectedMaterialId = list[0].id;
-  renderMaterialsArea();
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[!?.,;:]/g, "")
+    .replace(/\s+/g, " ");
 }
-
-async function toggleListening(event) {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  console.log("MIC BUTTON CLICKED");
-  voicePanel.classList.add("show");
-
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.onstart = () => {
-      console.log("AUDIO RECORDING STARTED");
-      setVoiceState("listening", "Тыңдап тұр...");
-    };
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        recordedChunks.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      console.log("AUDIO RECORDING STOPPED");
-      console.log("MEDIARECORDER ONSTOP FIRED");
-      console.log("ABOUT TO SEND AUDIO");
-      console.log("RECORDED CHUNKS:", recordedChunks.length);
-
-      const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
-
-      try {
-        setVoiceState("idle", "Дауысты мәтінге айналдырып жатырмын...");
-        const data = await sendAudioToAssistant(audioBlob);
-        console.log("TRANSCRIBE RESPONSE:", data);
-        setVoiceState("idle", `Түсінді: ${data.text}`);
-
-        if (!data.text) {
-          return;
-        }
-
-        const normalizedText = normalizeVoiceText(data.text);
-        console.log("NORMALIZED TEXT:", normalizedText);
-
-        const assistantData = await sendTextToAssistant(normalizedText);
-        console.log("ASSISTANT RESPONSE:", assistantData);
-        setVoiceState("speaking", assistantData.reply || data.text);
-        speakAssistantReply(assistantData.reply || data.text);
-
-        if (assistantData.action === "open_test") {
-          switchSubjectTab("test");
-        }
-
-        if (assistantData.action === "open_materials") {
-          switchSubjectTab("materials");
-        }
-
-        if (assistantData.action === "open_results") {
-          switchSubjectTab("results");
-        }
-
-        if (assistantData.action === "generate_test") {
-          await createAiQuestions();
-        }
-
-      } catch (error) {
-        console.error("TRANSCRIBE ERROR:", error);
-        setVoiceState("idle", "Дауыстық көмекшіге сұрау жіберу кезінде қате шықты.");
-        speakAssistantReply("Кешіріңіз, қазір сұрауды өңдей алмадым.");
-      }
-
-      stream.getTracks().forEach(track => track.stop());
-    };
-
-    mediaRecorder.start();
-  } catch (error) {
-    console.error("MIC ACCESS ERROR:", error);
-    setVoiceState("idle", "Микрофонға рұқсат берілмеді.");
-  }
-}
-
-let mediaRecorder = null;
-let recordedChunks = [];
-
 
 async function sendAudioToAssistant(audioBlob) {
   const formData = new FormData();
@@ -1494,16 +1242,6 @@ async function sendAudioToAssistant(audioBlob) {
   }
 
   return response.json();
-}
-
-function normalizeVoiceText(text) {
-  if (!text) return "";
-
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[!?.,;:]/g, "")
-    .replace(/\s+/g, " ");
 }
 
 async function sendTextToAssistant(text) {
@@ -1524,7 +1262,6 @@ async function sendTextToAssistant(text) {
 
 function speakAssistantReply(text) {
   if (!text || !("speechSynthesis" in window)) {
-    console.log("Speech synthesis not supported or empty text");
     return;
   }
 
@@ -1533,8 +1270,6 @@ function speakAssistantReply(text) {
 
   const utterance = new SpeechSynthesisUtterance(text);
   const voices = synth.getVoices();
-
-  console.log("AVAILABLE VOICES:", voices.map(v => `${v.name} | ${v.lang}`));
 
   const preferredVoice =
     voices.find(v => v.lang === "ru-RU") ||
@@ -1553,11 +1288,128 @@ function speakAssistantReply(text) {
   utterance.pitch = 1;
   utterance.volume = 1;
 
-  utterance.onstart = () => console.log("VOICE PLAYBACK STARTED");
-  utterance.onend = () => console.log("VOICE PLAYBACK ENDED");
-  utterance.onerror = (e) => console.error("VOICE PLAYBACK ERROR:", e);
-
   synth.speak(utterance);
+}
+
+async function handleAssistantAction(assistantData) {
+  if (!assistantData) return;
+
+  if (assistantData.action === "open_materials") {
+    switchSubjectPanel("materials");
+    return;
+  }
+
+  if (assistantData.action === "open_test") {
+    switchSubjectPanel("test");
+    return;
+  }
+
+  if (assistantData.action === "open_results") {
+    switchSubjectPanel("results");
+    return;
+  }
+
+  if (assistantData.action === "generate_test") {
+    switchSubjectPanel("test");
+    await createAiQuestions();
+    return;
+  }
+
+  if (assistantData.action === "open_course") {
+    if (assistantData.course_number) {
+      await openCourseDisciplines(Number(assistantData.course_number));
+    }
+    return;
+  }
+
+  if (assistantData.action === "open_qr") {
+    switchSubjectPanel("test");
+    if (!generatedQuestions.length) {
+      await createAiQuestions();
+    }
+    if (generatedQuestions.length) {
+      showQr();
+    }
+    return;
+  }
+
+  if (assistantData.action === "start_test") {
+    switchSubjectPanel("test");
+    if (!generatedQuestions.length) {
+      await createAiQuestions();
+    }
+    if (generatedQuestions.length) {
+      openTestDirect();
+    }
+    return;
+  }
+
+  if (assistantData.action === "go_back") {
+    showHome();
+    return;
+  }
+}
+
+async function toggleListening(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  voicePanel.classList.add("show");
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.onstart = () => {
+      setVoiceState("listening", "Тыңдап тұр...");
+    };
+
+    mediaRecorder.ondataavailable = (eventData) => {
+      if (eventData.data.size > 0) {
+        recordedChunks.push(eventData.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
+
+      try {
+        setVoiceState("idle", "Дауысты мәтінге айналдырып жатырмын...");
+        const data = await sendAudioToAssistant(audioBlob);
+        setVoiceState("idle", `Түсінді: ${data.text}`);
+
+        if (!data.text) return;
+
+        const normalizedText = normalizeVoiceText(data.text);
+        const assistantData = await sendTextToAssistant(normalizedText);
+
+        setVoiceState("speaking", assistantData.reply || data.text);
+        speakAssistantReply(assistantData.reply || data.text);
+
+        await handleAssistantAction(assistantData);
+      } catch (error) {
+        console.error("TRANSCRIBE ERROR:", error);
+        setVoiceState("idle", "Дауыстық көмекшіге сұрау жіберу кезінде қате шықты.");
+        speakAssistantReply("Кешіріңіз, қазір сұрауды өңдей алмадым.");
+      }
+
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorder.start();
+  } catch (error) {
+    console.error("MIC ACCESS ERROR:", error);
+    setVoiceState("idle", "Микрофонға рұқсат берілмеді.");
+  }
 }
 
 async function handleAssistantCommand(transcript) {
@@ -1577,7 +1429,6 @@ async function handleAssistantCommand(transcript) {
     }
 
     const data = await response.json();
-    console.log("ASSISTANT RESPONSE:", data);
 
     if (data.reply) {
       setVoiceState("idle", data.reply);
@@ -1590,44 +1441,7 @@ async function handleAssistantCommand(transcript) {
       }
     }
 
-    if (data.action === "open_materials") {
-      switchSubjectTab("materials");
-      return;
-    }
-
-    if (data.action === "open_test") {
-      switchSubjectTab("test");
-      return;
-    }
-
-    if (data.action === "open_results") {
-      switchSubjectTab("results");
-      return;
-    }
-
-    if (data.action === "generate_test") {
-      switchSubjectTab("test");
-      await createAiQuestions();
-      return;
-    }
-
-    if (data.action === "open_qr") {
-      switchSubjectTab("test");
-      openJoinSession();
-      showQr();
-      return;
-    }
-
-    if (data.action === "start_test") {
-      switchSubjectTab("test");
-      startTestSession();
-      return;
-    }
-
-    if (data.action === "go_back") {
-      showHome();
-      return;
-    }
+    await handleAssistantAction(data);
   } catch (error) {
     console.error("Assistant command error:", error);
     setVoiceState("idle", "Ассистент командасын өңдеу кезінде қате шықты.");
@@ -1648,19 +1462,16 @@ function initSpeechRecognition() {
   recognition.maxAlternatives = 1;
 
   recognition.onstart = () => {
-    console.log("RECOGNITION STARTED");
     isListening = true;
     setVoiceState("listening", "Тыңдап тұр...");
   };
 
   recognition.onerror = (event) => {
-    console.log("RECOGNITION ERROR:", event.error);
     isListening = false;
     setVoiceState("idle", `Қате: ${event.error}`);
   };
 
   recognition.onend = () => {
-    console.log("RECOGNITION ENDED");
     isListening = false;
     if (!voiceCore.classList.contains("listening")) {
       setVoiceState("idle", "Дайын");
@@ -1669,7 +1480,6 @@ function initSpeechRecognition() {
 
   recognition.onresult = async (event) => {
     const transcript = event.results[0][0].transcript;
-    console.log("VOICE TRANSCRIPT:", transcript);
     setVoiceState("idle", `Түсінді: ${transcript}`);
     await handleAssistantCommand(transcript);
   };
@@ -1716,13 +1526,6 @@ if (courseBackBtn) {
   courseBackBtn.addEventListener("click", showCourseStage);
 }
 
-tabButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    if (!selectedSubject) return;
-    switchSubjectTab(btn.dataset.tab);
-  });
-});
-
 if (backBtn) {
   backBtn.addEventListener("click", () => {
     subjectView.classList.add("hidden");
@@ -1752,33 +1555,69 @@ if (coverFileInput) {
   });
 }
 
-if (uploadFolderBtn) {
-  uploadFolderBtn.addEventListener("click", () => {
-    if (!selectedSubject) {
-      alert("Алдымен пәнді ашыңыз.");
-      return;
-    }
-    folderInput.click();
+if (materialTypeSelect) {
+  materialTypeSelect.addEventListener("change", () => {
+    activeType = materialTypeSelect.value;
+    selectedMaterialId = null;
+    populateTopicSelect();
+    resetTestState();
+    clearMaterialPreview();
+    renderTestBlock();
+    renderResultsBlock();
   });
 }
 
-if (folderInput) {
-  folderInput.addEventListener("change", async (e) => {
-    await handleFolderUpload(e.target.files);
-    e.target.value = "";
+if (topicSelect) {
+  topicSelect.addEventListener("change", () => {
+    selectedMaterialId = Number(topicSelect.value);
+    resetTestState();
+    clearMaterialPreview();
+    renderTestBlock();
+    renderResultsBlock();
   });
 }
 
-if (generateTestBtn) generateTestBtn.addEventListener("click", createAiQuestions);
-if (regenerateBtn) regenerateBtn.addEventListener("click", createAiQuestions);
-if (openJoinBtn) openJoinBtn.addEventListener("click", openJoinSession);
-if (startTestBtn) startTestBtn.addEventListener("click", startTestSession);
-
-if (viewTestBtn) {
-  viewTestBtn.addEventListener("click", () => {
-    renderQuestionModal(false);
-    openModal(testModal);
+if (openMaterialBtn) {
+  openMaterialBtn.addEventListener("click", () => {
+    renderMaterialPreview();
+    switchSubjectPanel("materials");
   });
+}
+
+if (generateTestBtn) {
+  generateTestBtn.addEventListener("click", createAiQuestions);
+}
+
+if (openQrBtn) {
+  openQrBtn.addEventListener("click", () => {
+    if (!generatedQuestions.length) return;
+
+    renderTestBlock(true);
+    switchSubjectPanel("test");
+  });
+}
+
+if (openResultsBtn) {
+  openResultsBtn.addEventListener("click", async () => {
+    switchSubjectPanel("results");
+    await renderResultsBlock();
+  });
+}
+
+if (openMaterialFullscreenBtn) {
+  openMaterialFullscreenBtn.addEventListener("click", openPreviewFullscreen);
+}
+
+if (openTestDirectBtn) {
+  openTestDirectBtn.addEventListener("click", openTestDirect);
+}
+
+if (showQrBtn) {
+  showQrBtn.addEventListener("click", showQr);
+}
+
+if (openResultsSheetBtn) {
+  openResultsSheetBtn.addEventListener("click", openResultsSheetDirect);
 }
 
 if (editTestBtn) {
@@ -1789,107 +1628,6 @@ if (editTestBtn) {
 
 if (saveTestBtn) {
   saveTestBtn.addEventListener("click", saveEditedQuestions);
-}
-
-if (participantsToggleBtn) {
-  participantsToggleBtn.addEventListener("click", () => {
-    participantsList.classList.toggle("show");
-  });
-}
-
-if (showQrBtn) showQrBtn.addEventListener("click", showQr);
-
-if (openResultsFromTestBtn) {
-  openResultsFromTestBtn.addEventListener("click", () => {
-    switchSubjectTab("results");
-  });
-}
-
-resultsTabButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    currentResultsInnerTab = btn.dataset.resultsTab;
-    renderReportDetail();
-  });
-});
-
-if (renameReportBtn) {
-  renameReportBtn.addEventListener("click", () => {
-    const report = getSelectedReport();
-    if (!report) return;
-
-    if (!isEditingReportTitle) {
-      isEditingReportTitle = true;
-      renderReportDetail();
-      reportTitleInput.focus();
-      reportTitleInput.select();
-    } else {
-      const value = reportTitleInput.value.trim();
-      if (value) report.title = value;
-      isEditingReportTitle = false;
-      renderReportDetail();
-      renderResultsList();
-    }
-  });
-}
-
-if (reportTitleInput) {
-  reportTitleInput.addEventListener("keydown", (e) => {
-    const report = getSelectedReport();
-    if (!report) return;
-
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const value = reportTitleInput.value.trim();
-      if (value) report.title = value;
-      isEditingReportTitle = false;
-      renderReportDetail();
-      renderResultsList();
-    }
-
-    if (e.key === "Escape") {
-      e.preventDefault();
-      isEditingReportTitle = false;
-      renderReportDetail();
-    }
-  });
-}
-
-if (reportMenuBtn) {
-  reportMenuBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    reportActionsMenu.classList.toggle("show");
-  });
-}
-
-if (deleteReportBtn) {
-  deleteReportBtn.addEventListener("click", () => {
-    reportActionsMenu.classList.remove("show");
-    reportDeleteBar.classList.add("show");
-  });
-}
-
-if (cancelDeleteReportBtn) {
-  cancelDeleteReportBtn.addEventListener("click", () => {
-    reportDeleteBar.classList.remove("show");
-  });
-}
-
-if (confirmDeleteReportBtn) {
-  confirmDeleteReportBtn.addEventListener("click", () => {
-    const report = getSelectedReport();
-    if (!report) return;
-    reportsData = reportsData.filter(item => item.id !== report.id);
-    selectedReportId = null;
-    reportDeleteBar.classList.remove("show");
-    renderResultsList();
-  });
-}
-
-if (closeReportBtn) {
-  closeReportBtn.addEventListener("click", () => {
-    selectedReportId = null;
-    renderResultsList();
-  });
 }
 
 if (openVoiceBtn) {
@@ -1961,10 +1699,6 @@ document.addEventListener("click", (e) => {
   const voiceAssistant = document.querySelector(".voice-assistant");
   if (voiceAssistant && !voiceAssistant.contains(e.target)) {
     voicePanel.classList.remove("show");
-  }
-
-  if (reportActionsMenu && reportMenuBtn && !reportActionsMenu.contains(e.target) && e.target !== reportMenuBtn) {
-    reportActionsMenu.classList.remove("show");
   }
 });
 

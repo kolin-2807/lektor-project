@@ -20,6 +20,8 @@ class Material(models.Model):
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
     cloud_url = models.URLField()
     description = models.TextField(blank=True)
+    form_url = models.URLField(blank=True)
+    results_sheet_url = models.URLField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

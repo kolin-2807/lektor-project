@@ -16,4 +16,6 @@ class MaterialSerializer(serializers.ModelSerializer):
             "created_at",
             "discipline",
             "discipline_title",
+            "form_url",
+            "results_sheet_url",
         ]

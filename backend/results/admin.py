@@ -1,9 +1,15 @@
 from django.contrib import admin
-from .models import Result
+from .models import Result, TestSession
 
 
 @admin.register(Result)
 class ResultAdmin(admin.ModelAdmin):
     list_display = ("id", "title", "discipline", "average_score", "participant_count", "highest_score", "created_at")
     list_filter = ("discipline", "created_at")
+    search_fields = ("title",)
+
+
+@admin.register(TestSession)
+class TestSessionAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "material", "form_url", "results_sheet_url", "created_at")
     search_fields = ("title",)
