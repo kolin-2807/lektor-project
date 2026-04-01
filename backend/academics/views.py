@@ -19,5 +19,9 @@ def discipline_list(request):
     if course_id:
         queryset = queryset.filter(course_id=course_id)
 
+    language = request.GET.get("language")
+    if language in {"kaz", "rus"}:
+        queryset = queryset.filter(language=language)
+
     serializer = DisciplineSerializer(queryset, many=True)
     return Response(serializer.data)
