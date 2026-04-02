@@ -3,11 +3,13 @@ from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from googleapiclient.errors import HttpError
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
 from materials.models import Material
+from users.models import resolve_google_drive_connection
 
 from .google_forms_service import (
     add_questions_to_form,
@@ -18,6 +20,25 @@ from .google_forms_service import (
 from .google_sheets_service import create_results_sheet, extract_spreadsheet_id, sync_sheet_data
 from .models import Result, TestAttempt, TestSession
 from .serializers import ResultSerializer, TestSessionSerializer
+
+
+def _format_google_error(exc, fallback_message: str) -> str:
+    if not isinstance(exc, HttpError):
+        return str(exc) or fallback_message
+
+    error_text = str(exc)
+
+    if "ACCESS_TOKEN_SCOPE_INSUFFICIENT" in error_text or "insufficient authentication scopes" in error_text.lower():
+        return (
+            "Google рұқсаттары жеткіліксіз. Google Drive-ты қайта қосып, жаңа рұқсаттарды растаңыз."
+        )
+
+    return error_text or fallback_message
+
+
+def _get_session_google_connection(request, material: Material | None = None):
+    owner_email = material.owner_email if material else ""
+    return resolve_google_drive_connection(request, owner_email=owner_email)
 
 
 def _normalize_student_identifier(name: str) -> str:
@@ -363,18 +384,25 @@ class TestSessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        connection = _get_session_google_connection(request, material)
+        if not connection:
+            return Response(
+                {"detail": "Осы материалды жүктеген Google аккаунтымен қайта қосылыңыз."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         session_title = f"{material.title} test"
 
         try:
-            form = create_google_form(session_title)
+            form = create_google_form(connection, session_title)
             form_id = form.get("formId", "")
             form_url = form.get("responderUri", "")
 
             if not form_id or not form_url:
                 raise ValueError("Google Form did not return formId/responderUri")
 
-            add_questions_to_form(form_id, questions)
-            sheet = create_results_sheet(f"{session_title} results")
+            add_questions_to_form(connection, form_id, questions)
+            sheet = create_results_sheet(connection, f"{session_title} results")
 
             session = TestSession.objects.create(
                 material=material,
@@ -388,7 +416,7 @@ class TestSessionViewSet(viewsets.ModelViewSet):
             )
         except Exception as exc:
             return Response(
-                {"detail": str(exc) or "Google Form creation failed"},
+                {"detail": _format_google_error(exc, "Google Form creation failed")},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
@@ -399,17 +427,29 @@ class TestSessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
 
         if session.form_id:
-            responses = get_form_responses(session.form_id)
-            form_questions = get_form_questions(session.form_id)
-            headers, sheet_rows, ordered_responses = _build_external_response_payload(
-                session=session,
-                form_questions=form_questions,
-                responses=responses,
-            )
+            connection = _get_session_google_connection(request, session.material)
+            if not connection:
+                return Response(
+                    {"detail": "Осы материалды жүктеген Google аккаунтымен қайта қосылыңыз."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            try:
+                responses = get_form_responses(connection, session.form_id)
+                form_questions = get_form_questions(connection, session.form_id)
+                headers, sheet_rows, ordered_responses = _build_external_response_payload(
+                    session=session,
+                    form_questions=form_questions,
+                    responses=responses,
+                )
 
-            spreadsheet_id = extract_spreadsheet_id(session.results_sheet_url)
-            if spreadsheet_id:
-                sync_sheet_data(spreadsheet_id, headers, sheet_rows)
+                spreadsheet_id = extract_spreadsheet_id(session.results_sheet_url)
+                if spreadsheet_id:
+                    sync_sheet_data(connection, spreadsheet_id, headers, sheet_rows)
+            except Exception as exc:
+                return Response(
+                    {"detail": _format_google_error(exc, "Google results loading failed")},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
             return Response({
                 "session_id": session.id,

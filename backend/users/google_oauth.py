@@ -17,6 +17,7 @@ OAUTH_SCOPES = [
     "https://www.googleapis.com/auth/forms.body",
     "https://www.googleapis.com/auth/forms.responses.readonly",
     "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/presentations",
     "https://www.googleapis.com/auth/drive.file",
 ]
 
@@ -131,7 +132,8 @@ def credentials_to_dict(credentials: Credentials) -> dict:
 
 
 def credentials_from_dict(data: dict) -> Credentials:
-    return Credentials.from_authorized_user_info(data, OAUTH_SCOPES)
+    granted_scopes = data.get("scopes") or OAUTH_SCOPES
+    return Credentials.from_authorized_user_info(data, granted_scopes)
 
 
 def fetch_google_userinfo(credentials: Credentials) -> dict:

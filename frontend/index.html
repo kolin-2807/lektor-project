@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Satbayev Edu Assistant</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260402-02" />
+  <link rel="stylesheet" href="./css/style.css?v=20260402-03" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -163,6 +163,7 @@
 
             <div class="control-actions-row" id="controlActionsRow">
               <button class="action-btn primary" id="openMaterialBtn" type="button">Материал</button>
+              <button class="action-btn" id="openSlidesBtn" type="button" disabled>Слайд</button>
               <button class="action-btn" id="generateTestBtn" type="button" disabled>Тест жасау</button>
               <button class="action-btn" id="openQrBtn" type="button" disabled>Тест (QR)</button>
               <button class="action-btn" id="openResultsBtn" type="button" disabled>Нәтижелер</button>
@@ -188,6 +189,21 @@
 
                 <input class="hidden-file" id="singleMaterialUploadInput" type="file" />
                 <input class="hidden-file" id="folderMaterialUploadInput" type="file" webkitdirectory directory multiple />
+              </div>
+
+              <div class="content-view hidden" id="slidesPane">
+                <div class="content-view-head slides-view-head">
+                  <div class="slides-view-copy">
+                    <p class="slides-view-status" id="slidesStatusText"></p>
+                  </div>
+
+                  <div class="content-view-actions">
+                    <button class="small-btn" id="openSlidesFullscreenBtn" type="button">Толық экран</button>
+                    <button class="small-btn primary" id="downloadSlidesBtn" type="button">Жүктеп алу</button>
+                  </div>
+                </div>
+
+                <div class="slides-preview-wrap" id="slidesPreview"></div>
               </div>
 
               <!-- TEST VIEW -->

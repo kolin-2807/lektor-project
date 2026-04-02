@@ -21,12 +21,17 @@ def get_active_google_drive_connection(request):
         except GoogleDriveConnection.DoesNotExist:
             request.session.pop("google_drive_connection_id", None)
 
-    # Temporary fallback until full user accounts are added.
-    # In local/dev mode, if there is only one connected teacher, reuse it.
-    connection = GoogleDriveConnection.objects.order_by("-updated_at").first()
-    if connection and GoogleDriveConnection.objects.count() == 1:
-        request.session["google_drive_connection_id"] = connection.id
-        request.session.modified = True
-        return connection
-
     return None
+
+
+def resolve_google_drive_connection(request, owner_email: str = ""):
+    active_connection = get_active_google_drive_connection(request)
+    normalized_owner_email = str(owner_email or "").strip().lower()
+
+    if not active_connection:
+        return None
+
+    if normalized_owner_email and active_connection.google_email.strip().lower() != normalized_owner_email:
+        return None
+
+    return active_connection

@@ -1,4 +1,7 @@
-const API_BASE = "http://127.0.0.1:8000/api";
+const LOCAL_API_BASE = "http://127.0.0.1:8000/api";
+const runtimeApiBase = window.__APP_CONFIG__?.apiBase?.trim();
+const isLocalStaticPreview = ["127.0.0.1:5500", "localhost:5500"].includes(window.location.host);
+const API_BASE = runtimeApiBase || (isLocalStaticPreview ? LOCAL_API_BASE : `${window.location.origin}/api`);
 
 const profileState = {
   fullName: "Каламан Ерболат Тлеуханұлы",
@@ -233,6 +236,38 @@ const UI_TEXT = {
   }
 };
 
+Object.assign(UI_TEXT.kaz, {
+  slides: "Слайд",
+  slidesGenerating: "Слайд дайындалып жатыр...",
+  slidesReady: ({ title }) => `Презентация дайын: ${title}`,
+  slidesLectureOnly: "Слайд тек дәріс материалы үшін қолжетімді.",
+  slidesSelectPrompt: "Слайд дайындау үшін дәріс материалын таңдаңыз.",
+  slidesEmptyTitle: "AI презентация осында ашылады",
+  slidesEmptyText: "Слайд батырмасын басқанда жүйе дәріс материалы бойынша дайын презентация жасап береді.",
+  slidesLoadingTitle: "Презентация құрастырылып жатыр",
+  slidesLoadingText: "AI материалдың мазмұнын жинап, негізгі ойларды слайдтарға бөліп жатыр.",
+  slidesOpen: "Слайдты ашу",
+  downloadSlides: "Жүктеп алу",
+  slidesError: "Слайд жасау кезінде қате шықты.",
+  slidesDownloadUnavailable: "Презентацияны жүктеу сілтемесі әлі дайын емес.",
+});
+
+Object.assign(UI_TEXT.rus, {
+  slides: "Слайд",
+  slidesGenerating: "Презентация создается...",
+  slidesReady: ({ title }) => `Презентация готова: ${title}`,
+  slidesLectureOnly: "Слайды доступны только для лекционного материала.",
+  slidesSelectPrompt: "Выберите лекционный материал для презентации.",
+  slidesEmptyTitle: "AI-презентация появится здесь",
+  slidesEmptyText: "Нажмите кнопку слайдов, и система соберет готовую презентацию по содержанию лекции.",
+  slidesLoadingTitle: "Презентация собирается",
+  slidesLoadingText: "AI выделяет ключевые идеи материала и превращает их в слайды.",
+  slidesOpen: "Открыть слайды",
+  downloadSlides: "Скачать",
+  slidesError: "Произошла ошибка при создании презентации.",
+  slidesDownloadUnavailable: "Ссылка на скачивание презентации пока не готова.",
+});
+
 const typeOrder = [
   { key: "lecture", label: "Дәріс" },
   { key: "practice", label: "Практика" },
@@ -309,18 +344,22 @@ const toggleMaterialManagerBtn = document.getElementById("toggleMaterialManagerB
 const changeCoverBtn = document.getElementById("changeCoverBtn");
 
 const materialsPane = document.getElementById("materialsPane");
+const slidesPane = document.getElementById("slidesPane");
 const testPane = document.getElementById("testPane");
 const resultsPane = document.getElementById("resultsPane");
 
 const materialTypeSelect = document.getElementById("materialTypeSelect");
 const topicSelect = document.getElementById("topicSelect");
 const openMaterialBtn = document.getElementById("openMaterialBtn");
+const openSlidesBtn = document.getElementById("openSlidesBtn");
 const generateTestBtn = document.getElementById("generateTestBtn");
 const openQrBtn = document.getElementById("openQrBtn");
 const openResultsBtn = document.getElementById("openResultsBtn");
 const controlActionsRow = document.getElementById("controlActionsRow");
 
 const materialPreview = document.getElementById("materialPreview");
+const slidesPreview = document.getElementById("slidesPreview");
+const slidesStatusText = document.getElementById("slidesStatusText");
 const materialManagerPanel = document.getElementById("materialManagerPanel");
 const materialManagerActions = document.getElementById("materialManagerActions");
 const uploadMenuWrap = document.getElementById("uploadMenuWrap");
@@ -332,6 +371,8 @@ const deleteMaterialBtn = document.getElementById("deleteMaterialBtn");
 const singleMaterialUploadInput = document.getElementById("singleMaterialUploadInput");
 const folderMaterialUploadInput = document.getElementById("folderMaterialUploadInput");
 const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscreenBtn");
+const openSlidesFullscreenBtn = document.getElementById("openSlidesFullscreenBtn");
+const downloadSlidesBtn = document.getElementById("downloadSlidesBtn");
 
 const testInfoText = document.getElementById("testInfoText");
 const qrImageInline = document.getElementById("qrImageInline");
@@ -428,6 +469,8 @@ let testConfig = {
   durationMinutes: 20,
 };
 let isTestGenerating = false;
+let isSlidesGenerating = false;
+let slidesErrorMessage = "";
 let appStateRestoreDone = false;
 let publicTestSessionToken = new URLSearchParams(window.location.search).get("session");
 let publicTestAttemptToken = "";
@@ -503,10 +546,13 @@ function applyStaticTranslations() {
   if (materialTypeLabel) materialTypeLabel.textContent = t("materialType");
   if (topicLabel) topicLabel.textContent = t("topic");
   if (openMaterialBtn) openMaterialBtn.textContent = t("material");
+  if (openSlidesBtn) openSlidesBtn.textContent = isSlidesGenerating ? t("slidesGenerating") : t("slides");
   if (generateTestBtn) generateTestBtn.textContent = t("generateTest");
   if (openQrBtn) openQrBtn.textContent = t("testQr");
   if (openResultsBtn) openResultsBtn.textContent = t("results");
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
+  if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
+  if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
   if (openTestDirectBtn) openTestDirectBtn.textContent = t("openTest");
   if (showQrBtn) showQrBtn.textContent = t("showQr");
   if (qrCodeLabel) qrCodeLabel.textContent = t("qrJoin");
@@ -552,6 +598,7 @@ function applyStaticTranslations() {
 
   renderDisciplinePreviewCard();
   renderDriveStatus();
+  renderSlidesPreview();
 }
 
 function normalizeMaterialType(type) {
@@ -870,6 +917,7 @@ async function uploadMaterialFiles(fileList) {
 
     const created = Array.isArray(payload?.created) ? payload.created : [];
     selectedSubject.materials = await loadMaterialsForSubject(selectedSubject.id);
+    slidesErrorMessage = "";
 
     if (created.length) {
       activeType = normalizeMaterialType(created[created.length - 1].category);
@@ -879,6 +927,7 @@ async function uploadMaterialFiles(fileList) {
     populateMaterialTypeSelect();
     populateTopicSelect();
     renderMaterialPreview();
+    renderSlidesPreview();
     resetTestState();
     renderTestBlock();
     renderResultsBlock();
@@ -909,10 +958,12 @@ async function deleteSelectedMaterial() {
     });
 
     selectedSubject.materials = await loadMaterialsForSubject(selectedSubject.id);
+    slidesErrorMessage = "";
     selectedMaterialId = null;
     populateMaterialTypeSelect();
     populateTopicSelect();
     clearMaterialPreview();
+    renderSlidesPreview();
     resetTestState();
     renderTestBlock();
     renderResultsBlock();
@@ -1390,6 +1441,7 @@ async function restoreTeacherAppState() {
   populateTopicSelect();
   await loadLatestTestSessionForSelectedMaterial();
   renderMaterialPreview();
+  renderSlidesPreview();
   renderTestBlock(false);
 
   if (activeSubjectPanel === "results") {
@@ -1436,11 +1488,16 @@ function switchSubjectPanel(panelName) {
   activeSubjectPanel = panelName;
 
   materialsPane.classList.add("hidden");
+  slidesPane.classList.add("hidden");
   testPane.classList.add("hidden");
   resultsPane.classList.add("hidden");
 
   if (panelName === "materials") {
     materialsPane.classList.remove("hidden");
+  }
+
+  if (panelName === "slides") {
+    slidesPane.classList.remove("hidden");
   }
 
   if (panelName === "test") {
@@ -1633,21 +1690,30 @@ function renderDisciplineCards() {
   }
 }
 
+function mapMaterialFromApi(item) {
+  const normalizedType = normalizeMaterialType(item.category);
+
+  return {
+    id: item.id,
+    type: normalizedType,
+    typeLabel: getTypeLabel(normalizedType),
+    title: item.title,
+    desc: item.description || t("materialDescriptionMissing"),
+    fileUrl: item.cloud_url,
+    formUrl: item.form_url || "",
+    resultsSheetUrl: item.results_sheet_url || "",
+    slidesUrl: item.slides_url || "",
+    slidesEmbedUrl: item.slides_embed_url || "",
+    slidesDownloadUrl: item.slides_download_url || "",
+    slidesPresentationId: item.slides_presentation_id || "",
+    createdAt: item.created_at || ""
+  };
+}
+
 async function loadMaterialsForSubject(subjectId) {
   try {
     const materials = await fetchJSON(`${API_BASE}/materials/?discipline_id=${subjectId}`);
-
-    return materials.map(item => ({
-      id: item.id,
-      type: normalizeMaterialType(item.category),
-      typeLabel: getTypeLabel(normalizeMaterialType(item.category)),
-      title: item.title,
-      desc: item.description || t("materialDescriptionMissing"),
-      fileUrl: item.cloud_url,
-      formUrl: item.form_url || "",
-      resultsSheetUrl: item.results_sheet_url || "",
-      createdAt: item.created_at || ""
-    }));
+    return materials.map(mapMaterialFromApi);
   } catch (error) {
     console.error("Materials load error:", error);
     return [];
@@ -1656,6 +1722,7 @@ async function loadMaterialsForSubject(subjectId) {
 
 async function openSubject(subject) {
   selectedSubject = { ...subject };
+  slidesErrorMessage = "";
   isEditingSubjectTitle = false;
   isMaterialManagerOpen = false;
   isUploadMenuOpen = false;
@@ -1686,6 +1753,7 @@ async function openSubject(subject) {
   populateTopicSelect();
   renderDriveStatus();
   clearMaterialPreview();
+  renderSlidesPreview();
   renderTestBlock(false);
   renderResultsBlock();
   switchSubjectPanel(activeSubjectPanel || "materials");
@@ -1697,6 +1765,7 @@ function showHome() {
   subjectView.classList.add("hidden");
   homeView.classList.remove("hidden");
   selectedSubject = null;
+  slidesErrorMessage = "";
   isMaterialManagerOpen = false;
   isUploadMenuOpen = false;
   openedDisciplineMenuId = null;
@@ -1786,6 +1855,21 @@ function getPreviewKindFromUrl(url) {
   if (["mp4", "webm", "ogg", "mov"].includes(ext)) return "video";
   if (["mp3", "wav", "oga", "m4a"].includes(ext)) return "audio";
   return "external";
+}
+
+function upsertSelectedSubjectMaterial(materialPayload) {
+  if (!selectedSubject || !materialPayload) return null;
+
+  const mappedMaterial = mapMaterialFromApi(materialPayload);
+  const existingIndex = selectedSubject.materials.findIndex(item => item.id === mappedMaterial.id);
+
+  if (existingIndex >= 0) {
+    selectedSubject.materials.splice(existingIndex, 1, mappedMaterial);
+  } else {
+    selectedSubject.materials.push(mappedMaterial);
+  }
+
+  return mappedMaterial;
 }
 
 function clearMaterialPreview() {
@@ -1905,6 +1989,133 @@ function renderTestSettingsPanel() {
   }
 }
 
+function setSlidesStatus(message = "", state = "neutral") {
+  if (!slidesStatusText) return;
+  slidesStatusText.textContent = message || "";
+  slidesStatusText.classList.toggle("is-error", state === "error");
+}
+
+function buildSlidesEmptyCard(title, text, extraClass = "") {
+  return `
+    <div class="slides-preview-shell">
+      <div class="slides-preview-card ${extraClass}">
+        <div class="slides-preview-copy">
+          <h3>${escapeHtml(title)}</h3>
+          <p>${escapeHtml(text)}</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSlidesPreview() {
+  if (!slidesPreview) return;
+
+  const material = getSelectedMaterial();
+  const isLecture = material?.type === "lecture";
+  const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
+
+  if (openSlidesFullscreenBtn) {
+    openSlidesFullscreenBtn.disabled = !hasSlides || isSlidesGenerating;
+  }
+
+  if (downloadSlidesBtn) {
+    downloadSlidesBtn.disabled = !material?.slidesDownloadUrl || isSlidesGenerating;
+  }
+
+  if (!material) {
+    slidesErrorMessage = "";
+    setSlidesStatus("");
+    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesSelectPrompt"));
+    return;
+  }
+
+  if (!isLecture) {
+    slidesErrorMessage = "";
+    setSlidesStatus(t("slidesLectureOnly"), "error");
+    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesLectureOnly"));
+    return;
+  }
+
+  if (isSlidesGenerating) {
+    setSlidesStatus(t("slidesGenerating"));
+    slidesPreview.innerHTML = `
+      <div class="slides-preview-shell">
+        <div class="slides-preview-card is-loading">
+          <div class="slides-preview-copy">
+            <div class="slides-loader"></div>
+            <h3>${t("slidesLoadingTitle")}</h3>
+            <p>${t("slidesLoadingText")}</p>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (!hasSlides) {
+    if (slidesErrorMessage) {
+      setSlidesStatus(slidesErrorMessage, "error");
+      slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), slidesErrorMessage);
+      return;
+    }
+
+    setSlidesStatus("");
+    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesEmptyText"));
+    return;
+  }
+
+  slidesErrorMessage = "";
+  setSlidesStatus(t("slidesReady", { title: material.title }));
+  slidesPreview.innerHTML = `
+    <div class="slides-preview-shell">
+      <div class="slides-embed-meta">
+        <div>
+          <strong>${escapeHtml(material.title)}</strong>
+          <span>${escapeHtml(selectedSubject?.title || "")}</span>
+        </div>
+      </div>
+
+      <div class="slides-embed-shell">
+        <iframe
+          src="${material.slidesEmbedUrl || material.slidesUrl}"
+          loading="lazy"
+          allowfullscreen
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+      </div>
+    </div>
+  `;
+}
+
+async function openSlidesPreviewFullscreen() {
+  const target = document.querySelector("#slidesPreview .slides-embed-shell") || slidesPreview;
+  if (!target) return;
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (target.requestFullscreen) {
+      await target.requestFullscreen();
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function downloadCurrentSlides() {
+  const material = getSelectedMaterial();
+  const downloadUrl = material?.slidesDownloadUrl;
+
+  if (!downloadUrl) {
+    setSlidesStatus(t("slidesDownloadUnavailable"), "error");
+    renderSlidesPreview();
+    return;
+  }
+
+  window.open(downloadUrl, "_blank", "noopener");
+}
+
 function updateActionButtonsState() {
   const material = getSelectedMaterial();
   const isLecture = material?.type === "lecture";
@@ -1912,6 +2123,8 @@ function updateActionButtonsState() {
   const hasSessionLink = !!currentTestSession?.access_token || !!currentTestSession?.form_url;
   const hasResults = !!currentTestSession;
 
+  openSlidesBtn.disabled = !isLecture || isSlidesGenerating;
+  openSlidesBtn.textContent = isSlidesGenerating ? t("slidesGenerating") : t("slides");
   generateTestBtn.disabled = !isLecture || isTestGenerating;
   openQrBtn.disabled = !hasGeneratedTest || !hasSessionLink;
   openResultsBtn.disabled = !hasResults;
@@ -3091,10 +3304,12 @@ if (materialTypeSelect) {
   materialTypeSelect.addEventListener("change", async () => {
     activeType = materialTypeSelect.value;
     selectedMaterialId = null;
+    slidesErrorMessage = "";
     populateTopicSelect();
     renderDriveStatus();
     await loadLatestTestSessionForSelectedMaterial();
     clearMaterialPreview();
+    renderSlidesPreview();
     renderTestBlock();
     renderResultsBlock();
     saveTeacherAppState();
@@ -3179,9 +3394,11 @@ if (saveDisciplineBtn) {
 if (topicSelect) {
   topicSelect.addEventListener("change", async () => {
     selectedMaterialId = Number(topicSelect.value);
+    slidesErrorMessage = "";
     renderDriveStatus();
     await loadLatestTestSessionForSelectedMaterial();
     clearMaterialPreview();
+    renderSlidesPreview();
     renderTestBlock();
     renderResultsBlock();
     saveTeacherAppState();
@@ -3195,6 +3412,74 @@ if (openMaterialBtn) {
     renderMaterialPreview();
     switchSubjectPanel("materials");
   });
+}
+
+if (openSlidesBtn) {
+  openSlidesBtn.addEventListener("click", async () => {
+    isMaterialManagerOpen = false;
+    renderMaterialManagerPanel();
+    switchSubjectPanel("slides");
+    renderSlidesPreview();
+
+    const material = getSelectedMaterial();
+    if (!material || material.type !== "lecture" || isSlidesGenerating) {
+      return;
+    }
+
+    if (material.slidesEmbedUrl || material.slidesUrl) {
+      return;
+    }
+
+    await generateSlidesForSelectedMaterial();
+  });
+}
+
+async function generateSlidesForSelectedMaterial() {
+  const currentMaterial = getSelectedMaterial();
+
+  switchSubjectPanel("slides");
+
+  if (!currentMaterial) {
+    setSlidesStatus(t("slidesSelectPrompt"), "error");
+    renderSlidesPreview();
+    return;
+  }
+
+  if (currentMaterial.type !== "lecture") {
+    slidesErrorMessage = "";
+    setSlidesStatus(t("slidesLectureOnly"), "error");
+    renderSlidesPreview();
+    return;
+  }
+
+  slidesErrorMessage = "";
+  isSlidesGenerating = true;
+  updateActionButtonsState();
+  renderSlidesPreview();
+
+  try {
+    const updatedMaterial = await fetchJSON(`${API_BASE}/materials/${currentMaterial.id}/generate-slides/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        language: selectedRole,
+      })
+    });
+
+    upsertSelectedSubjectMaterial(updatedMaterial);
+    setSlidesStatus(t("slidesReady", { title: updatedMaterial.title || currentMaterial.title }));
+    renderSlidesPreview();
+    saveTeacherAppState();
+  } catch (error) {
+    console.error("AI SLIDES ERROR:", error);
+    slidesErrorMessage = error?.message || t("slidesError");
+  } finally {
+    isSlidesGenerating = false;
+    updateActionButtonsState();
+    renderSlidesPreview();
+  }
 }
 
 function setTestPanelInfo(message = "", state = "neutral") {
@@ -3466,6 +3751,14 @@ if (openResultsBtn) {
 
 if (openMaterialFullscreenBtn) {
   openMaterialFullscreenBtn.addEventListener("click", openPreviewFullscreen);
+}
+
+if (openSlidesFullscreenBtn) {
+  openSlidesFullscreenBtn.addEventListener("click", openSlidesPreviewFullscreen);
+}
+
+if (downloadSlidesBtn) {
+  downloadSlidesBtn.addEventListener("click", downloadCurrentSlides);
 }
 
 if (openTestDirectBtn) {

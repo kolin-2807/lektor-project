@@ -7,9 +7,9 @@ from users.google_oauth import bypass_broken_local_proxy
 from .google_service import get_google_credentials
 
 
-def create_results_sheet(title: str):
+def create_results_sheet(connection, title: str):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         sheets_service = build("sheets", "v4", credentials=creds)
         spreadsheet_body = {
             "properties": {"title": title},
@@ -22,9 +22,9 @@ def create_results_sheet(title: str):
     return {"spreadsheet_id": spreadsheet_id, "spreadsheet_url": spreadsheet_url}
 
 
-def write_headers_to_sheet(spreadsheet_id: str, headers: list[str]):
+def write_headers_to_sheet(connection, spreadsheet_id: str, headers: list[str]):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         sheets_service = build("sheets", "v4", credentials=creds)
         sheets_service.spreadsheets().values().update(
             spreadsheetId=spreadsheet_id,
@@ -34,9 +34,9 @@ def write_headers_to_sheet(spreadsheet_id: str, headers: list[str]):
         ).execute()
 
 
-def clear_data_rows(spreadsheet_id: str):
+def clear_data_rows(connection, spreadsheet_id: str):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         sheets_service = build("sheets", "v4", credentials=creds)
         sheets_service.spreadsheets().values().clear(
             spreadsheetId=spreadsheet_id,
@@ -45,12 +45,12 @@ def clear_data_rows(spreadsheet_id: str):
         ).execute()
 
 
-def write_rows_to_sheet(spreadsheet_id: str, rows: list[list]):
+def write_rows_to_sheet(connection, spreadsheet_id: str, rows: list[list]):
     if not rows:
         return
 
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         sheets_service = build("sheets", "v4", credentials=creds)
         sheets_service.spreadsheets().values().update(
             spreadsheetId=spreadsheet_id,
@@ -65,7 +65,7 @@ def extract_spreadsheet_id(sheet_url: str) -> str:
     return match.group(1) if match else ""
 
 
-def sync_sheet_data(spreadsheet_id: str, headers: list[str], rows: list[list]):
-    write_headers_to_sheet(spreadsheet_id, headers)
-    clear_data_rows(spreadsheet_id)
-    write_rows_to_sheet(spreadsheet_id, rows)
+def sync_sheet_data(connection, spreadsheet_id: str, headers: list[str], rows: list[list]):
+    write_headers_to_sheet(connection, spreadsheet_id, headers)
+    clear_data_rows(connection, spreadsheet_id)
+    write_rows_to_sheet(connection, spreadsheet_id, rows)

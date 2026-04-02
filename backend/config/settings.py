@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -23,14 +24,27 @@ load_dotenv(BASE_DIR / ".env")
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-$dc5aow8tw$jzw7z+5%7=4vkk-^dhmk4fol@o=rq64#@7j#0&t'
 
+def _split_env_list(name: str) -> list[str]:
+    raw_value = os.getenv(name, "")
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
+
+PUBLIC_APP_ORIGIN = os.getenv("PUBLIC_APP_ORIGIN", "").strip().rstrip("/")
+_PUBLIC_APP_HOST = urlparse(PUBLIC_APP_ORIGIN).hostname if PUBLIC_APP_ORIGIN else ""
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "testserver",
+    ".trycloudflare.com",
+    *_split_env_list("DJANGO_ALLOWED_HOSTS"),
 ]
+
+if _PUBLIC_APP_HOST and _PUBLIC_APP_HOST not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_PUBLIC_APP_HOST)
 
 
 # Application definition
@@ -132,13 +146,21 @@ STATIC_URL = 'static/'
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    *[origin.rstrip("/") for origin in _split_env_list("CORS_ALLOWED_ORIGINS")],
 ]
+
+if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(PUBLIC_APP_ORIGIN)
 
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
+    *[origin.rstrip("/") for origin in _split_env_list("CSRF_TRUSTED_ORIGINS")],
 ]
+
+if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(PUBLIC_APP_ORIGIN)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

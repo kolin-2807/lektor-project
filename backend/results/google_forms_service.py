@@ -5,17 +5,17 @@ from users.google_oauth import bypass_broken_local_proxy
 from .google_service import get_google_credentials
 
 
-def create_google_form(title: str):
+def create_google_form(connection, title: str):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         forms_service = build("forms", "v1", credentials=creds)
         form_body = {"info": {"title": title}}
         return forms_service.forms().create(body=form_body).execute()
 
 
-def add_questions_to_form(form_id: str, questions: list):
+def add_questions_to_form(connection, form_id: str, questions: list):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         forms_service = build("forms", "v1", credentials=creds)
 
         name_request = {
@@ -67,17 +67,17 @@ def add_questions_to_form(form_id: str, questions: list):
         ).execute()
 
 
-def get_form_responses(form_id: str):
+def get_form_responses(connection, form_id: str):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         forms_service = build("forms", "v1", credentials=creds)
         result = forms_service.forms().responses().list(formId=form_id).execute()
         return result.get("responses", [])
 
 
-def get_form_questions(form_id: str):
+def get_form_questions(connection, form_id: str):
     with bypass_broken_local_proxy():
-        creds = get_google_credentials()
+        creds = get_google_credentials(connection)
         forms_service = build("forms", "v1", credentials=creds)
         form = forms_service.forms().get(formId=form_id).execute()
 
