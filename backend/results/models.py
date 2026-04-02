@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from academics.models import Discipline
 
@@ -25,11 +27,52 @@ class TestSession(models.Model):
         related_name="test_sessions"
     )
     title = models.CharField(max_length=255)
+    access_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     form_id = models.CharField(max_length=255, blank=True)
     form_url = models.URLField(blank=True)
     results_sheet_url = models.URLField(blank=True)
     questions_json = models.JSONField(default=list, blank=True)
+    question_count = models.PositiveSmallIntegerField(default=5)
+    duration_minutes = models.PositiveSmallIntegerField(default=20)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+
+
+class TestAttempt(models.Model):
+    STATUS_STARTED = "started"
+    STATUS_SUBMITTED = "submitted"
+    STATUS_EXPIRED = "expired"
+    STATUS_CHOICES = [
+      (STATUS_STARTED, "Started"),
+      (STATUS_SUBMITTED, "Submitted"),
+      (STATUS_EXPIRED, "Expired"),
+    ]
+
+    session = models.ForeignKey(
+        TestSession,
+        on_delete=models.CASCADE,
+        related_name="attempts"
+    )
+    student_name = models.CharField(max_length=255)
+    student_identifier = models.CharField(max_length=255)
+    attempt_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    answers_json = models.JSONField(default=list, blank=True)
+    score = models.PositiveSmallIntegerField(default=0)
+    max_score = models.PositiveSmallIntegerField(default=0)
+    time_spent_seconds = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_STARTED)
+    started_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "student_identifier"],
+                name="unique_student_attempt_per_session",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.student_name} - {self.session.title}"

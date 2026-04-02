@@ -46,6 +46,25 @@ const UI_TEXT = {
     coursesLoadError: "Курстар жүктелмеді.",
     coursesNotFound: "Курстар табылмады.",
     disciplinesNotFound: "Осы курс үшін пән табылмады.",
+    addDiscipline: "Пән қосу",
+    disciplineModalTitle: "Жаңа пән",
+    disciplinePreviewTitle: "Карточка үлгісі",
+    disciplineTitleLabel: "Пән атауы",
+    disciplineTitlePlaceholder: "Мысалы, Желілік қауіпсіздік",
+    disciplinePreviewUntitled: "Жаңа пән",
+    disciplineCreate: "Қосу",
+    disciplineCreating: "Қосылып жатыр...",
+    disciplineTitleRequired: "Пән атауын енгізіңіз.",
+    disciplineCreateError: "Пәнді қосу кезінде қате шықты.",
+    disciplineMenu: "Пән әрекеттері",
+    disciplineDelete: "Жою",
+    confirmDelete: "Жоюды растау",
+    cancel: "Бас тарту",
+    disciplineDeleting: "Жойылып жатыр...",
+    disciplineDeleteError: "Пәнді жою кезінде қате шықты.",
+    disciplineTitlePlaceholder: "Пән атауын өзгертіңіз",
+    disciplineRenameEmpty: "Пән атауы бос болмауы керек.",
+    disciplineRenameError: "Пән атауын жаңарту кезінде қате шықты.",
     materialsEmpty: "Материалды ашыңыз",
     materialSelectPrompt: "Материалды таңдаңыз.",
     materialDescriptionMissing: "Материал сипаттамасы жоқ",
@@ -86,6 +105,15 @@ const UI_TEXT = {
     email: "Email",
     bio: "Био",
     sheetFrameTitle: "Тест нәтижелері",
+    uploadMaterial: "Материал қосу",
+    connectDrive: "Google Drive қосу",
+    driveConnected: ({ email }) => `Google Drive қосылды: ${email}`,
+    driveNotConnected: "Google Drive әлі қосылмаған.",
+    driveNotConfigured: "Google Drive OAuth әлі бапталмаған.",
+    driveConnectError: "Google Drive қосу кезінде қате шықты.",
+    materialUploading: "Материал жүктеліп жатыр...",
+    materialUploadDone: ({ title }) => `"${title}" материалы жүктелді.`,
+    materialUploadError: "Материалды жүктеу кезінде қате шықты.",
     voiceReady: "Дайын",
     voiceListening: "Тыңдап тұр...",
     voiceUnderstood: ({ text }) => `Түсінді: ${text}`,
@@ -123,6 +151,25 @@ const UI_TEXT = {
     coursesLoadError: "Не удалось загрузить курсы.",
     coursesNotFound: "Курсы не найдены.",
     disciplinesNotFound: "Для этого курса дисциплины не найдены.",
+    addDiscipline: "Добавить дисциплину",
+    disciplineModalTitle: "Новая дисциплина",
+    disciplinePreviewTitle: "Предпросмотр карточки",
+    disciplineTitleLabel: "Название дисциплины",
+    disciplineTitlePlaceholder: "Например, Сетевые технологии",
+    disciplinePreviewUntitled: "Новая дисциплина",
+    disciplineCreate: "Добавить",
+    disciplineCreating: "Добавляется...",
+    disciplineTitleRequired: "Введите название дисциплины.",
+    disciplineCreateError: "Не удалось добавить дисциплину.",
+    disciplineMenu: "Действия дисциплины",
+    disciplineDelete: "Удалить",
+    confirmDelete: "Подтвердить удаление",
+    cancel: "Отмена",
+    disciplineDeleting: "Удаляется...",
+    disciplineDeleteError: "Не удалось удалить дисциплину.",
+    disciplineTitlePlaceholder: "Измените название дисциплины",
+    disciplineRenameEmpty: "Название дисциплины не должно быть пустым.",
+    disciplineRenameError: "Не удалось обновить название дисциплины.",
     materialsEmpty: "Откройте материал",
     materialSelectPrompt: "Выберите материал.",
     materialDescriptionMissing: "Описание материала отсутствует",
@@ -163,6 +210,15 @@ const UI_TEXT = {
     email: "Email",
     bio: "Био",
     sheetFrameTitle: "Результаты теста",
+    uploadMaterial: "Добавить материал",
+    connectDrive: "Подключить Google Drive",
+    driveConnected: ({ email }) => `Google Drive подключен: ${email}`,
+    driveNotConnected: "Google Drive еще не подключен.",
+    driveNotConfigured: "Google Drive OAuth еще не настроен.",
+    driveConnectError: "Не удалось подключить Google Drive.",
+    materialUploading: "Материал загружается...",
+    materialUploadDone: ({ title }) => `Материал "${title}" загружен.`,
+    materialUploadError: "Не удалось загрузить материал.",
     voiceReady: "Готово",
     voiceListening: "Слушаю...",
     voiceUnderstood: ({ text }) => `Понял: ${text}`,
@@ -185,6 +241,37 @@ const typeOrder = [
   { key: "syllabus", label: "Силлабус" }
 ];
 
+const APP_STATE_KEY = "lektor-teacher-state-v1";
+const TEST_CONFIG_KEY = "lektor-test-config-v1";
+const PUBLIC_TEST_ATTEMPT_KEY = "lektor-public-test-attempt-v1";
+
+const DISCIPLINE_THEMES = [
+  {
+    coverClass: "discipline-cover-1",
+    background: "linear-gradient(135deg, #275fa0 0%, #3e87d5 52%, #1c3e6d 100%)"
+  },
+  {
+    coverClass: "discipline-cover-2",
+    background: "linear-gradient(135deg, #127277 0%, #27a0a1 52%, #114a54 100%)"
+  },
+  {
+    coverClass: "discipline-cover-3",
+    background: "linear-gradient(135deg, #c1792a 0%, #e5a548 52%, #8f541d 100%)"
+  },
+  {
+    coverClass: "discipline-cover-4",
+    background: "linear-gradient(135deg, #3554a6 0%, #6b7ce8 54%, #262f73 100%)"
+  },
+  {
+    coverClass: "discipline-cover-5",
+    background: "linear-gradient(135deg, #7a4d9f 0%, #b37ce3 54%, #4f2f74 100%)"
+  },
+  {
+    coverClass: "discipline-cover-6",
+    background: "linear-gradient(135deg, #965034 0%, #d0805f 54%, #6c3624 100%)"
+  }
+];
+
 const homeView = document.getElementById("homeView");
 const subjectView = document.getElementById("subjectView");
 
@@ -192,6 +279,8 @@ const courseStage = document.getElementById("courseStage");
 const disciplineStage = document.getElementById("disciplineStage");
 const courseGrid = document.getElementById("courseGrid");
 const courseBackBtn = document.getElementById("courseBackBtn");
+const addDisciplineBtn = document.getElementById("addDisciplineBtn");
+const addDisciplineBtnText = document.getElementById("addDisciplineBtnText");
 
 const brandRoleTitle = document.getElementById("brandRoleTitle");
 const roleTitleBtn = document.getElementById("roleTitleBtn");
@@ -212,10 +301,12 @@ const cardsGrid = document.getElementById("cardsGrid");
 
 const backBtn = document.getElementById("backBtn");
 const subjectCoverTop = document.getElementById("subjectCoverTop");
+const subjectCoverCopy = document.querySelector(".subject-cover-copy");
 const subjectTitle = document.getElementById("subjectTitle");
+const subjectTitleInput = document.getElementById("subjectTitleInput");
 const subjectCourse = document.getElementById("subjectCourse");
+const toggleMaterialManagerBtn = document.getElementById("toggleMaterialManagerBtn");
 const changeCoverBtn = document.getElementById("changeCoverBtn");
-const coverFileInput = document.getElementById("coverFileInput");
 
 const materialsPane = document.getElementById("materialsPane");
 const testPane = document.getElementById("testPane");
@@ -227,14 +318,34 @@ const openMaterialBtn = document.getElementById("openMaterialBtn");
 const generateTestBtn = document.getElementById("generateTestBtn");
 const openQrBtn = document.getElementById("openQrBtn");
 const openResultsBtn = document.getElementById("openResultsBtn");
+const controlActionsRow = document.getElementById("controlActionsRow");
 
 const materialPreview = document.getElementById("materialPreview");
+const materialManagerPanel = document.getElementById("materialManagerPanel");
+const materialManagerActions = document.getElementById("materialManagerActions");
+const uploadMenuWrap = document.getElementById("uploadMenuWrap");
+const uploadModeMenu = document.getElementById("uploadModeMenu");
+const uploadMaterialBtn = document.getElementById("uploadMaterialBtn");
+const uploadSingleMaterialBtn = document.getElementById("uploadSingleMaterialBtn");
+const uploadFolderMaterialBtn = document.getElementById("uploadFolderMaterialBtn");
+const deleteMaterialBtn = document.getElementById("deleteMaterialBtn");
+const singleMaterialUploadInput = document.getElementById("singleMaterialUploadInput");
+const folderMaterialUploadInput = document.getElementById("folderMaterialUploadInput");
 const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscreenBtn");
 
 const testInfoText = document.getElementById("testInfoText");
 const qrImageInline = document.getElementById("qrImageInline");
 const openTestDirectBtn = document.getElementById("openTestDirectBtn");
 const showQrBtn = document.getElementById("showQrBtn");
+const buildTestBtn = document.getElementById("buildTestBtn");
+const testSettingsPanel = document.getElementById("testSettingsPanel");
+const testQuestionCountInput = document.getElementById("testQuestionCountInput");
+const testDurationInput = document.getElementById("testDurationInput");
+const testSettingsTitle = document.getElementById("testSettingsTitle");
+const testSettingsHint = document.getElementById("testSettingsHint");
+const testQrBoard = testPane?.querySelector(".test-qr-board");
+const testQrCard = testPane?.querySelector(".test-qr-card");
+const testQrActions = testPane?.querySelector(".test-qr-actions");
 
 const resultsInfoText = document.getElementById("resultsInfoText") || { textContent: "" };
 const resultsSheetFrame = document.getElementById("resultsSheetFrame");
@@ -274,16 +385,67 @@ const playerDetailTitle = document.getElementById("playerDetailTitle");
 const playerDetailMeta = document.getElementById("playerDetailMeta");
 const playerAnswerList = document.getElementById("playerAnswerList");
 
+const disciplineModal = document.getElementById("disciplineModal");
+const disciplineModalTitle = document.getElementById("disciplineModalTitle");
+const disciplinePreviewLabel = document.getElementById("disciplinePreviewLabel");
+const disciplineTitleInput = document.getElementById("disciplineTitleInput");
+const disciplineFormError = document.getElementById("disciplineFormError");
+const disciplinePreviewCard = document.getElementById("disciplinePreviewCard");
+const saveDisciplineBtn = document.getElementById("saveDisciplineBtn");
+
+const publicTestView = document.getElementById("publicTestView");
+const teacherApp = document.getElementById("teacherApp");
+const publicTestCourse = document.getElementById("publicTestCourse");
+const publicTestTitle = document.getElementById("publicTestTitle");
+const publicTestMeta = document.getElementById("publicTestMeta");
+const publicTestTimer = document.getElementById("publicTestTimer");
+const publicTestStatus = document.getElementById("publicTestStatus");
+const publicTestStartCard = document.getElementById("publicTestStartCard");
+const publicTestNameLabel = document.getElementById("publicTestNameLabel");
+const publicTestStudentNameInput = document.getElementById("publicTestStudentNameInput");
+const publicTestStartBtn = document.getElementById("publicTestStartBtn");
+const publicTestQuestionsWrap = document.getElementById("publicTestQuestionsWrap");
+const publicTestQuestionList = document.getElementById("publicTestQuestionList");
+const publicTestSubmitBtn = document.getElementById("publicTestSubmitBtn");
+const publicTestResultCard = document.getElementById("publicTestResultCard");
+
 let recognition = null;
 let isListening = false;
 let selectedSubject = null;
 let activeType = "lecture";
 let selectedMaterialId = null;
 let activeSubjectPanel = "materials";
+let openedDisciplineMenuId = null;
+let confirmingDisciplineDeleteId = null;
+let deletingDisciplineId = null;
+let disciplineDeleteError = "";
+let isEditingSubjectTitle = false;
+let isMaterialManagerOpen = false;
+let isUploadMenuOpen = false;
+let isMaterialDeleting = false;
+let testConfig = {
+  questionCount: 5,
+  durationMinutes: 20,
+};
+let isTestGenerating = false;
+let appStateRestoreDone = false;
+let publicTestSessionToken = new URLSearchParams(window.location.search).get("session");
+let publicTestAttemptToken = "";
+let publicTestSession = null;
+let publicTestAttempt = null;
+let publicTestCountdownTimer = null;
+let publicTestAnswers = [];
 
 let generatedQuestions = [];
 let currentTestSession = null;
 let isEditingTest = false;
+let driveConnection = {
+  configured: false,
+  connected: false,
+  google_email: "",
+  google_name: "",
+};
+let isMaterialUploading = false;
 
 let mediaRecorder = null;
 let recordedChunks = [];
@@ -325,6 +487,7 @@ function applyStaticTranslations() {
   const usernameLabel = document.querySelector('label[for="profileUsernameInput"]');
   const emailLabel = document.querySelector('label[for="profileEmailInput"]');
   const bioLabel = document.querySelector('label[for="profileBioInput"]');
+  const disciplineTitleLabel = document.querySelector('label[for="disciplineTitleInput"]');
 
   updateBrandRoleLabel();
   updateRoleMenuActive();
@@ -335,7 +498,8 @@ function applyStaticTranslations() {
 
   if (courseBackBtn) courseBackBtn.textContent = t("back");
   if (backBtn) backBtn.textContent = t("back");
-  if (changeCoverBtn) changeCoverBtn.textContent = t("edit");
+  if (changeCoverBtn) changeCoverBtn.textContent = isEditingSubjectTitle ? t("save") : t("edit");
+  if (subjectTitleInput) subjectTitleInput.placeholder = t("disciplineTitlePlaceholder");
   if (materialTypeLabel) materialTypeLabel.textContent = t("materialType");
   if (topicLabel) topicLabel.textContent = t("topic");
   if (openMaterialBtn) openMaterialBtn.textContent = t("material");
@@ -355,16 +519,39 @@ function applyStaticTranslations() {
   if (emailLabel) emailLabel.textContent = t("email");
   if (bioLabel) bioLabel.textContent = t("bio");
   if (saveProfileBtn) saveProfileBtn.textContent = t("save");
+  if (addDisciplineBtn) {
+    addDisciplineBtn.setAttribute("aria-label", t("addDiscipline"));
+    addDisciplineBtn.setAttribute("title", t("addDiscipline"));
+  }
+  if (addDisciplineBtnText) addDisciplineBtnText.textContent = t("addDiscipline");
+  if (disciplineModalTitle) disciplineModalTitle.textContent = t("disciplineModalTitle");
+  if (disciplinePreviewLabel) disciplinePreviewLabel.textContent = t("disciplinePreviewTitle");
+  if (disciplineTitleLabel) disciplineTitleLabel.textContent = t("disciplineTitleLabel");
+  if (disciplineTitleInput) disciplineTitleInput.placeholder = t("disciplineTitlePlaceholder");
+  if (saveDisciplineBtn) {
+    saveDisciplineBtn.textContent = saveDisciplineBtn.disabled ? t("disciplineCreating") : t("disciplineCreate");
+  }
   if (editTestBtn) editTestBtn.textContent = t("edit");
   if (saveTestBtn) saveTestBtn.textContent = t("save");
   if (testModalTitle) testModalTitle.textContent = isEditingTest ? t("testModalEdit") : t("testModalView");
   if (resultsSheetFrame) resultsSheetFrame.title = t("sheetFrameTitle");
+  if (buildTestBtn) buildTestBtn.textContent = selectedRole === "kaz" ? "Тестті құрастыру" : "Собрать тест";
+  if (testSettingsTitle) testSettingsTitle.textContent = selectedRole === "kaz" ? "Тест баптауы" : "Настройки теста";
+  if (testQuestionCountInput) testQuestionCountInput.placeholder = selectedRole === "kaz" ? "Сұрақ саны" : "Количество вопросов";
+  if (testDurationInput) testDurationInput.placeholder = selectedRole === "kaz" ? "Уақыт" : "Время";
+  if (publicTestNameLabel) publicTestNameLabel.textContent = selectedRole === "kaz" ? "Аты-жөніңіз" : "Имя и фамилия";
+  if (publicTestStartBtn) publicTestStartBtn.textContent = selectedRole === "kaz" ? "Тестті бастау" : "Начать тест";
+  if (publicTestSubmitBtn) publicTestSubmitBtn.textContent = selectedRole === "kaz" ? "Тапсыру" : "Отправить";
+  if (publicTestStudentNameInput) publicTestStudentNameInput.placeholder = selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз" : "Введите имя и фамилию";
   if (profileBtn) profileBtn.setAttribute("aria-label", t("editProfile"));
   if (openVoiceBtn) openVoiceBtn.setAttribute("aria-label", "AI assistant");
 
   if (recognition) {
     recognition.lang = getSpeechLanguage();
   }
+
+  renderDisciplinePreviewCard();
+  renderDriveStatus();
 }
 
 function normalizeMaterialType(type) {
@@ -399,12 +586,344 @@ function normalizeMaterialType(type) {
   return map[normalized] || normalized || "lecture";
 }
 
-async function fetchJSON(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+function toUploadCategory(type) {
+  if (type === "siw") return "sowj";
+  return type || "lecture";
+}
+
+async function fetchJSON(url, options = {}) {
+  const requestOptions = { ...options };
+  const method = (requestOptions.method || "GET").toUpperCase();
+
+  if (url.startsWith(API_BASE) && !requestOptions.credentials) {
+    requestOptions.credentials = "include";
   }
-  return response.json();
+
+  if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
+    const csrfToken = getCookie("csrftoken");
+    requestOptions.headers = {
+      ...(requestOptions.headers || {}),
+      ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+    };
+  }
+
+  const response = await fetch(url, requestOptions);
+  const responseType = response.headers.get("content-type") || "";
+  const payload = responseType.includes("application/json")
+    ? await response.json()
+    : await response.text();
+
+  if (!response.ok) {
+    const detail =
+      payload?.detail ||
+      payload?.title?.[0] ||
+      payload?.course?.[0] ||
+      payload?.language?.[0] ||
+      `Request failed: ${response.status}`;
+    const error = new Error(detail);
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
+function getCookie(name) {
+  const cookies = document.cookie ? document.cookie.split("; ") : [];
+  for (const cookie of cookies) {
+    const [cookieName, ...rest] = cookie.split("=");
+    if (cookieName === name) {
+      return decodeURIComponent(rest.join("="));
+    }
+  }
+  return "";
+}
+
+function clampTestConfig(questionCount, durationMinutes) {
+  return {
+    questionCount: Math.max(3, Math.min(Number(questionCount) || 5, 25)),
+    durationMinutes: Math.max(5, Math.min(Number(durationMinutes) || 20, 180)),
+  };
+}
+
+function getCurrentQuestionCount() {
+  return clampTestConfig(testQuestionCountInput?.value, testConfig.durationMinutes).questionCount;
+}
+
+function getCurrentDurationMinutes() {
+  return clampTestConfig(testConfig.questionCount, testDurationInput?.value).durationMinutes;
+}
+
+function syncTestConfigInputs() {
+  if (testQuestionCountInput) testQuestionCountInput.value = String(testConfig.questionCount);
+  if (testDurationInput) testDurationInput.value = String(testConfig.durationMinutes);
+}
+
+function saveStoredTestConfig() {
+  localStorage.setItem(TEST_CONFIG_KEY, JSON.stringify(testConfig));
+}
+
+function loadStoredTestConfig() {
+  try {
+    const raw = localStorage.getItem(TEST_CONFIG_KEY);
+    if (!raw) {
+      syncTestConfigInputs();
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    testConfig = clampTestConfig(parsed?.questionCount, parsed?.durationMinutes);
+  } catch (error) {
+    console.error("Test config restore error:", error);
+    testConfig = clampTestConfig(5, 20);
+  }
+
+  syncTestConfigInputs();
+}
+
+function buildPublicTestUrl(accessToken) {
+  if (!accessToken) return "";
+  const url = new URL(window.location.href);
+  url.search = `session=${accessToken}`;
+  url.hash = "";
+  return url.toString();
+}
+
+function getCurrentTestLaunchUrl(session = currentTestSession) {
+  if (!session) return "";
+  return session.form_url || session.public_url || buildPublicTestUrl(session.access_token);
+}
+
+function readTeacherAppState() {
+  try {
+    const raw = localStorage.getItem(APP_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error("App state parse error:", error);
+    return null;
+  }
+}
+
+function saveTeacherAppState() {
+  if (publicTestSessionToken) return;
+
+  const payload = {
+    selectedRole,
+    selectedCourseNumber,
+    selectedSubjectId: selectedSubject?.id || null,
+    activeType,
+    selectedMaterialId,
+    activeSubjectPanel,
+    isMaterialManagerOpen,
+  };
+
+  localStorage.setItem(APP_STATE_KEY, JSON.stringify(payload));
+}
+
+function clearTeacherAppState() {
+  localStorage.removeItem(APP_STATE_KEY);
+}
+
+function getPublicAttemptStorageKey(accessToken = publicTestSessionToken) {
+  return `${PUBLIC_TEST_ATTEMPT_KEY}:${accessToken || "none"}`;
+}
+
+function readStoredPublicAttempt(accessToken = publicTestSessionToken) {
+  try {
+    const raw = localStorage.getItem(getPublicAttemptStorageKey(accessToken));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error("Public attempt restore error:", error);
+    return null;
+  }
+}
+
+function saveStoredPublicAttempt(payload, accessToken = publicTestSessionToken) {
+  if (!accessToken) return;
+  localStorage.setItem(getPublicAttemptStorageKey(accessToken), JSON.stringify(payload));
+}
+
+function clearStoredPublicAttempt(accessToken = publicTestSessionToken) {
+  if (!accessToken) return;
+  localStorage.removeItem(getPublicAttemptStorageKey(accessToken));
+}
+
+function hydrateCurrentTestSession(sessionData) {
+  if (!sessionData) {
+    currentTestSession = null;
+    generatedQuestions = [];
+    return;
+  }
+
+  currentTestSession = {
+    ...sessionData,
+    public_url: buildPublicTestUrl(sessionData.access_token),
+  };
+
+  const restoredQuestions = Array.isArray(sessionData.questions_json) ? sessionData.questions_json : [];
+  generatedQuestions = restoredQuestions.map((item, index) => {
+    const options = Array.isArray(item.options) ? item.options : [];
+    const resolvedAnswer = item.correct_option_index ?? options.findIndex(option => option === item.correct_answer);
+
+    return {
+      id: index + 1,
+      question: item.question,
+      options,
+      answer: Number.isInteger(resolvedAnswer) && resolvedAnswer >= 0 ? resolvedAnswer : 0,
+    };
+  });
+
+  testConfig = clampTestConfig(
+    sessionData.question_count || generatedQuestions.length || testConfig.questionCount,
+    sessionData.duration_minutes || testConfig.durationMinutes,
+  );
+  saveStoredTestConfig();
+  syncTestConfigInputs();
+}
+
+async function loadDriveStatus() {
+  try {
+    driveConnection = await fetchJSON(`${API_BASE}/users/drive/status/`, {
+      credentials: "include"
+    });
+  } catch (error) {
+    console.error("Drive status error:", error);
+    driveConnection = {
+      configured: false,
+      connected: false,
+      google_email: "",
+      google_name: "",
+    };
+  }
+
+  renderDriveStatus();
+  return driveConnection;
+}
+
+function renderDriveStatus() {
+  ensureMaterialManagerLayout();
+
+  if (uploadMaterialBtn) {
+    uploadMaterialBtn.disabled = !selectedSubject || isMaterialUploading || isMaterialDeleting;
+    uploadMaterialBtn.textContent = getUploadActionLabel();
+  }
+
+  if (uploadSingleMaterialBtn) {
+    uploadSingleMaterialBtn.disabled = !selectedSubject || isMaterialUploading || isMaterialDeleting;
+    uploadSingleMaterialBtn.textContent = getUploadSingleActionLabel();
+  }
+
+  if (uploadFolderMaterialBtn) {
+    uploadFolderMaterialBtn.disabled = !selectedSubject || isMaterialUploading || isMaterialDeleting;
+    uploadFolderMaterialBtn.textContent = getUploadFolderActionLabel();
+  }
+
+  if (deleteMaterialBtn) {
+    deleteMaterialBtn.disabled = !selectedSubject || !getSelectedMaterial() || isMaterialUploading || isMaterialDeleting;
+    deleteMaterialBtn.textContent = isMaterialDeleting ? getDeletingActionLabel() : getDeleteActionLabel();
+  }
+
+  renderMaterialManagerPanel();
+}
+
+async function connectGoogleDrive() {
+  try {
+    const payload = await fetchJSON(`${API_BASE}/users/drive/connect/`, {
+      credentials: "include"
+    });
+
+    if (payload.authorization_url) {
+      window.location.href = payload.authorization_url;
+      return true;
+    }
+  } catch (error) {
+    console.error("Drive connect error:", error);
+    renderDriveStatus();
+  }
+
+  return false;
+}
+
+async function uploadMaterialFiles(fileList) {
+  const files = Array.from(fileList || []).filter(file => file && file.size >= 0);
+
+  if (!selectedSubject || !files.length) return;
+
+  isMaterialUploading = true;
+  isUploadMenuOpen = false;
+  renderDriveStatus();
+
+  try {
+    const formData = new FormData();
+    formData.append("discipline", selectedSubject.id);
+    formData.append("category", toUploadCategory(activeType));
+    formData.append("description", "");
+    files.forEach(file => {
+      formData.append("files", file, file.webkitRelativePath || file.name);
+    });
+
+    const payload = await fetchJSON(`${API_BASE}/materials/upload/`, {
+      method: "POST",
+      body: formData,
+      credentials: "include"
+    });
+
+    const created = Array.isArray(payload?.created) ? payload.created : [];
+    selectedSubject.materials = await loadMaterialsForSubject(selectedSubject.id);
+
+    if (created.length) {
+      activeType = normalizeMaterialType(created[created.length - 1].category);
+      selectedMaterialId = created[created.length - 1].id;
+    }
+
+    populateMaterialTypeSelect();
+    populateTopicSelect();
+    renderMaterialPreview();
+    resetTestState();
+    renderTestBlock();
+    renderResultsBlock();
+    renderDriveStatus();
+  } catch (error) {
+    console.error("Material upload error:", error);
+    renderDriveStatus();
+  } finally {
+    isMaterialUploading = false;
+    renderDriveStatus();
+  }
+}
+
+async function deleteSelectedMaterial() {
+  const material = getSelectedMaterial();
+  if (!selectedSubject || !material || isMaterialDeleting) return;
+
+  isMaterialDeleting = true;
+  renderDriveStatus();
+
+  const confirmMessage = selectedRole === "kaz"
+    ? `"${material.title}" материалы және оған қатысты тесттері жойылады. Жалғастыру керек пе?`
+    : `Материал "${material.title}" и связанные с ним тесты будут удалены. Продолжить?`;
+
+  try {
+    await fetchJSON(`${API_BASE}/materials/${material.id}/`, {
+      method: "DELETE"
+    });
+
+    selectedSubject.materials = await loadMaterialsForSubject(selectedSubject.id);
+    selectedMaterialId = null;
+    populateMaterialTypeSelect();
+    populateTopicSelect();
+    clearMaterialPreview();
+    resetTestState();
+    renderTestBlock();
+    renderResultsBlock();
+    renderDriveStatus();
+  } catch (error) {
+    console.error("Material delete error:", error);
+    renderDriveStatus();
+  } finally {
+    isMaterialDeleting = false;
+    renderDriveStatus();
+  }
 }
 
 async function loadTestSessionsForMaterial(materialId) {
@@ -430,7 +949,20 @@ async function getLatestSessionForSelectedMaterial() {
   }
 
   const sessions = await loadTestSessionsForMaterial(material.id);
-  currentTestSession = sessions[0] || null;
+  hydrateCurrentTestSession(sessions[0] || null);
+  return currentTestSession;
+}
+
+async function loadLatestTestSessionForSelectedMaterial() {
+  const material = getSelectedMaterial();
+
+  if (!material) {
+    resetTestState();
+    return null;
+  }
+
+  const sessions = await loadTestSessionsForMaterial(material.id);
+  hydrateCurrentTestSession(sessions[0] || null);
   return currentTestSession;
 }
 
@@ -466,6 +998,30 @@ function getBadgeClass(type) {
   return "badge-syllabus";
 }
 
+function getDisciplineTheme(seed = 0) {
+  const index = Math.abs(Number(seed) || 0) % DISCIPLINE_THEMES.length;
+  const theme = DISCIPLINE_THEMES[index];
+  return {
+    ...theme,
+    coverBackground: theme.background,
+    index: index + 1
+  };
+}
+
+function getDisciplineCoverMarkup(card = {}, extraClass = "") {
+  const coverClass = card.coverClass || DISCIPLINE_THEMES[0].coverClass;
+  return `
+    <div class="class-cover discipline-cover ${coverClass} ${extraClass}">
+      <div class="discipline-cover-art">
+        <span class="discipline-asset asset-a"></span>
+        <span class="discipline-asset asset-b"></span>
+        <span class="discipline-asset asset-c"></span>
+        <span class="discipline-asset asset-d"></span>
+      </div>
+    </div>
+  `;
+}
+
 function openModal(modal) {
   if (modal) modal.classList.add("show");
 }
@@ -499,6 +1055,81 @@ function getTypeLabel(type) {
   return labels[type] || t("material");
 }
 
+function getDeleteActionLabel() {
+  return selectedRole === "kaz" ? "Жою" : "Удалить";
+}
+
+function getDeletingActionLabel() {
+  return selectedRole === "kaz" ? "Р–РѕР№С‹Р»СѓРґР°..." : "РЈРґР°Р»РµРЅРёРµ...";
+}
+
+function getUploadActionLabel() {
+  return selectedRole === "kaz" ? "Жүктеу" : "Загрузка";
+}
+
+function getUploadSingleActionLabel() {
+  return selectedRole === "kaz" ? "Файл" : "Файл";
+}
+
+function getUploadFolderActionLabel() {
+  return selectedRole === "kaz" ? "Папка жүктеу" : "Загрузить папку";
+}
+
+function getMaterialManagerToggleLabel() {
+  if (selectedRole === "kaz") {
+    return isMaterialManagerOpen ? "Жүктеуді жабу" : "Материал жүктеу";
+  }
+
+  return isMaterialManagerOpen ? "Скрыть загрузку" : "Загрузка материала";
+}
+
+function ensureMaterialManagerLayout() {
+  return;
+}
+
+function renderUploadMenu() {
+  const canShowMenu = Boolean(selectedSubject) && isMaterialManagerOpen && !isMaterialUploading;
+  const shouldShowMenu = canShowMenu && isUploadMenuOpen;
+
+  if (uploadMenuWrap) {
+    uploadMenuWrap.classList.toggle("is-open", shouldShowMenu);
+  }
+
+  if (uploadModeMenu) {
+    uploadModeMenu.classList.toggle("show", shouldShowMenu);
+    uploadModeMenu.setAttribute("aria-hidden", String(!shouldShowMenu));
+  }
+}
+
+function renderMaterialManagerPanel() {
+  ensureMaterialManagerLayout();
+  const canShowManager = Boolean(selectedSubject);
+  const isManagerOpen = canShowManager && isMaterialManagerOpen;
+
+  if (!isManagerOpen) {
+    isUploadMenuOpen = false;
+  }
+
+  if (toggleMaterialManagerBtn) {
+    const label = getMaterialManagerToggleLabel();
+    toggleMaterialManagerBtn.textContent = label;
+    toggleMaterialManagerBtn.setAttribute("title", label);
+    toggleMaterialManagerBtn.setAttribute("aria-expanded", String(isManagerOpen));
+    toggleMaterialManagerBtn.classList.toggle("is-open", isManagerOpen);
+  }
+
+  if (materialManagerPanel) {
+    materialManagerPanel.classList.toggle("is-open", isManagerOpen);
+    materialManagerPanel.setAttribute("aria-hidden", String(!isManagerOpen));
+  }
+
+  if (controlActionsRow) {
+    controlActionsRow.classList.toggle("is-hidden", isManagerOpen);
+  }
+
+  renderUploadMenu();
+}
+
 function renderProfile() {
   applyRoleProfileState();
 
@@ -524,6 +1155,167 @@ function updateBrandRoleLabel() {
   brandRoleTitle.textContent = selectedRole === "kaz" ? t("roleTeacher") : t("roleLecturer");
 }
 
+function renderDisciplinePreviewCard() {
+  if (!disciplinePreviewCard) return;
+
+  const previewTitle = disciplineTitleInput?.value.trim() || t("disciplinePreviewUntitled");
+  const previewTheme = getDisciplineTheme((selectedCourseNumber || 0) + subjects.length + (selectedRole === "rus" ? 2 : 0));
+
+  disciplinePreviewCard.className = "discipline-preview-card";
+  disciplinePreviewCard.innerHTML = `
+    ${getDisciplineCoverMarkup(previewTheme, "discipline-preview-cover")}
+    <div class="discipline-preview-body">
+      <div class="discipline-preview-name">${escapeHtml(previewTitle)}</div>
+      <div class="discipline-preview-course">${selectedCourseNumber ? formatCourseLabel(selectedCourseNumber) : ""}</div>
+    </div>
+  `;
+}
+
+function openDisciplineModal() {
+  if (!selectedCourseNumber || !disciplineModal) return;
+  if (disciplineTitleInput) disciplineTitleInput.value = "";
+  if (disciplineFormError) disciplineFormError.textContent = "";
+  renderDisciplinePreviewCard();
+  openModal(disciplineModal);
+  disciplineTitleInput?.focus();
+}
+
+async function createDisciplineFromModal() {
+  if (!disciplineTitleInput || !saveDisciplineBtn || !selectedCourseNumber) return;
+
+  const title = disciplineTitleInput.value.trim();
+  if (!title) {
+    if (disciplineFormError) disciplineFormError.textContent = t("disciplineTitleRequired");
+    disciplineTitleInput.focus();
+    return;
+  }
+
+  const courseId = await getCourseIdByNumber(selectedCourseNumber);
+  if (!courseId) {
+    if (disciplineFormError) disciplineFormError.textContent = t("coursesLoadError");
+    return;
+  }
+
+  saveDisciplineBtn.disabled = true;
+  saveDisciplineBtn.textContent = t("disciplineCreating");
+  if (disciplineFormError) disciplineFormError.textContent = "";
+
+  try {
+    await fetchJSON(`${API_BASE}/disciplines/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title,
+        course: courseId,
+        language: selectedRole,
+        description: ""
+      })
+    });
+
+    closeModal(disciplineModal);
+    await loadDisciplinesForCourse(selectedCourseNumber);
+  } catch (error) {
+    console.error("Discipline create error:", error);
+    if (disciplineFormError) {
+      disciplineFormError.textContent = error.message || t("disciplineCreateError");
+    }
+  } finally {
+    saveDisciplineBtn.disabled = false;
+    saveDisciplineBtn.textContent = t("disciplineCreate");
+  }
+}
+
+function startSubjectTitleEdit() {
+  if (!selectedSubject || !subjectTitleInput || !subjectTitle) return;
+  isEditingSubjectTitle = true;
+  subjectTitleInput.value = selectedSubject.title || "";
+  renderSubjectHeader();
+  subjectTitleInput.focus();
+  subjectTitleInput.select();
+}
+
+function cancelSubjectTitleEdit() {
+  if (!subjectTitleInput) return;
+  isEditingSubjectTitle = false;
+  subjectTitleInput.value = selectedSubject?.title || "";
+  renderSubjectHeader();
+}
+
+async function saveSubjectTitleEdit() {
+  if (!selectedSubject || !subjectTitleInput) return;
+
+  const nextTitle = subjectTitleInput.value.trim();
+  if (!nextTitle) {
+    subjectTitleInput.focus();
+    subjectTitleInput.select();
+    return;
+  }
+
+  if (nextTitle === selectedSubject.title) {
+    cancelSubjectTitleEdit();
+    return;
+  }
+
+  try {
+    const updated = await fetchJSON(`${API_BASE}/disciplines/${selectedSubject.id}/`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        title: nextTitle
+      })
+    });
+
+    selectedSubject.title = updated.title;
+    subjects = subjects.map(item =>
+      Number(item.id) === Number(selectedSubject.id)
+        ? { ...item, title: updated.title }
+        : item
+    );
+
+    isEditingSubjectTitle = false;
+    renderSubjectHeader();
+  } catch (error) {
+    console.error("Discipline rename error:", error);
+    subjectTitleInput.focus();
+    subjectTitleInput.select();
+  }
+}
+
+async function deleteDiscipline(card) {
+  try {
+    deletingDisciplineId = card.id;
+    disciplineDeleteError = "";
+    renderDisciplineCards();
+
+    await fetchJSON(`${API_BASE}/disciplines/${card.id}/`, {
+      method: "DELETE"
+    });
+
+    openedDisciplineMenuId = null;
+    confirmingDisciplineDeleteId = null;
+    deletingDisciplineId = null;
+
+    if (selectedSubject && Number(selectedSubject.id) === Number(card.id)) {
+      showHome();
+    }
+
+    if (selectedCourseNumber) {
+      await loadDisciplinesForCourse(selectedCourseNumber);
+    }
+  } catch (error) {
+    console.error("Discipline delete error:", error);
+    deletingDisciplineId = null;
+    disciplineDeleteError = error.message || t("disciplineDeleteError");
+    openedDisciplineMenuId = card.id;
+    confirmingDisciplineDeleteId = card.id;
+    renderDisciplineCards();
+  }
+}
+
 async function refreshInterfaceLanguage({ roleChanged = false } = {}) {
   applyStaticTranslations();
   renderProfile();
@@ -544,6 +1336,71 @@ async function refreshInterfaceLanguage({ roleChanged = false } = {}) {
   if (selectedCourseNumber) {
     await loadDisciplinesForCourse(selectedCourseNumber);
   }
+
+  saveTeacherAppState();
+}
+
+async function restoreTeacherAppState() {
+  if (appStateRestoreDone || publicTestSessionToken) return;
+
+  loadStoredTestConfig();
+
+  const savedState = readTeacherAppState();
+  if (!savedState) {
+    appStateRestoreDone = true;
+    return;
+  }
+
+  if (savedState.selectedRole && ["kaz", "rus"].includes(savedState.selectedRole)) {
+    selectedRole = savedState.selectedRole;
+    applyStaticTranslations();
+    renderProfile();
+  }
+
+  if (!savedState.selectedCourseNumber) {
+    appStateRestoreDone = true;
+    return;
+  }
+
+  await openCourseDisciplines(Number(savedState.selectedCourseNumber));
+
+  if (!savedState.selectedSubjectId) {
+    appStateRestoreDone = true;
+    return;
+  }
+
+  const restoredSubject = subjects.find(item => Number(item.id) === Number(savedState.selectedSubjectId));
+  if (!restoredSubject) {
+    appStateRestoreDone = true;
+    return;
+  }
+
+  activeSubjectPanel = savedState.activeSubjectPanel || "materials";
+  await openSubject(restoredSubject);
+
+  if (savedState.activeType) {
+    activeType = savedState.activeType;
+    populateMaterialTypeSelect();
+  }
+
+  if (savedState.selectedMaterialId) {
+    selectedMaterialId = Number(savedState.selectedMaterialId);
+  }
+
+  populateTopicSelect();
+  await loadLatestTestSessionForSelectedMaterial();
+  renderMaterialPreview();
+  renderTestBlock(false);
+
+  if (activeSubjectPanel === "results") {
+    await renderResultsBlock();
+  }
+
+  switchSubjectPanel(activeSubjectPanel || "materials");
+  isMaterialManagerOpen = Boolean(savedState.isMaterialManagerOpen);
+  renderMaterialManagerPanel();
+  saveTeacherAppState();
+  appStateRestoreDone = true;
 }
 
 function getDisciplineLang(discipline) {
@@ -555,13 +1412,19 @@ async function openCourseDisciplines(courseNumber) {
   courseStage.classList.add("hidden");
   disciplineStage.classList.remove("hidden");
   await loadDisciplinesForCourse(courseNumber);
+  saveTeacherAppState();
 }
 
 function showCourseStage() {
   selectedCourseNumber = null;
+  openedDisciplineMenuId = null;
+  confirmingDisciplineDeleteId = null;
+  deletingDisciplineId = null;
+  disciplineDeleteError = "";
   disciplineStage.classList.add("hidden");
   courseStage.classList.remove("hidden");
   cardsGrid.innerHTML = "";
+  saveTeacherAppState();
 }
 
 async function getCourseIdByNumber(courseNumber) {
@@ -587,12 +1450,15 @@ function switchSubjectPanel(panelName) {
   if (panelName === "results") {
     resultsPane.classList.remove("hidden");
   }
+
+  saveTeacherAppState();
 }
 
 async function loadCoursesFromApi() {
   try {
     coursesData = await fetchJSON(`${API_BASE}/courses/`);
     renderCourseCards();
+    await restoreTeacherAppState();
   } catch (error) {
     console.error("Courses load error:", error);
     courseGrid.innerHTML = `<div class="empty-state">${t("coursesLoadError")}</div>`;
@@ -653,19 +1519,14 @@ async function loadDisciplinesForCourse(courseNumber) {
 
     subjects = disciplines
       .map((discipline, index) => ({
+        ...getDisciplineTheme(discipline.id || index),
         id: discipline.id,
         title: discipline.title,
         course: formatCourseLabel(discipline.course_number),
         courseNum: formatCourseLabel(discipline.course_number),
         courseNumber: discipline.course_number,
         groupLang: getDisciplineLang(discipline),
-        tone: ["lavender", "peach", "mint", "rose"][index % 4],
-        coverImage: [
-          "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1600&q=80",
-          "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=1600&q=80",
-          "https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1600&q=80",
-          "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1600&q=80"
-        ][index % 4],
+        coverImage: "",
         materials: []
       }))
       .filter(item => item.groupLang === selectedRole);
@@ -684,13 +1545,81 @@ function renderDisciplineCards() {
   subjects.forEach(card => {
     const el = document.createElement("div");
     el.className = "class-card";
+    const menuOpen = openedDisciplineMenuId === card.id;
+    const confirmDelete = confirmingDisciplineDeleteId === card.id;
+    const isDeleting = deletingDisciplineId === card.id;
+    const menuContent = confirmDelete
+      ? `
+        <button class="class-card-menu-item danger" type="button" data-discipline-action="confirm-delete" ${isDeleting ? "disabled" : ""}>
+          ${isDeleting ? t("disciplineDeleting") : t("confirmDelete")}
+        </button>
+        <button class="class-card-menu-item" type="button" data-discipline-action="cancel-delete" ${isDeleting ? "disabled" : ""}>
+          ${t("cancel")}
+        </button>
+        ${disciplineDeleteError ? `<div class="class-card-menu-error">${escapeHtml(disciplineDeleteError)}</div>` : ""}
+      `
+      : `
+        <button class="class-card-menu-item danger" type="button" data-discipline-action="start-delete">${t("disciplineDelete")}</button>
+      `;
     el.innerHTML = `
-      <div class="class-cover cover-${card.tone}"></div>
+      <div class="class-card-menu-wrap">
+        <button class="class-card-menu-btn" type="button" aria-label="${t("disciplineMenu")}">
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <circle cx="10" cy="4.25" r="1.45"></circle>
+            <circle cx="10" cy="10" r="1.45"></circle>
+            <circle cx="10" cy="15.75" r="1.45"></circle>
+          </svg>
+        </button>
+        <div class="class-card-menu ${menuOpen ? "show" : ""}">
+          ${menuContent}
+        </div>
+      </div>
+      ${getDisciplineCoverMarkup(card)}
       <div class="class-body">
         <div class="class-subject">${card.title}</div>
         <div class="class-course">${card.course}</div>
       </div>
     `;
+
+    const menuBtn = el.querySelector(".class-card-menu-btn");
+
+    if (menuBtn) {
+      menuBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        disciplineDeleteError = "";
+        confirmingDisciplineDeleteId = null;
+        openedDisciplineMenuId = menuOpen ? null : card.id;
+        renderDisciplineCards();
+      });
+    }
+
+    el.querySelectorAll("[data-discipline-action]").forEach((actionBtn) => {
+      actionBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        const action = actionBtn.dataset.disciplineAction;
+
+        if (action === "start-delete") {
+          disciplineDeleteError = "";
+          openedDisciplineMenuId = card.id;
+          confirmingDisciplineDeleteId = card.id;
+          renderDisciplineCards();
+          return;
+        }
+
+        if (action === "cancel-delete") {
+          disciplineDeleteError = "";
+          confirmingDisciplineDeleteId = null;
+          openedDisciplineMenuId = null;
+          renderDisciplineCards();
+          return;
+        }
+
+        if (action === "confirm-delete") {
+          await deleteDiscipline(card);
+        }
+      });
+    });
+
     el.addEventListener("click", () => openSubject(card));
     cardsGrid.appendChild(el);
   });
@@ -727,10 +1656,19 @@ async function loadMaterialsForSubject(subjectId) {
 
 async function openSubject(subject) {
   selectedSubject = { ...subject };
+  isEditingSubjectTitle = false;
+  isMaterialManagerOpen = false;
+  isUploadMenuOpen = false;
+  openedDisciplineMenuId = null;
+  confirmingDisciplineDeleteId = null;
+  deletingDisciplineId = null;
+  disciplineDeleteError = "";
 
   if (!selectedSubject.materials || !selectedSubject.materials.length) {
     selectedSubject.materials = await loadMaterialsForSubject(selectedSubject.id);
   }
+
+  await loadDriveStatus();
 
   const existingType = typeOrder.find(t => selectedSubject.materials.some(m => m.type === t.key));
   activeType = existingType ? existingType.key : "lecture";
@@ -738,7 +1676,7 @@ async function openSubject(subject) {
   const firstMaterial = selectedSubject.materials.find(m => m.type === activeType) || selectedSubject.materials[0] || null;
   selectedMaterialId = firstMaterial ? firstMaterial.id : null;
 
-  resetTestState();
+  await loadLatestTestSessionForSelectedMaterial();
 
   homeView.classList.add("hidden");
   subjectView.classList.remove("hidden");
@@ -746,17 +1684,28 @@ async function openSubject(subject) {
   renderSubjectHeader();
   populateMaterialTypeSelect();
   populateTopicSelect();
+  renderDriveStatus();
   clearMaterialPreview();
   renderTestBlock(false);
   renderResultsBlock();
-  switchSubjectPanel("materials");
+  switchSubjectPanel(activeSubjectPanel || "materials");
+  saveTeacherAppState();
 }
 
 function showHome() {
+  cancelSubjectTitleEdit();
   subjectView.classList.add("hidden");
   homeView.classList.remove("hidden");
   selectedSubject = null;
+  isMaterialManagerOpen = false;
+  isUploadMenuOpen = false;
+  openedDisciplineMenuId = null;
+  confirmingDisciplineDeleteId = null;
+  deletingDisciplineId = null;
+  disciplineDeleteError = "";
   activeSubjectPanel = "materials";
+  renderMaterialManagerPanel();
+  saveTeacherAppState();
 }
 
 function getTypeMaterials() {
@@ -781,22 +1730,29 @@ function renderSubjectHeader() {
   if (!selectedSubject) return;
 
   subjectTitle.textContent = selectedSubject.title;
+  if (subjectTitleInput) {
+    subjectTitleInput.value = selectedSubject.title;
+    subjectTitleInput.classList.toggle("hidden", !isEditingSubjectTitle);
+  }
+  if (subjectTitle) {
+    subjectTitle.classList.toggle("hidden", isEditingSubjectTitle);
+  }
   subjectCourse.textContent = selectedSubject.course;
-  subjectCoverTop.style.backgroundImage = `
-    linear-gradient(180deg, rgba(7,11,18,0.20), rgba(7,11,18,0.28)),
-    url("${selectedSubject.coverImage}")
-  `;
+  subjectCoverTop.style.backgroundImage = selectedSubject.coverImage
+    ? `linear-gradient(180deg, rgba(7,11,18,0.20), rgba(7,11,18,0.28)), url("${selectedSubject.coverImage}")`
+    : `${selectedSubject.coverBackground || selectedSubject.background || DISCIPLINE_THEMES[0].background}`;
+  if (changeCoverBtn) {
+    changeCoverBtn.textContent = isEditingSubjectTitle ? t("save") : t("edit");
+  }
 }
 
 function populateMaterialTypeSelect() {
   if (!materialTypeSelect || !selectedSubject) return;
 
-  const existingTypes = typeOrder.filter(type =>
-    selectedSubject.materials.some(m => m.type === type.key)
-  );
+  const existingTypes = typeOrder;
 
   materialTypeSelect.innerHTML = existingTypes.map(type => `
-    <option value="${type.key}" ${type.key === activeType ? "selected" : ""}>${type.label}</option>
+    <option value="${type.key}" ${type.key === activeType ? "selected" : ""}>${getTypeLabel(type.key)}</option>
   `).join("");
 
   if (!existingTypes.length) {
@@ -846,7 +1802,13 @@ function renderMaterialPreview() {
     return;
   }
 
-  let previewInner = `<img src="${selectedSubject.coverImage}" alt="preview" />`;
+  let previewInner = selectedSubject?.coverImage
+    ? `<img src="${selectedSubject.coverImage}" alt="preview" />`
+    : `
+      <div class="preview-discipline-shell">
+        ${getDisciplineCoverMarkup(selectedSubject, "preview-discipline-cover")}
+      </div>
+    `;
   const kind = getPreviewKindFromUrl(item.fileUrl);
 
   if (item.fileUrl) {
@@ -894,20 +1856,66 @@ function resetTestState() {
   generatedQuestions = [];
   currentTestSession = null;
   isEditingTest = false;
+  isTestGenerating = false;
   updateActionButtonsState();
+}
+
+function renderTestSettingsPanel() {
+  const material = getSelectedMaterial();
+  const isLecture = material?.type === "lecture";
+  const hasTest = Boolean(currentTestSession && generatedQuestions.length);
+
+  syncTestConfigInputs();
+
+  if (buildTestBtn) {
+    buildTestBtn.disabled = !isLecture || isTestGenerating;
+    buildTestBtn.textContent = isTestGenerating
+      ? (selectedRole === "kaz" ? "Құрастырылып жатыр..." : "Создается...")
+      : (selectedRole === "kaz" ? "Тестті құрастыру" : "Собрать тест");
+  }
+
+  if (testQuestionCountInput) {
+    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testDurationInput) {
+    testDurationInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testInfoText) {
+    testInfoText.classList.toggle("is-error", !isLecture);
+  }
+
+  if (testSettingsHint) {
+    if (!isLecture) {
+      testSettingsHint.textContent = t("testLectureOnly");
+      return;
+    }
+
+    if (hasTest) {
+      testSettingsHint.textContent = selectedRole === "kaz"
+        ? `Тест дайын: ${generatedQuestions.length} сұрақ, ${testConfig.durationMinutes} минут.`
+        : `Тест готов: ${generatedQuestions.length} вопросов, ${testConfig.durationMinutes} минут.`;
+      return;
+    }
+
+    testSettingsHint.textContent = selectedRole === "kaz"
+      ? "Сұрақ санын және тест уақытын белгілеп, содан кейін тестті құрастырыңыз."
+      : "Укажите количество вопросов и длительность теста, затем соберите тест.";
+  }
 }
 
 function updateActionButtonsState() {
   const material = getSelectedMaterial();
   const isLecture = material?.type === "lecture";
   const hasGeneratedTest = generatedQuestions.length > 0;
-  const hasSessionLink = !!currentTestSession?.form_url;
-  const hasResultsSheet =
-    !!currentTestSession?.results_sheet_url || !!material?.resultsSheetUrl;
+  const hasSessionLink = !!currentTestSession?.access_token || !!currentTestSession?.form_url;
+  const hasResults = !!currentTestSession;
 
-  generateTestBtn.disabled = !isLecture;
+  generateTestBtn.disabled = !isLecture || isTestGenerating;
   openQrBtn.disabled = !hasGeneratedTest || !hasSessionLink;
-  openResultsBtn.disabled = !hasResultsSheet;
+  openResultsBtn.disabled = !hasResults;
+  renderTestSettingsPanel();
 }
 
 function buildInlineQrUrl(value) {
@@ -944,7 +1952,7 @@ function makeQuestion(index, topicTitle) {
   };
 }
 
-function saveEditedQuestions() {
+async function saveEditedQuestions() {
   document.querySelectorAll(".edit-textarea").forEach(area => {
     const qIndex = Number(area.dataset.questionIndex);
     generatedQuestions[qIndex].question = area.value.trim() || generatedQuestions[qIndex].question;
@@ -961,11 +1969,36 @@ function saveEditedQuestions() {
     if (checked) question.answer = Number(checked.value);
   });
 
+  if (currentTestSession?.id) {
+    try {
+      const updated = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          questions_json: generatedQuestions.map((q) => ({
+            question: q.question,
+            options: q.options,
+            correct_answer: q.options[q.answer] || "",
+            correct_option_index: q.answer,
+          })),
+          question_count: generatedQuestions.length,
+        }),
+      });
+
+      hydrateCurrentTestSession(updated);
+    } catch (error) {
+      console.error("Test session save error:", error);
+    }
+  }
+
   renderQuestionModal(false);
 }
 
 function renderTestBlock(showQrInline = false) {
   const material = getSelectedMaterial();
+  renderTestSettingsPanel();
 
   if (!material) {
     testInfoText.textContent = "";
@@ -996,11 +2029,12 @@ function renderTestBlock(showQrInline = false) {
     return;
   }
 
-  testInfoText.textContent = t("testReady", { count: generatedQuestions.length });
+  const publicUrl = getCurrentTestLaunchUrl();
+  testInfoText.textContent = selectedRole === "kaz"
+    ? `Тест дайын · ${generatedQuestions.length} сұрақ · ${testConfig.durationMinutes} мин`
+    : `Тест готов · ${generatedQuestions.length} вопросов · ${testConfig.durationMinutes} мин`;
 
-  const formUrl = currentTestSession?.form_url;
-
-  if (!formUrl) {
+  if (!publicUrl) {
     qrImageInline.style.display = "none";
     openTestDirectBtn.disabled = true;
     showQrBtn.disabled = true;
@@ -1009,7 +2043,7 @@ function renderTestBlock(showQrInline = false) {
   }
 
   if (showQrInline) {
-    qrImageInline.src = buildInlineQrUrl(formUrl);
+    qrImageInline.src = buildInlineQrUrl(publicUrl);
     qrImageInline.style.display = "block";
   } else {
     qrImageInline.style.display = "none";
@@ -1165,7 +2199,7 @@ async function openResultsSheetDirect() {
 function openTestDirect() {
   if (!generatedQuestions.length) return;
 
-  const formUrl = currentTestSession?.form_url;
+  const formUrl = getCurrentTestLaunchUrl();
 
   if (!formUrl) {
     alert(t("formNotReady"));
@@ -1178,16 +2212,15 @@ function openTestDirect() {
 function showQr() {
   if (!generatedQuestions.length) return;
 
-  const formUrl = currentTestSession?.form_url;
+  const formUrl = getCurrentTestLaunchUrl();
 
   if (!formUrl) {
     alert(t("qrNotReady"));
     return;
   }
 
-  qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(formUrl)}`;
-  qrCodeLabel.textContent = t("qrJoin");
-  openModal(qrModal);
+  switchSubjectPanel("test");
+  renderTestBlock(true);
 }
 
 async function createAiQuestions() {
@@ -1203,17 +2236,25 @@ async function createAiQuestions() {
     return;
   }
 
+  isTestGenerating = true;
   generateTestBtn.disabled = true;
   testInfoText.textContent = t("generatingAiTest");
+  renderTestSettingsPanel();
 
   try {
+    const nextQuestionCount = getCurrentQuestionCount();
+    const nextDurationMinutes = getCurrentDurationMinutes();
+    testConfig = clampTestConfig(nextQuestionCount, nextDurationMinutes);
+    saveStoredTestConfig();
+
     const response = await fetch(`${API_BASE}/materials/${currentMaterial.id}/generate-test/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        language: selectedRole
+        language: selectedRole,
+        question_count: testConfig.questionCount,
       })
     });
 
@@ -1237,6 +2278,8 @@ async function createAiQuestions() {
       },
       body: JSON.stringify({
         material_id: currentMaterial.id,
+        question_count: testConfig.questionCount,
+        duration_minutes: testConfig.durationMinutes,
         questions: generatedQuestions.map((q) => ({
           question: q.question,
           options: q.options,
@@ -1251,21 +2294,336 @@ async function createAiQuestions() {
     }
 
     const sessionData = await sessionResponse.json();
-    currentTestSession = {
+    hydrateCurrentTestSession({
       ...sessionData,
-      material: currentMaterial.id
-    };
+      material: currentMaterial.id,
+      questions_json: generatedQuestions.map((q) => ({
+        question: q.question,
+        options: q.options,
+        correct_answer: q.options[q.answer] || "",
+        correct_option_index: q.answer,
+      })),
+    });
 
     renderTestBlock(false);
     switchSubjectPanel("test");
+    saveTeacherAppState();
   } catch (error) {
     console.error("AI TEST ERROR:", error);
     testInfoText.textContent = t("aiTestError");
     alert(t("aiTestError"));
   } finally {
+    isTestGenerating = false;
     generateTestBtn.disabled = false;
     updateActionButtonsState();
   }
+}
+
+function formatCountdown(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const restSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(restSeconds).padStart(2, "0")}`;
+}
+
+function setPublicTestStatus(message = "", state = "neutral") {
+  if (!publicTestStatus) return;
+  publicTestStatus.textContent = message;
+  publicTestStatus.dataset.state = state;
+}
+
+function stopPublicTestTimer() {
+  if (publicTestCountdownTimer) {
+    clearInterval(publicTestCountdownTimer);
+    publicTestCountdownTimer = null;
+  }
+}
+
+function persistPublicAttemptState() {
+  if (!publicTestSessionToken || !publicTestAttempt) return;
+
+  saveStoredPublicAttempt({
+    attemptToken: publicTestAttempt.attempt_token,
+    studentName: publicTestAttempt.student_name,
+    answers: publicTestAnswers,
+  }, publicTestSessionToken);
+}
+
+function renderPublicTestQuestions() {
+  if (!publicTestQuestionList) return;
+
+  const questions = publicTestSession?.questions || [];
+  publicTestQuestionList.innerHTML = questions.map((question, qIndex) => `
+    <article class="public-test-question-card">
+      <div class="public-test-question-top">
+        <div class="public-test-question-index">${qIndex + 1}</div>
+        <div class="public-test-question-text">${escapeHtml(question.question)}</div>
+      </div>
+
+      <div class="public-test-options">
+        ${(question.options || []).map((option, oIndex) => `
+          <label class="public-test-option">
+            <input type="radio" name="public-question-${qIndex}" value="${oIndex}" ${publicTestAnswers[qIndex] === oIndex ? "checked" : ""} />
+            <span>${escapeHtml(option)}</span>
+          </label>
+        `).join("")}
+      </div>
+    </article>
+  `).join("");
+
+  publicTestQuestionList.querySelectorAll("input[type='radio']").forEach((input) => {
+    input.addEventListener("change", () => {
+      const match = input.name.match(/public-question-(\d+)/);
+      if (!match) return;
+      const questionIndex = Number(match[1]);
+      publicTestAnswers[questionIndex] = Number(input.value);
+      persistPublicAttemptState();
+    });
+  });
+}
+
+function renderPublicResultCard(resultAttempt = publicTestAttempt) {
+  if (!publicTestResultCard || !resultAttempt) return;
+
+  publicTestResultCard.innerHTML = `
+    <h3 style="font-size:24px;line-height:1.2;font-weight:800;color:#fff;">${selectedRole === "kaz" ? "Тест аяқталды" : "Тест завершен"}</h3>
+    <p style="font-size:15px;line-height:1.6;color:rgba(226,232,240,0.82);">
+      ${selectedRole === "kaz" ? "Нәтижеңіз" : "Ваш результат"}: <strong>${escapeHtml(resultAttempt.score_label || "-")}</strong>
+    </p>
+  `;
+  publicTestResultCard.classList.remove("hidden");
+}
+
+function startPublicTestTimer() {
+  stopPublicTestTimer();
+
+  if (!publicTestAttempt || publicTestAttempt.status !== "started") {
+    publicTestTimer.textContent = "--:--";
+    return;
+  }
+
+  const updateTimer = () => {
+    const remaining = Number(publicTestAttempt.remaining_seconds || 0);
+    publicTestTimer.textContent = formatCountdown(remaining);
+
+    if (remaining <= 0) {
+      stopPublicTestTimer();
+      setPublicTestStatus(selectedRole === "kaz" ? "Тест уақыты аяқталды." : "Время теста истекло.", "error");
+      publicTestSubmitBtn.disabled = true;
+      publicTestQuestionsWrap.classList.add("hidden");
+      publicTestResultCard.classList.remove("hidden");
+      publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Уақыт аяқталды." : "Время вышло."}</p>`;
+      clearStoredPublicAttempt(publicTestSessionToken);
+      return;
+    }
+
+    publicTestAttempt.remaining_seconds = remaining - 1;
+  };
+
+  updateTimer();
+  publicTestCountdownTimer = setInterval(updateTimer, 1000);
+}
+
+function renderPublicTestState() {
+  if (!publicTestView) return;
+
+  const session = publicTestSession;
+  const attempt = publicTestAttempt;
+
+  publicTestTitle.textContent = session?.title || (selectedRole === "kaz" ? "Тест" : "Тест");
+  publicTestCourse.textContent = session?.discipline_title || (selectedRole === "kaz" ? "Тест сессиясы" : "Тестовая сессия");
+  publicTestMeta.textContent = session
+    ? `${session.material_title} · ${session.question_count} ${selectedRole === "kaz" ? "сұрақ" : "вопросов"} · ${session.duration_minutes} ${selectedRole === "kaz" ? "мин" : "мин"}`
+    : "";
+
+  publicTestResultCard.classList.add("hidden");
+  publicTestQuestionsWrap.classList.add("hidden");
+  publicTestStartCard.classList.remove("hidden");
+  publicTestSubmitBtn.disabled = false;
+
+  if (!attempt) {
+    publicTestTimer.textContent = session ? formatCountdown(session.duration_minutes * 60) : "--:--";
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? "Тестті бастау үшін аты-жөніңізді енгізіңіз."
+        : "Введите имя и фамилию, чтобы начать тест.",
+      "neutral",
+    );
+    return;
+  }
+
+  if (attempt.status === "submitted") {
+    publicTestStartCard.classList.add("hidden");
+    renderPublicResultCard(attempt);
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? "Бұл тест осы студент үшін бұрын тапсырылған."
+        : "Этот тест уже был отправлен этим студентом.",
+      "success",
+    );
+    publicTestTimer.textContent = "00:00";
+    persistPublicAttemptState();
+    return;
+  }
+
+  if (attempt.status === "expired") {
+    publicTestStartCard.classList.add("hidden");
+    publicTestResultCard.classList.remove("hidden");
+    publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Бұл әрекет уақыты аяқталған." : "Время этой попытки истекло."}</p>`;
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? "Уақыт аяқталған соң бұл тестті қайта бастауға болмайды."
+        : "После истечения времени повторно начать тест нельзя.",
+      "error",
+    );
+    publicTestTimer.textContent = "00:00";
+    clearStoredPublicAttempt(publicTestSessionToken);
+    return;
+  }
+
+  publicTestStartCard.classList.add("hidden");
+  publicTestQuestionsWrap.classList.remove("hidden");
+  publicTestStudentNameInput.value = attempt.student_name || "";
+  setPublicTestStatus(
+    selectedRole === "kaz"
+      ? "Тест жүріп жатыр. Уақыт аяқталғанша тапсырып үлгеріңіз."
+      : "Тест запущен. Успейте отправить до окончания времени.",
+    "info",
+  );
+  renderPublicTestQuestions();
+  startPublicTestTimer();
+}
+
+async function loadPublicTestSession() {
+  if (!publicTestSessionToken) return;
+
+  const storedAttempt = readStoredPublicAttempt(publicTestSessionToken);
+  if (storedAttempt?.attemptToken) {
+    publicTestAttemptToken = storedAttempt.attemptToken;
+    publicTestAnswers = Array.isArray(storedAttempt.answers) ? storedAttempt.answers : [];
+  }
+
+  const query = publicTestAttemptToken ? `?attempt_token=${publicTestAttemptToken}` : "";
+  const sessionPayload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/${query}`);
+  publicTestSession = sessionPayload;
+  publicTestAttempt = sessionPayload.attempt || null;
+
+  if (publicTestSession?.language && ["kaz", "rus"].includes(publicTestSession.language)) {
+    selectedRole = publicTestSession.language;
+    applyStaticTranslations();
+  }
+
+  if (!publicTestAttempt && storedAttempt?.studentName) {
+    publicTestStudentNameInput.value = storedAttempt.studentName;
+  }
+
+  if (publicTestAttempt?.attempt_token) {
+    publicTestAttemptToken = publicTestAttempt.attempt_token;
+  }
+
+  renderPublicTestState();
+}
+
+async function startPublicTest() {
+  if (!publicTestSessionToken) return;
+
+  const studentName = publicTestStudentNameInput.value.trim();
+  if (!studentName) {
+    setPublicTestStatus(
+      selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз." : "Введите имя и фамилию.",
+      "error",
+    );
+    publicTestStudentNameInput.focus();
+    return;
+  }
+
+  publicTestStartBtn.disabled = true;
+  setPublicTestStatus(selectedRole === "kaz" ? "Тест ашылып жатыр..." : "Тест открывается...", "info");
+
+  try {
+    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/start/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        student_name: studentName,
+        attempt_token: publicTestAttemptToken || undefined,
+      }),
+    });
+
+    publicTestSession = payload.session;
+    publicTestAttempt = payload.attempt;
+    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+    publicTestAnswers = new Array(publicTestSession?.questions?.length || 0).fill(null);
+    persistPublicAttemptState();
+    renderPublicTestState();
+  } catch (error) {
+    console.error("Public test start error:", error);
+    const payload = error.payload || {};
+    if (payload.attempt) {
+      publicTestSession = payload.session || publicTestSession;
+      publicTestAttempt = payload.attempt;
+      publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+      publicTestAnswers = Array.isArray(publicTestAttempt?.answers)
+        ? publicTestAttempt.answers.map(item => item.selected_option_index ?? null)
+        : publicTestAnswers;
+      persistPublicAttemptState();
+      renderPublicTestState();
+      return;
+    }
+
+    setPublicTestStatus(error.message || (selectedRole === "kaz" ? "Тестті бастау мүмкін болмады." : "Не удалось начать тест."), "error");
+  } finally {
+    publicTestStartBtn.disabled = false;
+  }
+}
+
+async function submitPublicTest() {
+  if (!publicTestSessionToken || !publicTestAttemptToken) return;
+
+  publicTestSubmitBtn.disabled = true;
+  setPublicTestStatus(selectedRole === "kaz" ? "Жауаптар жіберіліп жатыр..." : "Ответы отправляются...", "info");
+
+  try {
+    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/submit/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        attempt_token: publicTestAttemptToken,
+        answers: publicTestAnswers,
+      }),
+    });
+
+    publicTestSession = payload.session;
+    publicTestAttempt = payload.attempt;
+    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+    persistPublicAttemptState();
+    renderPublicTestState();
+  } catch (error) {
+    console.error("Public test submit error:", error);
+    setPublicTestStatus(error.message || (selectedRole === "kaz" ? "Тестті тапсыру мүмкін болмады." : "Не удалось отправить тест."), "error");
+  } finally {
+    publicTestSubmitBtn.disabled = false;
+  }
+}
+
+async function initPublicTestMode() {
+  if (!publicTestSessionToken || !publicTestView) return false;
+
+  document.body.classList.add("public-test-mode");
+  publicTestView.classList.remove("hidden");
+
+  try {
+    await loadPublicTestSession();
+  } catch (error) {
+    console.error("Public test init error:", error);
+    setPublicTestStatus(selectedRole === "kaz" ? "Тест сессиясын ашу мүмкін болмады." : "Не удалось открыть тестовую сессию.", "error");
+  }
+
+  return true;
 }
 
 function renderQuestionModal(editMode = false) {
@@ -1655,72 +3013,443 @@ if (courseBackBtn) {
   courseBackBtn.addEventListener("click", showCourseStage);
 }
 
+function handleDriveReturnParams() {
+  const params = new URLSearchParams(window.location.search);
+  const driveStatus = params.get("drive");
+  const email = params.get("email");
+  const message = params.get("message");
+
+  if (!driveStatus && !email && !message) {
+    return;
+  }
+
+  window.history.replaceState({}, "", window.location.pathname);
+
+  if (driveStatus === "connected" && email) {
+    renderDriveStatus();
+    loadDriveStatus();
+    return;
+  }
+
+  if (driveStatus === "error") {
+    renderDriveStatus();
+    window.alert(message || t("driveConnectError"));
+  }
+}
+
+if (addDisciplineBtn) {
+  addDisciplineBtn.addEventListener("click", openDisciplineModal);
+}
+
 if (backBtn) {
   backBtn.addEventListener("click", () => {
-    subjectView.classList.add("hidden");
-    homeView.classList.remove("hidden");
+    showHome();
+  });
+}
+
+if (toggleMaterialManagerBtn) {
+  toggleMaterialManagerBtn.addEventListener("click", () => {
+    if (!selectedSubject) return;
+    isMaterialManagerOpen = !isMaterialManagerOpen;
+    if (!isMaterialManagerOpen) {
+      isUploadMenuOpen = false;
+    }
+    if (isMaterialManagerOpen) {
+      switchSubjectPanel("materials");
+      renderMaterialPreview();
+    }
+    renderMaterialManagerPanel();
   });
 }
 
 if (changeCoverBtn) {
-  changeCoverBtn.addEventListener("click", () => {
-    coverFileInput.click();
+  changeCoverBtn.addEventListener("click", async () => {
+    if (!isEditingSubjectTitle) {
+      startSubjectTitleEdit();
+      return;
+    }
+
+    await saveSubjectTitleEdit();
   });
 }
 
-if (coverFileInput) {
-  coverFileInput.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedSubject) return;
+if (subjectTitleInput) {
+  subjectTitleInput.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      await saveSubjectTitleEdit();
+    }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      selectedSubject.coverImage = reader.result;
-      renderSubjectHeader();
-      renderMaterialPreview();
-      renderDisciplineCards();
-    };
-    reader.readAsDataURL(file);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      cancelSubjectTitleEdit();
+    }
   });
 }
 
 if (materialTypeSelect) {
-  materialTypeSelect.addEventListener("change", () => {
+  materialTypeSelect.addEventListener("change", async () => {
     activeType = materialTypeSelect.value;
     selectedMaterialId = null;
     populateTopicSelect();
-    resetTestState();
+    renderDriveStatus();
+    await loadLatestTestSessionForSelectedMaterial();
     clearMaterialPreview();
     renderTestBlock();
     renderResultsBlock();
+    saveTeacherAppState();
   });
 }
 
+if (uploadMaterialBtn) {
+  uploadMaterialBtn.addEventListener("click", async () => {
+    if (!selectedSubject || isMaterialUploading) return;
+
+    if (!driveConnection.connected) {
+      await connectGoogleDrive();
+      return;
+    }
+
+    isUploadMenuOpen = !isUploadMenuOpen;
+    renderUploadMenu();
+  });
+}
+
+if (uploadSingleMaterialBtn) {
+  uploadSingleMaterialBtn.addEventListener("click", () => {
+    if (!selectedSubject || isMaterialUploading) return;
+    isUploadMenuOpen = false;
+    renderUploadMenu();
+    singleMaterialUploadInput?.click();
+  });
+}
+
+if (uploadFolderMaterialBtn) {
+  uploadFolderMaterialBtn.addEventListener("click", () => {
+    if (!selectedSubject || isMaterialUploading) return;
+    isUploadMenuOpen = false;
+    renderUploadMenu();
+    folderMaterialUploadInput?.click();
+  });
+}
+
+if (deleteMaterialBtn) {
+  deleteMaterialBtn.addEventListener("click", async () => {
+    if (!selectedSubject || !getSelectedMaterial()) return;
+    await deleteSelectedMaterial();
+  });
+}
+
+if (singleMaterialUploadInput) {
+  singleMaterialUploadInput.addEventListener("change", async (event) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+    await uploadMaterialFiles(files);
+    singleMaterialUploadInput.value = "";
+  });
+}
+
+if (folderMaterialUploadInput) {
+  folderMaterialUploadInput.addEventListener("change", async (event) => {
+    const files = event.target.files;
+    if (!files?.length) return;
+    await uploadMaterialFiles(files);
+    folderMaterialUploadInput.value = "";
+  });
+}
+
+if (disciplineTitleInput) {
+  disciplineTitleInput.addEventListener("input", () => {
+    if (disciplineFormError) disciplineFormError.textContent = "";
+    renderDisciplinePreviewCard();
+  });
+
+  disciplineTitleInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      createDisciplineFromModal();
+    }
+  });
+}
+
+if (saveDisciplineBtn) {
+  saveDisciplineBtn.addEventListener("click", createDisciplineFromModal);
+}
+
 if (topicSelect) {
-  topicSelect.addEventListener("change", () => {
+  topicSelect.addEventListener("change", async () => {
     selectedMaterialId = Number(topicSelect.value);
-    resetTestState();
+    renderDriveStatus();
+    await loadLatestTestSessionForSelectedMaterial();
     clearMaterialPreview();
     renderTestBlock();
     renderResultsBlock();
+    saveTeacherAppState();
   });
 }
 
 if (openMaterialBtn) {
   openMaterialBtn.addEventListener("click", () => {
+    isMaterialManagerOpen = false;
+    renderMaterialManagerPanel();
     renderMaterialPreview();
     switchSubjectPanel("materials");
   });
 }
 
+function setTestPanelInfo(message = "", state = "neutral") {
+  if (!testInfoText) return;
+  testInfoText.textContent = message || "";
+  testInfoText.classList.toggle("is-error", state === "error");
+}
+
+function setTestPaneMode(mode = "settings") {
+  const qrMode = mode === "qr";
+
+  if (testQrBoard) {
+    testQrBoard.classList.toggle("is-qr-mode", qrMode);
+    testQrBoard.classList.toggle("is-settings-mode", !qrMode);
+  }
+
+  if (testQrCard) {
+    testQrCard.classList.toggle("is-qr-mode", qrMode);
+    testQrCard.classList.toggle("is-settings-mode", !qrMode);
+  }
+
+  if (testSettingsPanel) {
+    testSettingsPanel.classList.toggle("hidden", qrMode);
+  }
+
+  if (testQrActions) {
+    testQrActions.classList.toggle("hidden", !qrMode);
+  }
+
+  if (testInfoText) {
+    testInfoText.classList.toggle("hidden", qrMode || !testInfoText.textContent.trim());
+  }
+}
+
+renderTestSettingsPanel = function renderTestSettingsPanelOverride() {
+  const material = getSelectedMaterial();
+  const isLecture = material?.type === "lecture";
+
+  syncTestConfigInputs();
+
+  if (buildTestBtn) {
+    buildTestBtn.disabled = !isLecture || isTestGenerating;
+    buildTestBtn.textContent = isTestGenerating
+      ? (selectedRole === "kaz" ? "Жасалып жатыр..." : "Создается...")
+      : (selectedRole === "kaz" ? "Тест жасау" : "Создать тест");
+  }
+
+  if (testQuestionCountInput) {
+    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testDurationInput) {
+    testDurationInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testSettingsTitle) {
+    testSettingsTitle.textContent = "";
+  }
+
+  if (testSettingsHint) {
+    testSettingsHint.textContent = "";
+  }
+};
+
+renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
+  const material = getSelectedMaterial();
+  const qrMode = showQrInline === true;
+  renderTestSettingsPanel();
+  setTestPaneMode(qrMode ? "qr" : "settings");
+
+  if (!material) {
+    setTestPanelInfo("");
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  if (material.type !== "lecture") {
+    setTestPanelInfo(t("testLectureOnly"), "error");
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  if (!generatedQuestions.length) {
+    setTestPanelInfo("");
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  const publicUrl = getCurrentTestLaunchUrl();
+
+  if (!qrMode) {
+    setTestPanelInfo(
+      selectedRole === "kaz"
+        ? `Тест дайын · ${generatedQuestions.length} сұрақ · ${testConfig.durationMinutes} мин`
+        : `Тест готов · ${generatedQuestions.length} вопросов · ${testConfig.durationMinutes} мин`
+    );
+  } else {
+    setTestPanelInfo("");
+  }
+
+  if (!publicUrl) {
+    qrImageInline.style.display = "none";
+    openTestDirectBtn.disabled = true;
+    if (showQrBtn) showQrBtn.disabled = true;
+    updateActionButtonsState();
+    return;
+  }
+
+  if (qrMode) {
+    qrImageInline.src = buildInlineQrUrl(publicUrl);
+    qrImageInline.style.display = "block";
+  } else {
+    qrImageInline.style.display = "none";
+  }
+
+  openTestDirectBtn.disabled = !qrMode;
+  if (showQrBtn) showQrBtn.disabled = false;
+  setTestPaneMode(qrMode ? "qr" : "settings");
+  updateActionButtonsState();
+};
+
+createAiQuestions = async function createAiQuestionsOverride() {
+  const currentMaterial = getSelectedMaterial();
+
+  switchSubjectPanel("test");
+  setTestPaneMode("settings");
+
+  if (!currentMaterial) {
+    setTestPanelInfo(t("selectMaterialFirst"), "error");
+    renderTestSettingsPanel();
+    return;
+  }
+
+  if (currentMaterial.type !== "lecture") {
+    setTestPanelInfo(t("aiTestLectureOnly"), "error");
+    renderTestSettingsPanel();
+    return;
+  }
+
+  isTestGenerating = true;
+  generateTestBtn.disabled = true;
+  setTestPanelInfo(t("generatingAiTest"));
+  renderTestSettingsPanel();
+
+  try {
+    const nextQuestionCount = getCurrentQuestionCount();
+    const nextDurationMinutes = getCurrentDurationMinutes();
+    testConfig = clampTestConfig(nextQuestionCount, nextDurationMinutes);
+    saveStoredTestConfig();
+
+    const data = await fetchJSON(`${API_BASE}/materials/${currentMaterial.id}/generate-test/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        language: selectedRole,
+        question_count: testConfig.questionCount,
+      })
+    });
+
+    generatedQuestions = data.test.map((item, index) => ({
+      id: index + 1,
+      question: item.question,
+      options: item.options,
+      answer: ["A", "B", "C", "D"].indexOf(item.answer)
+    }));
+
+    const sessionData = await fetchJSON(`${API_BASE}/results/test-sessions/create-from-ai/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        material_id: currentMaterial.id,
+        question_count: testConfig.questionCount,
+        duration_minutes: testConfig.durationMinutes,
+        questions: generatedQuestions.map((q) => ({
+          question: q.question,
+          options: q.options,
+          correct_answer: q.options[q.answer] || "",
+          correct_option_index: q.answer
+        }))
+      })
+    });
+    hydrateCurrentTestSession({
+      ...sessionData,
+      material: currentMaterial.id,
+      questions_json: generatedQuestions.map((q) => ({
+        question: q.question,
+        options: q.options,
+        correct_answer: q.options[q.answer] || "",
+        correct_option_index: q.answer,
+      })),
+    });
+
+    renderTestBlock(false);
+    saveTeacherAppState();
+  } catch (error) {
+    console.error("AI TEST ERROR:", error);
+    setTestPanelInfo(error?.message || t("aiTestError"), "error");
+  } finally {
+    isTestGenerating = false;
+    generateTestBtn.disabled = false;
+    updateActionButtonsState();
+  }
+};
+
+if (buildTestBtn) {
+  buildTestBtn.addEventListener("click", createAiQuestions);
+}
+
+if (testQuestionCountInput) {
+  testQuestionCountInput.addEventListener("input", () => {
+    testConfig = clampTestConfig(testQuestionCountInput.value, testConfig.durationMinutes);
+    saveStoredTestConfig();
+    renderTestSettingsPanel();
+  });
+}
+
+if (testDurationInput) {
+  testDurationInput.addEventListener("input", () => {
+    testConfig = clampTestConfig(testConfig.questionCount, testDurationInput.value);
+    saveStoredTestConfig();
+    renderTestSettingsPanel();
+  });
+}
+
 if (generateTestBtn) {
-  generateTestBtn.addEventListener("click", createAiQuestions);
+  generateTestBtn.addEventListener("click", () => {
+    isMaterialManagerOpen = false;
+    renderMaterialManagerPanel();
+    switchSubjectPanel("test");
+    renderTestBlock(false);
+  });
 }
 
 if (openQrBtn) {
   openQrBtn.addEventListener("click", () => {
     if (!generatedQuestions.length) return;
 
+    isMaterialManagerOpen = false;
+    renderMaterialManagerPanel();
     renderTestBlock(true);
     switchSubjectPanel("test");
   });
@@ -1728,6 +3457,8 @@ if (openQrBtn) {
 
 if (openResultsBtn) {
   openResultsBtn.addEventListener("click", async () => {
+    isMaterialManagerOpen = false;
+    renderMaterialManagerPanel();
     switchSubjectPanel("results");
     await renderResultsBlock();
   });
@@ -1747,6 +3478,23 @@ if (showQrBtn) {
 
 if (openResultsSheetBtn) {
   openResultsSheetBtn.addEventListener("click", openResultsSheetDirect);
+}
+
+if (publicTestStartBtn) {
+  publicTestStartBtn.addEventListener("click", startPublicTest);
+}
+
+if (publicTestStudentNameInput) {
+  publicTestStudentNameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      startPublicTest();
+    }
+  });
+}
+
+if (publicTestSubmitBtn) {
+  publicTestSubmitBtn.addEventListener("click", submitPublicTest);
 }
 
 if (editTestBtn) {
@@ -1809,7 +3557,7 @@ document.querySelectorAll("[data-close-modal]").forEach((btn) => {
   });
 });
 
-[profileModal, testModal, qrModal, playerDetailModal].forEach(modal => {
+[profileModal, disciplineModal, testModal, qrModal, playerDetailModal].forEach(modal => {
   if (!modal) return;
   modal.addEventListener("click", (e) => {
     if (e.target === modal) closeModal(modal);
@@ -1825,14 +3573,39 @@ document.addEventListener("click", (e) => {
     roleMenu.classList.add("hidden");
   }
 
+  if (openedDisciplineMenuId !== null && !e.target.closest(".class-card-menu-wrap")) {
+    openedDisciplineMenuId = null;
+    confirmingDisciplineDeleteId = null;
+    deletingDisciplineId = null;
+    disciplineDeleteError = "";
+    renderDisciplineCards();
+  }
+
+  if (isUploadMenuOpen && uploadMenuWrap && !uploadMenuWrap.contains(e.target)) {
+    isUploadMenuOpen = false;
+    renderUploadMenu();
+  }
+
   const voiceAssistant = document.querySelector(".voice-assistant");
   if (voiceAssistant && !voiceAssistant.contains(e.target)) {
     voicePanel.classList.remove("show");
   }
 });
 
-applyStaticTranslations();
-renderProfile();
-loadCoursesFromApi();
-initSpeechRecognition();
-setVoiceState("idle", t("voiceReady"));
+async function bootstrapApp() {
+  loadStoredTestConfig();
+  applyStaticTranslations();
+  renderProfile();
+
+  if (await initPublicTestMode()) {
+    return;
+  }
+
+  handleDriveReturnParams();
+  loadDriveStatus();
+  loadCoursesFromApi();
+  initSpeechRecognition();
+  setVoiceState("idle", t("voiceReady"));
+}
+
+bootstrapApp();

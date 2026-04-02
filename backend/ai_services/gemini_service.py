@@ -1,77 +1,72 @@
 import json
+import os
+from contextlib import contextmanager
 
 from django.conf import settings
 from google import genai
 
 
-def generate_test_from_text(text: str, language: str = "kaz") -> list:
+BROKEN_LOCAL_PROXY_MARKERS = ("127.0.0.1:9", "localhost:9")
+
+
+@contextmanager
+def _bypass_broken_local_proxy():
+    removed_values = {}
+
+    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        value = os.environ.get(key)
+        if value and any(marker in value for marker in BROKEN_LOCAL_PROXY_MARKERS):
+            removed_values[key] = value
+            os.environ.pop(key, None)
+
+    try:
+        yield
+    finally:
+        for key, value in removed_values.items():
+            os.environ[key] = value
+
+
+def generate_test_from_text(text: str, language: str = "kaz", question_count: int = 5) -> list:
     if not settings.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY табылмады")
+        raise ValueError("GEMINI_API_KEY tabylmady")
 
-    client = genai.Client(api_key=settings.GEMINI_API_KEY)
     is_russian = language == "rus"
+    safe_question_count = max(3, min(int(question_count or 5), 25))
+    target_language = "Russian" if is_russian else "Kazakh"
 
-    if is_russian:
-        prompt = f"""
-        Ты генератор тестов для преподавателя.
+    prompt = f"""
+You generate multiple-choice tests for a university teacher.
 
-        По материалу ниже составь ровно 5 тестовых вопросов на русском языке.
-        Верни ответ только в JSON формате.
-        Не добавляй пояснения, markdown или любой лишний текст.
+Create exactly {safe_question_count} questions based only on the material below.
+Return only valid JSON. Do not add markdown, explanations, or extra text.
 
-        Формат должен быть строго таким:
-        [
-          {{
-            "question": "Текст вопроса",
-            "options": ["A", "B", "C", "D"],
-            "answer": "A"
-          }}
-        ]
+Required JSON format:
+[
+  {{
+    "question": "Question text",
+    "options": ["A", "B", "C", "D"],
+    "answer": "A"
+  }}
+]
 
-        Требования:
-        - Должно быть ровно 5 вопросов
-        - В каждом вопросе должно быть 4 варианта ответа
-        - Вопросы и варианты должны быть на русском языке
-        - Вопросы должны быть тесно связаны с материалом
-        - Правильный ответ должен быть одним из вариантов
-        - Ответ верни только как JSON-массив
+Rules:
+- Exactly {safe_question_count} questions
+- Exactly 4 answer options per question
+- All questions and options must be in {target_language}
+- Questions must stay tightly connected to the provided material
+- The correct answer must match one of the 4 options through the answer letter
+- Return a JSON array only
 
-        Материал:
-        {text}
-        """
-    else:
-        prompt = f"""
-        Сен оқытушыға арналған тест генераторысың.
+Material:
+{text}
+"""
 
-        Төмендегі материал бойынша нақты 5 тест сұрағын қазақ тілінде құрастыр.
-        Жауапты тек JSON форматында қайтар.
-        Ешқандай артық түсіндірме, markdown немесе қосымша мәтін жазба.
-
-        Формат дәл мынадай болсын:
-        [
-          {{
-            "question": "Сұрақ мәтіні",
-            "options": ["A", "B", "C", "D"],
-            "answer": "A"
-          }}
-        ]
-
-        Талаптар:
-        - Барлығы 5 сұрақ болсын
-        - Әр сұрақта 4 нұсқа болсын
-        - Сұрақтар мен жауап нұсқалары қазақ тілінде болсын
-        - Сұрақтар материалға тікелей байланысты болсын
-        - Дұрыс жауап нұсқалардың бірі болсын
-        - Жауап тек JSON массив болсын
-
-        Материал:
-        {text}
-        """
-
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-    )
+    with _bypass_broken_local_proxy():
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
 
     cleaned_text = (response.text or "").strip()
 

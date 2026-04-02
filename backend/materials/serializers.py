@@ -18,4 +18,9 @@ class MaterialSerializer(serializers.ModelSerializer):
             "discipline_title",
             "form_url",
             "results_sheet_url",
+            "drive_file_id",
+            "drive_folder_id",
+            "mime_type",
+            "original_filename",
+            "owner_email",
         ]

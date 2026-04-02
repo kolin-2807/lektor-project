@@ -4,10 +4,44 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Satbayev Edu Assistant</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260401-08" />
+  <link rel="stylesheet" href="./css/style.css?v=20260402-02" />
 </head>
 <body>
-  <div class="app">
+  <section class="public-test-shell hidden" id="publicTestView">
+    <div class="public-test-box">
+      <div class="public-test-head">
+        <div class="public-test-copy">
+          <p class="public-test-eyebrow" id="publicTestCourse">Тест</p>
+          <h1 id="publicTestTitle">Тест</h1>
+          <p class="public-test-meta" id="publicTestMeta"></p>
+        </div>
+        <div class="public-test-timer" id="publicTestTimer">--:--</div>
+      </div>
+
+      <div class="public-test-alert" id="publicTestStatus"></div>
+
+      <div class="public-test-start-card" id="publicTestStartCard">
+        <label class="public-test-field" for="publicTestStudentNameInput">
+          <span id="publicTestNameLabel">Аты-жөніңіз</span>
+          <input id="publicTestStudentNameInput" type="text" placeholder="Аты-жөніңізді енгізіңіз" />
+        </label>
+
+        <button class="action-btn primary" id="publicTestStartBtn" type="button">Тестті бастау</button>
+      </div>
+
+      <div class="public-test-questions hidden" id="publicTestQuestionsWrap">
+        <div class="public-test-question-list" id="publicTestQuestionList"></div>
+
+        <div class="public-test-actions">
+          <button class="action-btn primary" id="publicTestSubmitBtn" type="button">Тапсыру</button>
+        </div>
+      </div>
+
+      <div class="public-test-result hidden" id="publicTestResultCard"></div>
+    </div>
+  </section>
+
+  <div class="app" id="teacherApp">
     <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
@@ -60,8 +94,12 @@
         </div>
 
         <div class="home-stage hidden" id="disciplineStage">
-          <div class="section-head-inline section-head-inline-compact">
+          <div class="section-head-inline discipline-stage-head">
             <button class="back-chip-btn" id="courseBackBtn" type="button">← Артқа</button>
+            <button class="add-discipline-btn" id="addDisciplineBtn" type="button">
+              <span class="add-discipline-btn-plus">+</span>
+              <span id="addDisciplineBtnText">Пән қосу</span>
+            </button>
           </div>
 
           <section class="cards-grid" id="cardsGrid"></section>
@@ -73,21 +111,38 @@
 
           <!-- ЖОҒАРЫҒА КӨТЕРІЛГЕН SUBJECT HEADER -->
           <div class="subject-cover-top" id="subjectCoverTop">
-            <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
+            <div class="subject-cover-meta">
+              <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
 
-            <div class="subject-cover-copy">
-              <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
-              <p id="subjectCourse">3 курс</p>
+              <div class="subject-cover-copy">
+                <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
+                <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
+                <p id="subjectCourse">3 курс</p>
+              </div>
+
+              <button class="subject-manage-toggle" id="toggleMaterialManagerBtn" type="button">Материал жүктеу</button>
             </div>
 
             <div class="subject-cover-edit">
               <button class="cover-btn" id="changeCoverBtn" type="button">Өңдеу</button>
-              <input class="hidden-file" id="coverFileInput" type="file" accept="image/*" />
             </div>
           </div>
 
           <!-- ЖАҢА БАСҚАРУ ПАНЕЛІ -->
           <div class="subject-control-panel" id="subjectControlPanel">
+            <div class="material-manager-panel" id="materialManagerPanel">
+              <div class="material-manager-actions" id="materialManagerActions">
+                <div class="upload-menu-wrap" id="uploadMenuWrap">
+                  <button class="small-btn primary" id="uploadMaterialBtn" type="button">Жүктеу</button>
+                  <div class="upload-menu" id="uploadModeMenu" aria-hidden="true">
+                    <button class="upload-menu-item" id="uploadSingleMaterialBtn" type="button">Файл</button>
+                    <button class="upload-menu-item" id="uploadFolderMaterialBtn" type="button">Папка жүктеу</button>
+                  </div>
+                </div>
+                <button class="small-btn danger" id="deleteMaterialBtn" type="button">Жою</button>
+              </div>
+            </div>
+
             <div class="control-select-card">
               <label for="materialTypeSelect">Материал түрі</label>
               <select id="materialTypeSelect">
@@ -99,14 +154,14 @@
               </select>
             </div>
 
-            <div class="control-select-card">
+            <div class="control-select-card topic-select-card">
               <label for="topicSelect">Тақырып</label>
               <select id="topicSelect">
                 <option value="">Тақырыпты таңдаңыз</option>
               </select>
             </div>
 
-            <div class="control-actions-row">
+            <div class="control-actions-row" id="controlActionsRow">
               <button class="action-btn primary" id="openMaterialBtn" type="button">Материал</button>
               <button class="action-btn" id="generateTestBtn" type="button" disabled>Тест жасау</button>
               <button class="action-btn" id="openQrBtn" type="button" disabled>Тест (QR)</button>
@@ -130,16 +185,35 @@
                 <div class="material-preview-wrap">
                   <div class="material-preview" id="materialPreview"></div>
                 </div>
+
+                <input class="hidden-file" id="singleMaterialUploadInput" type="file" />
+                <input class="hidden-file" id="folderMaterialUploadInput" type="file" webkitdirectory directory multiple />
               </div>
 
               <!-- TEST VIEW -->
               <div class="content-view hidden" id="testPane">
-                <div class="content-view-head compact-test-head">
-                  <p id="testInfoText" class="test-ready-inline"></p>
-                </div>
-
                 <div class="test-qr-board">
                   <div class="test-qr-card">
+                    <p id="testInfoText" class="test-ready-inline"></p>
+
+                    <div class="test-settings-panel" id="testSettingsPanel">
+                      <div class="test-settings-grid">
+                        <label class="test-settings-field" for="testQuestionCountInput">
+                          <span id="testQuestionCountLabel">Сұрақ саны</span>
+                          <input id="testQuestionCountInput" type="number" min="3" max="25" value="5" />
+                        </label>
+
+                        <label class="test-settings-field" for="testDurationInput">
+                          <span id="testDurationLabel">Уақыт (минут)</span>
+                          <input id="testDurationInput" type="number" min="5" max="180" value="20" />
+                        </label>
+
+                        <div class="test-settings-cta">
+                          <button class="small-btn primary" id="buildTestBtn" type="button">Тест жасау</button>
+                        </div>
+                      </div>
+                    </div>
+
                     <img
                       id="qrImageInline"
                       alt="QR code"
@@ -148,7 +222,6 @@
 
                     <div class="test-qr-actions">
                       <button class="small-btn primary" id="openTestDirectBtn" type="button">Тестті ашу</button>
-                      <button class="small-btn" id="showQrBtn" type="button">QR ашу</button>
                     </div>
                   </div>
                 </div>
@@ -250,6 +323,34 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="disciplineModal">
+      <div class="modal-box discipline-modal-box">
+        <div class="modal-top">
+          <h3 id="disciplineModalTitle">Жаңа пән</h3>
+          <button class="modal-close" data-close-modal="disciplineModal" type="button">×</button>
+        </div>
+
+        <div class="discipline-modal-grid">
+          <div class="discipline-preview-wrap">
+            <p class="discipline-preview-label" id="disciplinePreviewLabel">Карточка үлгісі</p>
+            <div class="discipline-preview-card" id="disciplinePreviewCard"></div>
+          </div>
+
+          <div class="discipline-form-wrap">
+            <div class="edit-field">
+              <label for="disciplineTitleInput">Пән атауы</label>
+              <input id="disciplineTitleInput" type="text" maxlength="255" placeholder="Мысалы, Желілік қауіпсіздік" />
+            </div>
+            <p class="discipline-form-error" id="disciplineFormError"></p>
+          </div>
+        </div>
+
+        <div class="profile-modal-actions">
+          <button class="save-btn" id="saveDisciplineBtn" type="button">Қосу</button>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-backdrop" id="testModal">
       <div class="modal-box large">
         <div class="modal-top">
@@ -274,7 +375,7 @@
         </div>
 
         <div style="display:grid;justify-items:center;gap:14px;">
-          <img id="qrImageInline" alt="QR code" style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"/>
+          <img id="qrImage" alt="QR code" style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"/>
           <div class="pill open" id="qrCodeLabel">Тестке қосылу</div>
         </div>
       </div>
@@ -293,6 +394,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260401-08"></script>
+  <script src="./js/app.js?v=20260401-18"></script>
 </body>
 </html>
