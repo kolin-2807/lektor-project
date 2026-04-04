@@ -268,6 +268,38 @@ Object.assign(UI_TEXT.rus, {
   slidesDownloadUnavailable: "Ссылка на скачивание презентации пока не готова.",
 });
 
+Object.assign(UI_TEXT.kaz, {
+  homeLogo: "Негізгі бетке өту",
+  voiceAssistantLabel: "ИИ ассистент",
+  voiceHelpLabel: "Жылдам көмек",
+  voiceHelpTitle: "Жылдам көмек",
+  voiceHelpIntro: "Көмекші қысқа және нақты командаларды жақсы түсінеді.",
+  voiceHelpSteps: [
+    "Алдымен не керек екенін айтыңыз: курс, материал, тест немесе нәтиже.",
+    "Бір сұрауда бір әрекет берсеңіз, жауап дәлірек шығады."
+  ],
+  voiceInputPlaceholder: "",
+  voiceSendLabel: "Жіберу",
+  voiceInputEmpty: "Алдымен сұрағыңызды жазыңыз немесе айтыңыз.",
+  voiceLiveCaptured: ({ text }) => `Тыңдалды: ${text}`,
+});
+
+Object.assign(UI_TEXT.rus, {
+  homeLogo: "Перейти на главную страницу",
+  voiceAssistantLabel: "ИИ ассистент",
+  voiceHelpLabel: "Быстрая помощь",
+  voiceHelpTitle: "Быстрая помощь",
+  voiceHelpIntro: "Помощник лучше всего понимает короткие и точные команды.",
+  voiceHelpSteps: [
+    "Сначала скажите, что именно нужно: курс, материал, тест или результаты.",
+    "Если в одном запросе одна задача, ответ обычно получается точнее."
+  ],
+  voiceInputPlaceholder: "",
+  voiceSendLabel: "Отправить",
+  voiceInputEmpty: "Сначала введите запрос или продиктуйте его.",
+  voiceLiveCaptured: ({ text }) => `Распознано: ${text}`,
+});
+
 const typeOrder = [
   { key: "lecture", label: "Дәріс" },
   { key: "practice", label: "Практика" },
@@ -313,6 +345,7 @@ const subjectView = document.getElementById("subjectView");
 const courseStage = document.getElementById("courseStage");
 const disciplineStage = document.getElementById("disciplineStage");
 const courseGrid = document.getElementById("courseGrid");
+const homeLogoBtn = document.getElementById("homeLogoBtn");
 const courseBackBtn = document.getElementById("courseBackBtn");
 const addDisciplineBtn = document.getElementById("addDisciplineBtn");
 const addDisciplineBtnText = document.getElementById("addDisciplineBtnText");
@@ -396,10 +429,23 @@ const openResultsSheetBtn = document.getElementById("openResultsSheetBtn") || {
 };
 
 const openVoiceBtn = document.getElementById("openVoiceBtn");
+const openVoiceHelpBtn = document.getElementById("openVoiceHelpBtn");
 const closeVoiceBtn = document.getElementById("closeVoiceBtn");
+const closeVoiceHelpBtn = document.getElementById("closeVoiceHelpBtn");
 const voicePanel = document.getElementById("voicePanel");
+const voiceHelpPanel = document.getElementById("voiceHelpPanel");
 const voiceCore = document.getElementById("voiceCore");
 const voiceStatus = document.getElementById("voiceStatus");
+const voiceBadge = document.getElementById("voiceBadge");
+const voiceHelpBadge = document.getElementById("voiceHelpBadge");
+const voiceHelpTitle = document.getElementById("voiceHelpTitle");
+const voiceHelpIntro = document.getElementById("voiceHelpIntro");
+const voiceHelpList = document.getElementById("voiceHelpList");
+const voiceHelpExamplesTitle = document.getElementById("voiceHelpExamplesTitle");
+const voiceHelpExamples = document.getElementById("voiceHelpExamples");
+const voiceInputLabel = document.getElementById("voiceInputLabel");
+const voiceInput = document.getElementById("voiceInput");
+const voiceSendBtn = document.getElementById("voiceSendBtn");
 
 const profileModal = document.getElementById("profileModal");
 const avatarEditPreview = document.getElementById("avatarEditPreview");
@@ -492,6 +538,8 @@ let isMaterialUploading = false;
 
 let mediaRecorder = null;
 let recordedChunks = [];
+let voiceInterimBaseText = "";
+let isVoiceCaptureCancelled = false;
 
 function t(key, params = {}) {
   const dictionary = UI_TEXT[selectedRole] || UI_TEXT.kaz;
@@ -502,6 +550,46 @@ function t(key, params = {}) {
 
 function formatCourseLabel(number) {
   return t("courseLabel", { number });
+}
+
+function navigateToMainPage() {
+  if (!subjectView.classList.contains("hidden")) {
+    showHome();
+  }
+
+  showCourseStage();
+}
+
+function setVoicePanelOpen(shouldOpen) {
+  if (!voicePanel) return;
+  voicePanel.classList.toggle("show", shouldOpen);
+}
+
+function setVoiceHelpOpen(shouldOpen) {
+  if (!voiceHelpPanel) return;
+  voiceHelpPanel.classList.toggle("show", shouldOpen);
+}
+
+function renderVoiceHelp() {
+  if (voiceHelpTitle) voiceHelpTitle.textContent = t("voiceHelpTitle");
+  if (voiceHelpIntro) voiceHelpIntro.textContent = t("voiceHelpIntro");
+  if (voiceInput) voiceInput.placeholder = t("voiceInputPlaceholder");
+  if (voiceSendBtn) voiceSendBtn.setAttribute("aria-label", t("voiceSendLabel"));
+  if (homeLogoBtn) homeLogoBtn.setAttribute("aria-label", t("homeLogo"));
+  if (openVoiceHelpBtn) openVoiceHelpBtn.setAttribute("aria-label", t("voiceHelpLabel"));
+  if (openVoiceBtn) openVoiceBtn.setAttribute("aria-label", t("voiceAssistantLabel"));
+
+  if (voiceHelpList) {
+    const items = t("voiceHelpSteps");
+    voiceHelpList.innerHTML = Array.isArray(items)
+      ? items.map((item, index) => `
+          <div class="voice-help-item">
+            <span>${index + 1}</span>
+            <p>${escapeHtml(item)}</p>
+          </div>
+        `).join("")
+      : "";
+  }
 }
 
 function getSpeechLanguage() {
@@ -590,12 +678,12 @@ function applyStaticTranslations() {
   if (publicTestSubmitBtn) publicTestSubmitBtn.textContent = selectedRole === "kaz" ? "Тапсыру" : "Отправить";
   if (publicTestStudentNameInput) publicTestStudentNameInput.placeholder = selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз" : "Введите имя и фамилию";
   if (profileBtn) profileBtn.setAttribute("aria-label", t("editProfile"));
-  if (openVoiceBtn) openVoiceBtn.setAttribute("aria-label", "AI assistant");
 
   if (recognition) {
     recognition.lang = getSpeechLanguage();
   }
 
+  renderVoiceHelp();
   renderDisciplinePreviewCard();
   renderDriveStatus();
   renderSlidesPreview();
@@ -2943,6 +3031,21 @@ async function sendTextToAssistant(text) {
   return response.json();
 }
 
+async function submitVoiceInput(customText) {
+  const message = (customText ?? voiceInput?.value ?? "").trim();
+
+  if (!message) {
+    setVoiceState("idle", t("voiceInputEmpty"));
+    return;
+  }
+
+  if (voiceInput) {
+    voiceInput.value = message;
+  }
+
+  await handleAssistantCommand(message);
+}
+
 async function handleAssistantAction(assistantData) {
   if (!assistantData) return;
 
@@ -3046,65 +3149,126 @@ function speakAssistantReply(text) {
   synth.speak(utterance);
 }
 
+function stopVoiceCapture() {
+  isVoiceCaptureCancelled = false;
+
+  if (recognition && isListening) {
+    recognition.stop();
+    return true;
+  }
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    return true;
+  }
+
+  return false;
+}
+
+function cancelVoiceCapture() {
+  isVoiceCaptureCancelled = true;
+
+  if (recognition && isListening) {
+    if (typeof recognition.abort === "function") {
+      recognition.abort();
+    } else {
+      recognition.stop();
+    }
+    return true;
+  }
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    return true;
+  }
+
+  return false;
+}
+
+async function startMediaRecorderCapture() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(stream);
+
+  mediaRecorder.onstart = () => {
+    setVoiceState("listening", t("voiceListening"));
+  };
+
+  mediaRecorder.ondataavailable = (eventData) => {
+    if (eventData.data.size > 0) {
+      recordedChunks.push(eventData.data);
+    }
+  };
+
+  mediaRecorder.onstop = async () => {
+    const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
+
+    try {
+      if (isVoiceCaptureCancelled) {
+        return;
+      }
+
+      setVoiceState("idle", t("voiceTranscribing"));
+      const data = await sendAudioToAssistant(audioBlob);
+      const capturedText = data.text?.trim();
+
+      if (!capturedText) return;
+
+      const mergedText = `${voiceInterimBaseText}${capturedText}`.trim();
+      if (voiceInput) {
+        voiceInput.value = mergedText;
+      }
+
+      setVoiceState("idle", t("voiceLiveCaptured", { text: capturedText }));
+      await submitVoiceInput(mergedText);
+    } catch (error) {
+      console.error("TRANSCRIBE ERROR:", error);
+      setVoiceState("idle", t("voiceRequestError"));
+      speakAssistantReply(t("voiceSorry"));
+    } finally {
+      stream.getTracks().forEach(track => track.stop());
+      voiceInterimBaseText = "";
+      isVoiceCaptureCancelled = false;
+    }
+  };
+
+  mediaRecorder.start();
+}
+
 async function toggleListening(event) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
 
-  voicePanel.classList.add("show");
+  setVoicePanelOpen(true);
+  setVoiceHelpOpen(false);
 
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    mediaRecorder.stop();
+  if (stopVoiceCapture()) {
     return;
   }
 
+  voiceInterimBaseText = voiceInput?.value.trim() || "";
+  if (voiceInterimBaseText) {
+    voiceInterimBaseText += " ";
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    recordedChunks = [];
-    mediaRecorder = new MediaRecorder(stream);
-
-    mediaRecorder.onstart = () => {
-      setVoiceState("listening", t("voiceListening"));
-    };
-
-    mediaRecorder.ondataavailable = (eventData) => {
-      if (eventData.data.size > 0) {
-        recordedChunks.push(eventData.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
-
+    if (recognition) {
       try {
-        setVoiceState("idle", t("voiceTranscribing"));
-        const data = await sendAudioToAssistant(audioBlob);
-        setVoiceState("idle", t("voiceUnderstood", { text: data.text }));
-
-        if (!data.text) return;
-
-        const normalizedText = normalizeVoiceText(data.text);
-        const assistantData = await sendTextToAssistant(normalizedText);
-
-        setVoiceState("speaking", assistantData.reply || data.text);
-        speakAssistantReply(assistantData.reply || data.text);
-
-        await handleAssistantAction(assistantData);
-      } catch (error) {
-        console.error("TRANSCRIBE ERROR:", error);
-        setVoiceState("idle", t("voiceRequestError"));
-        speakAssistantReply(t("voiceSorry"));
+        recognition.start();
+        return;
+      } catch (recognitionError) {
+        console.warn("Speech recognition start failed, falling back to recorder:", recognitionError);
       }
+    }
 
-      stream.getTracks().forEach(track => track.stop());
-    };
-
-    mediaRecorder.start();
+    await startMediaRecorderCapture();
   } catch (error) {
     console.error("MIC ACCESS ERROR:", error);
     setVoiceState("idle", t("micDenied"));
+    voiceInterimBaseText = "";
   }
 }
 
@@ -3154,7 +3318,7 @@ function initSpeechRecognition() {
 
   recognition = new SpeechRecognition();
   recognition.lang = getSpeechLanguage();
-  recognition.interimResults = false;
+  recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
   recognition.onstart = () => {
@@ -3164,20 +3328,61 @@ function initSpeechRecognition() {
 
   recognition.onerror = (event) => {
     isListening = false;
+    if (isVoiceCaptureCancelled) {
+      setVoiceState("idle", t("voiceReady"));
+      isVoiceCaptureCancelled = false;
+      return;
+    }
     setVoiceState("idle", t("errorLabel", { error: event.error }));
   };
 
   recognition.onend = () => {
     isListening = false;
-    if (!voiceCore.classList.contains("listening")) {
+    voiceCore.classList.remove("listening");
+    if (!voiceStatus.textContent || voiceStatus.textContent === t("voiceListening")) {
       setVoiceState("idle", t("voiceReady"));
     }
+    voiceInterimBaseText = "";
+    isVoiceCaptureCancelled = false;
   };
 
   recognition.onresult = async (event) => {
-    const transcript = event.results[0][0].transcript;
-    setVoiceState("idle", t("voiceUnderstood", { text: transcript }));
-    await handleAssistantCommand(transcript);
+    if (isVoiceCaptureCancelled) {
+      return;
+    }
+
+    let interimTranscript = "";
+    let finalTranscript = "";
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index];
+      const transcriptPart = result[0]?.transcript || "";
+
+      if (result.isFinal) {
+        finalTranscript += transcriptPart;
+      } else {
+        interimTranscript += transcriptPart;
+      }
+    }
+
+    const draftTranscript = `${voiceInterimBaseText}${finalTranscript || interimTranscript}`.trim();
+    if (voiceInput && draftTranscript) {
+      voiceInput.value = draftTranscript;
+    }
+
+    if (interimTranscript && !finalTranscript) {
+      setVoiceState("listening", draftTranscript);
+      return;
+    }
+
+    if (finalTranscript) {
+      const completeTranscript = `${voiceInterimBaseText}${finalTranscript}`.trim();
+      if (voiceInput) {
+        voiceInput.value = completeTranscript;
+      }
+      setVoiceState("idle", t("voiceLiveCaptured", { text: finalTranscript.trim() }));
+      await submitVoiceInput(completeTranscript);
+    }
   };
 }
 
@@ -3224,6 +3429,10 @@ roleMenuItems.forEach(btn => {
 
 if (courseBackBtn) {
   courseBackBtn.addEventListener("click", showCourseStage);
+}
+
+if (homeLogoBtn) {
+  homeLogoBtn.addEventListener("click", navigateToMainPage);
 }
 
 function handleDriveReturnParams() {
@@ -3802,13 +4011,30 @@ if (saveTestBtn) {
 
 if (openVoiceBtn) {
   openVoiceBtn.addEventListener("click", () => {
-    voicePanel.classList.toggle("show");
+    const shouldOpen = !voicePanel.classList.contains("show");
+    if (!shouldOpen) {
+      cancelVoiceCapture();
+    }
+    setVoicePanelOpen(shouldOpen);
   });
 }
 
 if (closeVoiceBtn) {
   closeVoiceBtn.addEventListener("click", () => {
-    voicePanel.classList.remove("show");
+    cancelVoiceCapture();
+    setVoicePanelOpen(false);
+  });
+}
+
+if (openVoiceHelpBtn) {
+  openVoiceHelpBtn.addEventListener("click", () => {
+    setVoiceHelpOpen(!voiceHelpPanel.classList.contains("show"));
+  });
+}
+
+if (closeVoiceHelpBtn) {
+  closeVoiceHelpBtn.addEventListener("click", () => {
+    setVoiceHelpOpen(false);
   });
 }
 
@@ -3817,6 +4043,21 @@ if (voiceCore) {
     event.preventDefault();
     event.stopPropagation();
     toggleListening(event);
+  });
+}
+
+if (voiceSendBtn) {
+  voiceSendBtn.addEventListener("click", async () => {
+    await submitVoiceInput();
+  });
+}
+
+if (voiceInput) {
+  voiceInput.addEventListener("keydown", async (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      await submitVoiceInput();
+    }
   });
 }
 
@@ -3879,10 +4120,6 @@ document.addEventListener("click", (e) => {
     renderUploadMenu();
   }
 
-  const voiceAssistant = document.querySelector(".voice-assistant");
-  if (voiceAssistant && !voiceAssistant.contains(e.target)) {
-    voicePanel.classList.remove("show");
-  }
 });
 
 async function bootstrapApp() {

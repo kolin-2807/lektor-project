@@ -45,9 +45,11 @@
     <header class="topbar">
       <div class="topbar-inner">
         <div class="brand">
-          <div class="brand-logo">
-            <img src="./assets/images/lektor_logo.png" alt="Lektor logo" />
-          </div>
+          <button class="brand-logo-btn" id="homeLogoBtn" type="button" aria-label="Негізгі бетке өту">
+            <div class="brand-logo">
+              <img src="./assets/images/lektor_logo.png" alt="Lektor logo" />
+            </div>
+          </button>
 
           <div class="brand-text">
             <button class="role-title-btn" id="roleTitleBtn" type="button">
@@ -266,36 +268,77 @@
     </main>
 
     <div class="voice-assistant">
-      <div class="voice-panel" id="voicePanel">
-        <div class="voice-top">
-          <button class="voice-close" id="closeVoiceBtn" type="button">×</button>
+      <div class="voice-windows">
+        <div class="voice-panel" id="voicePanel">
+          <div class="voice-top">
+            <button class="voice-close" id="closeVoiceBtn" type="button">×</button>
+          </div>
+
+          <div class="voice-core-wrap">
+            <div class="voice-rings">
+              <div class="ring r1"></div>
+              <div class="ring r2"></div>
+              <div class="ring r3"></div>
+              <div class="voice-core" id="voiceCore" title="Түртіп тыңдауды бастау"></div>
+            </div>
+
+            <div class="voice-bars">
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+
+            <div class="voice-status" id="voiceStatus">Дайын</div>
+          </div>
+
+          <div class="voice-input-block">
+            <div class="voice-input-shell">
+              <textarea
+                class="voice-input"
+                id="voiceInput"
+                rows="2"
+              ></textarea>
+
+              <button class="voice-send-btn" id="voiceSendBtn" type="button" aria-label="Жіберу">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 12h12"></path>
+                  <path d="M13 6l6 6-6 6"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="voice-core-wrap">
-          <div class="voice-rings">
-            <div class="ring r1"></div>
-            <div class="ring r2"></div>
-            <div class="ring r3"></div>
-            <div class="voice-core" id="voiceCore" title="Түртіп тыңдауды бастау"></div>
+        <div class="voice-help-panel" id="voiceHelpPanel">
+          <div class="voice-help-top">
+            <button class="voice-help-close" id="closeVoiceHelpBtn" type="button">×</button>
           </div>
 
-          <div class="voice-bars">
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
+          <h3 class="voice-help-title" id="voiceHelpTitle">Көмекшімен не істеуге болады</h3>
+          <p class="voice-help-text" id="voiceHelpIntro"></p>
 
-          <div class="voice-status" id="voiceStatus">Дайын</div>
+          <div class="voice-help-list" id="voiceHelpList"></div>
         </div>
       </div>
 
-      <button class="voice-dock" id="openVoiceBtn" type="button" aria-label="AI assistant">
-        <svg viewBox="0 0 24 24">
-          <path d="M5 14V10"></path>
-          <path d="M9 18V6"></path>
-          <path d="M13 20V4"></path>
-          <path d="M17 17V7"></path>
-          <path d="M21 13V11"></path>
-        </svg>
-      </button>
+      <div class="voice-toolbar">
+        <button class="voice-dock" id="openVoiceBtn" type="button" aria-label="AI assistant">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 14V10"></path>
+            <path d="M9 18V6"></path>
+            <path d="M13 20V4"></path>
+            <path d="M17 17V7"></path>
+            <path d="M21 13V11"></path>
+          </svg>
+        </button>
+
+        <button class="voice-help-btn" id="openVoiceHelpBtn" type="button" aria-label="Көмек көрсету">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 4h9l3 3v13H6z"></path>
+            <path d="M15 4v4h4"></path>
+            <path d="M9 11h6"></path>
+            <path d="M9 15h6"></path>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div class="modal-backdrop" id="profileModal">
