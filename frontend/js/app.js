@@ -35,6 +35,10 @@ const UI_TEXT = {
     save: "Сақтау",
     editProfile: "Профильді өңдеу",
     logout: "Шығу",
+    subjectField: "Пән",
+    subjectPlaceholder: "Пәнді таңдаңыз",
+    subjectNotFound: "Пән табылмады",
+    subjectSelectFirst: "Алдымен пәнді таңдаңыз.",
     materialType: "Материал түрі",
     topic: "Тақырып",
     material: "Материал",
@@ -140,6 +144,10 @@ const UI_TEXT = {
     save: "Сохранить",
     editProfile: "Редактировать профиль",
     logout: "Выйти",
+    subjectField: "Дисциплина",
+    subjectPlaceholder: "Выберите дисциплину",
+    subjectNotFound: "Дисциплина не найдена",
+    subjectSelectFirst: "Сначала выберите дисциплину.",
     materialType: "Тип материала",
     topic: "Тема",
     material: "Материал",
@@ -373,6 +381,8 @@ const subjectCoverCopy = document.querySelector(".subject-cover-copy");
 const subjectTitle = document.getElementById("subjectTitle");
 const subjectTitleInput = document.getElementById("subjectTitleInput");
 const subjectCourse = document.getElementById("subjectCourse");
+const subjectCourseCardCover = document.getElementById("subjectCourseCardCover");
+const subjectCourseIllustration = document.getElementById("subjectCourseIllustration");
 const toggleMaterialManagerBtn = document.getElementById("toggleMaterialManagerBtn");
 const changeCoverBtn = document.getElementById("changeCoverBtn");
 
@@ -381,6 +391,7 @@ const slidesPane = document.getElementById("slidesPane");
 const testPane = document.getElementById("testPane");
 const resultsPane = document.getElementById("resultsPane");
 
+const subjectSelect = document.getElementById("subjectSelect");
 const materialTypeSelect = document.getElementById("materialTypeSelect");
 const topicSelect = document.getElementById("topicSelect");
 const openMaterialBtn = document.getElementById("openMaterialBtn");
@@ -552,6 +563,32 @@ function formatCourseLabel(number) {
   return t("courseLabel", { number });
 }
 
+function getCourseVisualConfig(courseNumber) {
+  const normalizedNumber = Number(courseNumber) || 1;
+  const visualMap = {
+    1: { coverClass: "course-card-cover-1", illustrationClass: "course-card-illustration-1" },
+    2: { coverClass: "course-card-cover-2", illustrationClass: "course-card-illustration-2" },
+    3: { coverClass: "course-card-cover-3", illustrationClass: "course-card-illustration-3" },
+    4: { coverClass: "course-card-cover-4", illustrationClass: "course-card-illustration-4" }
+  };
+
+  return visualMap[normalizedNumber] || visualMap[1];
+}
+
+function getPreferredSubject(preferredSubjectId = null) {
+  if (preferredSubjectId) {
+    const matched = subjects.find(item => Number(item.id) === Number(preferredSubjectId));
+    if (matched) return matched;
+  }
+
+  if (selectedSubject?.id) {
+    const currentMatch = subjects.find(item => Number(item.id) === Number(selectedSubject.id));
+    if (currentMatch) return currentMatch;
+  }
+
+  return subjects[0] || null;
+}
+
 function navigateToMainPage() {
   if (!subjectView.classList.contains("hidden")) {
     showHome();
@@ -609,6 +646,7 @@ function applyRoleProfileState() {
 function applyStaticTranslations() {
   document.documentElement.lang = selectedRole === "kaz" ? "kk" : "ru";
 
+  const subjectLabel = document.querySelector('label[for="subjectSelect"]');
   const materialTypeLabel = document.querySelector('label[for="materialTypeSelect"]');
   const topicLabel = document.querySelector('label[for="topicSelect"]');
   const editProfileBtn = document.getElementById("editProfileBtn");
@@ -631,6 +669,7 @@ function applyStaticTranslations() {
   if (backBtn) backBtn.textContent = t("back");
   if (changeCoverBtn) changeCoverBtn.textContent = isEditingSubjectTitle ? t("save") : t("edit");
   if (subjectTitleInput) subjectTitleInput.placeholder = t("disciplineTitlePlaceholder");
+  if (subjectLabel) subjectLabel.textContent = t("subjectField");
   if (materialTypeLabel) materialTypeLabel.textContent = t("materialType");
   if (topicLabel) topicLabel.textContent = t("topic");
   if (openMaterialBtn) openMaterialBtn.textContent = t("material");
@@ -843,6 +882,7 @@ function saveTeacherAppState() {
   if (publicTestSessionToken) return;
 
   const payload = {
+    currentView: subjectView.classList.contains("hidden") ? "home" : "subject",
     selectedRole,
     selectedCourseNumber,
     selectedSubjectId: selectedSubject?.id || null,
@@ -1255,6 +1295,7 @@ function renderMaterialManagerPanel() {
     toggleMaterialManagerBtn.setAttribute("title", label);
     toggleMaterialManagerBtn.setAttribute("aria-expanded", String(isManagerOpen));
     toggleMaterialManagerBtn.classList.toggle("is-open", isManagerOpen);
+    toggleMaterialManagerBtn.disabled = !selectedSubject;
   }
 
   if (materialManagerPanel) {
@@ -1417,6 +1458,7 @@ async function saveSubjectTitleEdit() {
 
     isEditingSubjectTitle = false;
     renderSubjectHeader();
+    populateSubjectSelect();
   } catch (error) {
     console.error("Discipline rename error:", error);
     subjectTitleInput.focus();
@@ -1439,11 +1481,21 @@ async function deleteDiscipline(card) {
     deletingDisciplineId = null;
 
     if (selectedSubject && Number(selectedSubject.id) === Number(card.id)) {
-      showHome();
+      await loadDisciplinesForCourse(selectedCourseNumber);
+      const nextSubject = getPreferredSubject();
+      if (nextSubject) {
+        await openSubject(nextSubject);
+      } else if (selectedCourseNumber) {
+        openEmptySubjectWorkspace(selectedCourseNumber);
+      } else {
+        showHome();
+      }
+      return;
     }
 
     if (selectedCourseNumber) {
       await loadDisciplinesForCourse(selectedCourseNumber);
+      populateSubjectSelect();
     }
   } catch (error) {
     console.error("Discipline delete error:", error);
@@ -1456,24 +1508,27 @@ async function deleteDiscipline(card) {
 }
 
 async function refreshInterfaceLanguage({ roleChanged = false } = {}) {
+  const wasSubjectOpen = !subjectView.classList.contains("hidden");
+  const previousSubjectId = selectedSubject?.id || null;
+
   applyStaticTranslations();
   renderProfile();
   renderCourseCards();
 
-  if (roleChanged && !subjectView.classList.contains("hidden")) {
-    selectedSubject = null;
-    selectedMaterialId = null;
-    generatedQuestions = [];
-    currentTestSession = null;
-    activeSubjectPanel = "materials";
-    subjectView.classList.add("hidden");
-    homeView.classList.remove("hidden");
-    courseStage.classList.add("hidden");
-    disciplineStage.classList.remove("hidden");
-  }
-
   if (selectedCourseNumber) {
     await loadDisciplinesForCourse(selectedCourseNumber);
+  }
+
+  if (roleChanged && wasSubjectOpen) {
+    const nextSubject = getPreferredSubject(previousSubjectId);
+    if (nextSubject) {
+      await openSubject(nextSubject);
+    } else if (selectedCourseNumber) {
+      openEmptySubjectWorkspace(selectedCourseNumber);
+    } else {
+      showHome();
+      showCourseStage();
+    }
   }
 
   saveTeacherAppState();
@@ -1496,26 +1551,15 @@ async function restoreTeacherAppState() {
     renderProfile();
   }
 
-  if (!savedState.selectedCourseNumber) {
-    appStateRestoreDone = true;
-    return;
-  }
+  const shouldRestoreSubjectView = savedState.currentView === "subject" || (!("currentView" in savedState) && savedState.selectedSubjectId);
 
-  await openCourseDisciplines(Number(savedState.selectedCourseNumber));
-
-  if (!savedState.selectedSubjectId) {
-    appStateRestoreDone = true;
-    return;
-  }
-
-  const restoredSubject = subjects.find(item => Number(item.id) === Number(savedState.selectedSubjectId));
-  if (!restoredSubject) {
+  if (!shouldRestoreSubjectView || !savedState.selectedCourseNumber) {
     appStateRestoreDone = true;
     return;
   }
 
   activeSubjectPanel = savedState.activeSubjectPanel || "materials";
-  await openSubject(restoredSubject);
+  await openCourseDisciplines(Number(savedState.selectedCourseNumber), savedState.selectedSubjectId || null);
 
   if (savedState.activeType) {
     activeType = savedState.activeType;
@@ -1547,11 +1591,18 @@ function getDisciplineLang(discipline) {
   return discipline.language || "kaz";
 }
 
-async function openCourseDisciplines(courseNumber) {
+async function openCourseDisciplines(courseNumber, preferredSubjectId = null) {
   selectedCourseNumber = courseNumber;
-  courseStage.classList.add("hidden");
-  disciplineStage.classList.remove("hidden");
+  disciplineStage.classList.add("hidden");
   await loadDisciplinesForCourse(courseNumber);
+
+  const nextSubject = getPreferredSubject(preferredSubjectId);
+  if (nextSubject) {
+    await openSubject(nextSubject);
+  } else {
+    openEmptySubjectWorkspace(courseNumber);
+  }
+
   saveTeacherAppState();
 }
 
@@ -1837,6 +1888,7 @@ async function openSubject(subject) {
   subjectView.classList.remove("hidden");
 
   renderSubjectHeader();
+  populateSubjectSelect();
   populateMaterialTypeSelect();
   populateTopicSelect();
   renderDriveStatus();
@@ -1852,6 +1904,8 @@ function showHome() {
   cancelSubjectTitleEdit();
   subjectView.classList.add("hidden");
   homeView.classList.remove("hidden");
+  disciplineStage.classList.add("hidden");
+  courseStage.classList.remove("hidden");
   selectedSubject = null;
   slidesErrorMessage = "";
   isMaterialManagerOpen = false;
@@ -1883,28 +1937,88 @@ function getSelectedMaterial() {
   return list.find(m => m.id === selectedMaterialId) || null;
 }
 
-function renderSubjectHeader() {
-  if (!selectedSubject) return;
+function populateSubjectSelect() {
+  if (!subjectSelect) return;
 
-  subjectTitle.textContent = selectedSubject.title;
+  if (!subjects.length) {
+    subjectSelect.innerHTML = `<option value="">${t("subjectNotFound")}</option>`;
+    subjectSelect.disabled = true;
+    return;
+  }
+
+  subjectSelect.disabled = false;
+  subjectSelect.innerHTML = subjects.map(item => `
+    <option value="${item.id}" ${Number(item.id) === Number(selectedSubject?.id) ? "selected" : ""}>
+      ${escapeHtml(item.title)}
+    </option>
+  `).join("");
+}
+
+function openEmptySubjectWorkspace(courseNumber) {
+  selectedCourseNumber = courseNumber || selectedCourseNumber;
+  selectedSubject = null;
+  slidesErrorMessage = "";
+  isEditingSubjectTitle = false;
+  isMaterialManagerOpen = false;
+  isUploadMenuOpen = false;
+  activeType = "lecture";
+  selectedMaterialId = null;
+  resetTestState();
+
+  homeView.classList.add("hidden");
+  subjectView.classList.remove("hidden");
+
+  renderSubjectHeader();
+  populateSubjectSelect();
+  populateMaterialTypeSelect();
+  populateTopicSelect();
+  renderDriveStatus();
+  clearMaterialPreview();
+  renderSlidesPreview();
+  renderTestBlock(false);
+  renderResultsBlock();
+  switchSubjectPanel(activeSubjectPanel || "materials");
+  saveTeacherAppState();
+}
+
+function renderSubjectHeader() {
+  const courseNumber = Number(selectedSubject?.courseNumber || selectedCourseNumber || 1);
+  const courseVisual = getCourseVisualConfig(courseNumber);
+
+  subjectTitle.textContent = selectedSubject?.title || t("subjectPlaceholder");
   if (subjectTitleInput) {
-    subjectTitleInput.value = selectedSubject.title;
-    subjectTitleInput.classList.toggle("hidden", !isEditingSubjectTitle);
+    subjectTitleInput.value = selectedSubject?.title || "";
+    subjectTitleInput.classList.toggle("hidden", !selectedSubject || !isEditingSubjectTitle);
   }
   if (subjectTitle) {
     subjectTitle.classList.toggle("hidden", isEditingSubjectTitle);
   }
-  subjectCourse.textContent = selectedSubject.course;
-  subjectCoverTop.style.backgroundImage = selectedSubject.coverImage
-    ? `linear-gradient(180deg, rgba(7,11,18,0.20), rgba(7,11,18,0.28)), url("${selectedSubject.coverImage}")`
-    : `${selectedSubject.coverBackground || selectedSubject.background || DISCIPLINE_THEMES[0].background}`;
+  subjectCourse.textContent = selectedSubject?.course || (selectedCourseNumber ? formatCourseLabel(selectedCourseNumber) : "");
+  if (subjectCoverTop) {
+    subjectCoverTop.dataset.courseNumber = String(courseNumber);
+    subjectCoverTop.style.backgroundImage = "";
+  }
+  if (subjectCourseCardCover) {
+    subjectCourseCardCover.className = `course-card-cover subject-course-card-cover ${courseVisual.coverClass}`;
+  }
+  if (subjectCourseIllustration) {
+    subjectCourseIllustration.className = `course-card-illustration subject-course-illustration ${courseVisual.illustrationClass}`;
+  }
   if (changeCoverBtn) {
     changeCoverBtn.textContent = isEditingSubjectTitle ? t("save") : t("edit");
   }
 }
 
 function populateMaterialTypeSelect() {
-  if (!materialTypeSelect || !selectedSubject) return;
+  if (!materialTypeSelect) return;
+
+  if (!selectedSubject) {
+    materialTypeSelect.innerHTML = `<option value="">${t("subjectSelectFirst")}</option>`;
+    materialTypeSelect.disabled = true;
+    return;
+  }
+
+  materialTypeSelect.disabled = false;
 
   const existingTypes = typeOrder;
 
@@ -1921,11 +2035,19 @@ function populateMaterialTypeSelect() {
 function populateTopicSelect() {
   if (!topicSelect) return;
 
+  if (!selectedSubject) {
+    topicSelect.innerHTML = `<option value="">${t("subjectSelectFirst")}</option>`;
+    topicSelect.disabled = true;
+    return;
+  }
+
+  topicSelect.disabled = false;
+
   const list = getTypeMaterials();
   ensureSelectedMaterial();
 
   if (!list.length) {
-    topicSelect.innerHTML = `<option value="">Тақырып табылмады</option>`;
+    topicSelect.innerHTML = `<option value="">${t("topicNotFound")}</option>`;
     return;
   }
 
@@ -1967,6 +2089,11 @@ function clearMaterialPreview() {
 }
 
 function renderMaterialPreview() {
+  if (!selectedSubject) {
+    materialPreview.innerHTML = `<div class="empty-state">${t("subjectSelectFirst")}</div>`;
+    return;
+  }
+
   const item = getSelectedMaterial();
 
   if (!item) {
@@ -2098,6 +2225,13 @@ function buildSlidesEmptyCard(title, text, extraClass = "") {
 
 function renderSlidesPreview() {
   if (!slidesPreview) return;
+
+  if (!selectedSubject) {
+    slidesErrorMessage = "";
+    setSlidesStatus("");
+    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("subjectSelectFirst"));
+    return;
+  }
 
   const material = getSelectedMaterial();
   const isLecture = material?.type === "lecture";
@@ -3506,6 +3640,19 @@ if (subjectTitleInput) {
       event.preventDefault();
       cancelSubjectTitleEdit();
     }
+  });
+}
+
+if (subjectSelect) {
+  subjectSelect.addEventListener("change", async () => {
+    const nextSubjectId = Number(subjectSelect.value);
+    const nextSubject = subjects.find(item => Number(item.id) === nextSubjectId);
+
+    if (!nextSubject || Number(nextSubject.id) === Number(selectedSubject?.id)) {
+      return;
+    }
+
+    await openSubject(nextSubject);
   });
 }
 

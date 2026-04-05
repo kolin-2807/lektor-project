@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="kk">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Satbayev Edu Assistant</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260402-03" />
+  <link rel="stylesheet" href="./css/style.css?v=20260405-10" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -47,7 +47,7 @@
         <div class="brand">
           <button class="brand-logo-btn" id="homeLogoBtn" type="button" aria-label="Негізгі бетке өту">
             <div class="brand-logo">
-              <img src="./assets/images/lektor_logo.png" alt="Lektor logo" />
+              <img src="./assets/images/lektor_logo_dark.png?v=20260405-10" alt="Lektor logo" />
             </div>
           </button>
 
@@ -113,20 +113,29 @@
 
           <!-- ЖОҒАРЫҒА КӨТЕРІЛГЕН SUBJECT HEADER -->
           <div class="subject-cover-top" id="subjectCoverTop">
-            <div class="subject-cover-meta">
+            <div class="subject-cover-head">
               <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
+
+              <button class="subject-manage-toggle" id="toggleMaterialManagerBtn" type="button">Материал жүктеу</button>
+            </div>
+
+            <div class="subject-cover-main">
+              <div class="subject-course-card" aria-hidden="true">
+                <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
+                  <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration">
+                    <span class="course-card-asset asset-base"></span>
+                    <span class="course-card-asset asset-sheet"></span>
+                    <span class="course-card-asset asset-tool"></span>
+                    <span class="course-card-asset asset-chip"></span>
+                  </div>
+                </div>
+              </div>
 
               <div class="subject-cover-copy">
                 <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
                 <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
                 <p id="subjectCourse">3 курс</p>
               </div>
-
-              <button class="subject-manage-toggle" id="toggleMaterialManagerBtn" type="button">Материал жүктеу</button>
-            </div>
-
-            <div class="subject-cover-edit">
-              <button class="cover-btn" id="changeCoverBtn" type="button">Өңдеу</button>
             </div>
           </div>
 
@@ -143,6 +152,13 @@
                 </div>
                 <button class="small-btn danger" id="deleteMaterialBtn" type="button">Жою</button>
               </div>
+            </div>
+
+            <div class="control-select-card subject-select-card">
+              <label for="subjectSelect" id="subjectSelectLabel">Пән</label>
+              <select id="subjectSelect">
+                <option value="">Пәнді таңдаңыз</option>
+              </select>
             </div>
 
             <div class="control-select-card">
@@ -453,6 +469,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260401-18"></script>
+  <script src="./js/app.js?v=20260405-10"></script>
 </body>
 </html>
