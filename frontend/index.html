@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Satbayev Edu Assistant</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260405-10" />
+  <title>Lektor</title>
+  <link rel="stylesheet" href="./css/style.css?v=20260409-02" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -47,7 +47,7 @@
         <div class="brand">
           <button class="brand-logo-btn" id="homeLogoBtn" type="button" aria-label="Негізгі бетке өту">
             <div class="brand-logo">
-              <img src="./assets/images/lektor_logo_dark.png?v=20260405-10" alt="Lektor logo" />
+              <img src="./assets/images/Satabayev_University_logo.png?v=20260408-01" alt="Satbayev University logo" />
             </div>
           </button>
 
@@ -65,23 +65,29 @@
         </div>
 
         <div class="topbar-right">
-          <button class="profile-avatar-btn" id="profileBtn" type="button" aria-label="profile">
-            <div class="avatar" id="topAvatar">КЕ</div>
-          </button>
+          <div class="auth-actions" id="authActions">
+            <button class="auth-login-btn" id="authOpenBtn" type="button">Кіру</button>
+          </div>
 
-          <div class="profile-dropdown" id="profileDropdown">
-            <div class="profile-card-top">
-              <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
-              <div class="profile-main">
-                <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
-                <span id="dropdownRole">ст.преподаватель</span>
-                <span id="dropdownEmail">kalaman@university.kz</span>
+          <div class="profile-shell hidden" id="profileShell">
+            <button class="profile-avatar-btn" id="profileBtn" type="button" aria-label="profile">
+              <div class="avatar" id="topAvatar">КЕ</div>
+            </button>
+
+            <div class="profile-dropdown" id="profileDropdown">
+              <div class="profile-card-top">
+                <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
+                <div class="profile-main">
+                  <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
+                  <span id="dropdownRole">ст.преподаватель</span>
+                  <span id="dropdownEmail">kalaman@university.kz</span>
+                </div>
               </div>
-            </div>
 
-            <div class="profile-actions">
-              <button id="editProfileBtn" type="button">Профильді өңдеу</button>
-              <button id="logoutBtn" type="button">Шығу</button>
+              <div class="profile-actions">
+                <button id="editProfileBtn" type="button">Профильді өңдеу</button>
+                <button id="logoutBtn" type="button">Шығу</button>
+              </div>
             </div>
           </div>
         </div>
@@ -120,20 +126,22 @@
             </div>
 
             <div class="subject-cover-main">
-              <div class="subject-course-card" aria-hidden="true">
-                <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
-                  <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration">
-                    <span class="course-card-asset asset-base"></span>
-                    <span class="course-card-asset asset-sheet"></span>
-                    <span class="course-card-asset asset-tool"></span>
-                    <span class="course-card-asset asset-chip"></span>
-                  </div>
+            <div class="subject-course-card" aria-hidden="true">
+              <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
+                <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration">
+                  <span class="course-card-asset asset-base"></span>
+                  <span class="course-card-asset asset-sheet"></span>
+                  <span class="course-card-asset asset-tool"></span>
+                  <span class="course-card-asset asset-chip"></span>
                 </div>
               </div>
+            </div>
 
-              <div class="subject-cover-copy">
-                <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
-                <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
+            <div class="subject-course-banner-badge" id="subjectCourseBannerBadge">3 курс</div>
+
+            <div class="subject-cover-copy">
+              <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
+              <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
                 <p id="subjectCourse">3 курс</p>
               </div>
             </div>
@@ -143,6 +151,7 @@
           <div class="subject-control-panel" id="subjectControlPanel">
             <div class="material-manager-panel" id="materialManagerPanel">
               <div class="material-manager-actions" id="materialManagerActions">
+                <button class="small-btn" id="addInlineDisciplineBtn" type="button">Пән қосу</button>
                 <div class="upload-menu-wrap" id="uploadMenuWrap">
                   <button class="small-btn primary" id="uploadMaterialBtn" type="button">Жүктеу</button>
                   <div class="upload-menu" id="uploadModeMenu" aria-hidden="true">
@@ -150,7 +159,8 @@
                     <button class="upload-menu-item" id="uploadFolderMaterialBtn" type="button">Папка жүктеу</button>
                   </div>
                 </div>
-                <button class="small-btn danger" id="deleteMaterialBtn" type="button">Жою</button>
+                <button class="small-btn danger" id="deleteMaterialBtn" type="button">Материалды жою</button>
+                <button class="small-btn danger subtle" id="deleteDisciplineBtn" type="button">Пәнді жою</button>
               </div>
             </div>
 
@@ -265,6 +275,12 @@
               <div class="content-view hidden" id="resultsPane">
                 <div class="content-view-head">
                   <div>
+                    <p class="results-view-status" id="resultsInfoText"></p>
+                  </div>
+
+                  <div class="content-view-actions">
+                    <button class="small-btn" id="openResultsSheetBtn" type="button">Google Sheets-та ашу</button>
+                    <button class="small-btn primary" id="downloadResultsBtn" type="button">Жүктеп алу</button>
                   </div>
                 </div>
 
@@ -328,7 +344,7 @@
             <button class="voice-help-close" id="closeVoiceHelpBtn" type="button">×</button>
           </div>
 
-          <h3 class="voice-help-title" id="voiceHelpTitle">Көмекшімен не істеуге болады</h3>
+          <h3 class="voice-help-title" id="voiceHelpTitle">Дауыстық көмекші</h3>
           <p class="voice-help-text" id="voiceHelpIntro"></p>
 
           <div class="voice-help-list" id="voiceHelpList"></div>
@@ -354,6 +370,27 @@
             <path d="M9 15h6"></path>
           </svg>
         </button>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="authModal">
+      <div class="auth-modal-box">
+        <button class="auth-modal-close" data-close-modal="authModal" type="button" aria-label="Жабу">×</button>
+
+        <div class="auth-modal-copy">
+          <p class="auth-modal-eyebrow">Lektor</p>
+          <h2 id="authModalTitle">Жүйеге кіру</h2>
+          <p id="authModalText">Материалдарды жүктеу мен профильді сақтау үшін Google арқылы кіріңіз.</p>
+        </div>
+
+        <button class="auth-provider-btn" id="authGoogleBtn" type="button">
+          <span class="auth-provider-icon auth-provider-icon-google" aria-hidden="true">G</span>
+          <span id="authGoogleBtnText">Google арқылы жалғастыру</span>
+        </button>
+
+        <p class="auth-modal-note" id="authModalNote">
+          Google аккаунты бар болса кіресіз, жаңа болса тіркелу автоматты жүреді.
+        </p>
       </div>
     </div>
 
@@ -469,6 +506,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260405-10"></script>
+  <script src="./js/app.js?v=20260409-03"></script>
 </body>
 </html>

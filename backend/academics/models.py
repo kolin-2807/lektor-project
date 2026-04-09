@@ -24,6 +24,7 @@ class Discipline(models.Model):
         ],
         default="kaz"
     )
+    owner_email = models.EmailField(blank=True, db_index=True)
 
     def __str__(self):
         return self.title

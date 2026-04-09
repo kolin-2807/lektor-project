@@ -3,21 +3,20 @@ from datetime import timedelta
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from googleapiclient.errors import HttpError
+from rest_framework.permissions import BasePermission
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
-from materials.models import Material
-from users.models import resolve_google_drive_connection
+try:
+    from googleapiclient.errors import HttpError
+except ImportError:  # pragma: no cover - optional dependency in some environments
+    class HttpError(Exception):
+        pass
 
-from .google_forms_service import (
-    add_questions_to_form,
-    create_google_form,
-    get_form_questions,
-    get_form_responses,
-)
-from .google_sheets_service import create_results_sheet, extract_spreadsheet_id, sync_sheet_data
+from materials.models import Material
+from users.models import get_active_google_drive_connection, resolve_google_drive_connection
+
 from .models import Result, TestAttempt, TestSession
 from .serializers import ResultSerializer, TestSessionSerializer
 
@@ -41,6 +40,13 @@ def _get_session_google_connection(request, material: Material | None = None):
     return resolve_google_drive_connection(request, owner_email=owner_email)
 
 
+class HasGoogleSession(BasePermission):
+    message = "Google login required."
+
+    def has_permission(self, request, view):
+        return get_active_google_drive_connection(request) is not None
+
+
 def _normalize_student_identifier(name: str) -> str:
     normalized = re.sub(r"\s+", " ", str(name or "").strip().lower())
     return normalized
@@ -55,21 +61,72 @@ def _get_answer_value(answer: dict | None) -> str:
     return " | ".join(values)
 
 
+def _strip_option_prefix(value: str) -> str:
+    return re.sub(r"^\s*[A-DА-Г0-9]+\s*[\)\.\:\-]\s*", "", str(value or "").strip(), flags=re.IGNORECASE)
+
+
+def _resolve_option_index(options: list, raw_value) -> int | None:
+    if raw_value is None:
+        return None
+
+    try:
+        numeric_value = int(raw_value)
+        if 0 <= numeric_value < len(options):
+            return numeric_value
+    except (TypeError, ValueError):
+        pass
+
+    normalized_value = str(raw_value or "").strip()
+    if not normalized_value:
+        return None
+
+    match = re.match(r"^\s*([A-D])(?:[\)\.\:\-\s]|$)", normalized_value, flags=re.IGNORECASE)
+    if match:
+        option_letter_index = ord(match.group(1).upper()) - ord("A")
+        if 0 <= option_letter_index < len(options):
+            return option_letter_index
+
+    cleaned_value = _strip_option_prefix(normalized_value).casefold()
+
+    for index, option in enumerate(options):
+        normalized_option = str(option or "").strip()
+        if not normalized_option:
+            continue
+
+        if normalized_value.casefold() == normalized_option.casefold():
+            return index
+
+        if cleaned_value and cleaned_value == _strip_option_prefix(normalized_option).casefold():
+            return index
+
+    return None
+
+
+def _answers_match(left, right) -> bool:
+    normalized_left = str(left or "").strip()
+    normalized_right = str(right or "").strip()
+
+    if not normalized_left or not normalized_right:
+        return False
+
+    if normalized_left.casefold() == normalized_right.casefold():
+        return True
+
+    return _strip_option_prefix(normalized_left).casefold() == _strip_option_prefix(normalized_right).casefold()
+
+
 def _get_correct_answer_value(question_config: dict) -> str:
+    options = question_config.get("options") or []
     direct_value = str(question_config.get("correct_answer") or "").strip()
     if direct_value:
+        resolved_index = _resolve_option_index(options, direct_value)
+        if resolved_index is not None:
+            return str(options[resolved_index]).strip()
         return direct_value
 
-    options = question_config.get("options") or []
-    option_index = question_config.get("correct_option_index")
-
+    option_index = _resolve_option_index(options, question_config.get("correct_option_index"))
     if option_index is not None:
-        try:
-            normalized_index = int(option_index)
-            if 0 <= normalized_index < len(options):
-                return str(options[normalized_index]).strip()
-        except (TypeError, ValueError):
-            pass
+        return str(options[option_index]).strip()
 
     for key in ("answer", "correct"):
         raw_value = question_config.get(key)
@@ -77,14 +134,45 @@ def _get_correct_answer_value(question_config: dict) -> str:
         if not normalized_value:
             continue
 
-        if len(normalized_value) == 1 and normalized_value.upper() in ("A", "B", "C", "D"):
-            option_letter_index = ord(normalized_value.upper()) - ord("A")
-            if 0 <= option_letter_index < len(options):
-                return str(options[option_letter_index]).strip()
+        resolved_index = _resolve_option_index(options, normalized_value)
+        if resolved_index is not None:
+            return str(options[resolved_index]).strip()
 
         return normalized_value
 
     return ""
+
+
+def _normalize_question_payload(question_config: dict) -> dict:
+    options = [str(option or "").strip() for option in (question_config.get("options") or [])]
+    normalized_question = {
+        **question_config,
+        "question": str(question_config.get("question") or "").strip(),
+        "options": options,
+    }
+    raw_answer = (
+        question_config.get("correct_answer")
+        or question_config.get("answer")
+        or question_config.get("correct")
+    )
+    resolved_index = _resolve_option_index(options, question_config.get("correct_option_index"))
+    if resolved_index is None:
+        resolved_index = _resolve_option_index(options, raw_answer)
+
+    normalized_question["correct_option_index"] = resolved_index if resolved_index is not None else -1
+    normalized_question["correct_answer"] = str(options[resolved_index]).strip() if resolved_index is not None else str(raw_answer or "").strip()
+
+    if raw_answer not in (None, ""):
+        normalized_question["answer"] = raw_answer
+
+    return normalized_question
+
+
+def _get_answer_key_stats(session: TestSession) -> tuple[int, int]:
+    questions = session.questions_json or []
+    question_count = len(questions)
+    answer_key_count = sum(1 for question in questions if _get_correct_answer_value(question))
+    return answer_key_count, question_count
 
 
 def _get_question_blueprint(session: TestSession, form_questions: list[dict]) -> list[dict]:
@@ -109,10 +197,41 @@ def _get_question_blueprint(session: TestSession, form_questions: list[dict]) ->
     return fallback_questions
 
 
+def _format_percentage_value(score: int, max_score: int) -> int:
+    if not max_score:
+        return 0
+    return round((score / max_score) * 100)
+
+
+def _get_results_sheet_headers(session: TestSession, answer_headers: list[str]) -> list[str]:
+    language = getattr(session.material.discipline, "language", "kaz")
+
+    if language == "rus":
+        base_headers = [
+            "Студент",
+            "Балл",
+            "Правильных ответов",
+            "Всего вопросов",
+            "Процент",
+            "Время отправки",
+        ]
+    else:
+        base_headers = [
+            "Студент",
+            "Балл",
+            "Дұрыс жауап",
+            "Жалпы сұрақ",
+            "Пайыз",
+            "Жіберілген уақыты",
+        ]
+
+    return base_headers + answer_headers
+
+
 def _build_external_response_payload(session: TestSession, form_questions: list[dict], responses: list[dict]):
     question_blueprint = _get_question_blueprint(session, form_questions)
     answer_headers = [item["title"] for item in question_blueprint[1:]]
-    headers = ["Submitted At", "Student Name", "Score"] + answer_headers
+    headers = _get_results_sheet_headers(session, answer_headers)
     ordered_responses = []
     sheet_rows = []
     session_questions = session.questions_json or []
@@ -148,7 +267,7 @@ def _build_external_response_payload(session: TestSession, form_questions: list[
             question_config = session_questions[index] if index < len(session_questions) else {}
             correct_answer = _get_correct_answer_value(question_config)
             answer_value = str(answer["value"] or "").strip()
-            is_correct = bool(correct_answer) and answer_value == correct_answer
+            is_correct = bool(correct_answer) and _answers_match(answer_value, correct_answer)
 
             if is_correct:
                 score += 1
@@ -161,6 +280,10 @@ def _build_external_response_payload(session: TestSession, form_questions: list[
             })
 
         score_label = f"{score}/{max_score}" if max_score else "-"
+        percentage_value = _format_percentage_value(score, max_score)
+        correct_answers_label = score if max_score else "-"
+        total_questions_label = max_score if max_score else "-"
+        percentage_label = f"{percentage_value}%" if max_score else "-"
 
         ordered_responses.append({
             "response_id": response.get("responseId", ""),
@@ -169,18 +292,22 @@ def _build_external_response_payload(session: TestSession, form_questions: list[
             "score": score,
             "max_score": max_score,
             "score_label": score_label,
+            "percentage": percentage_value,
             "answers": question_answers,
         })
 
         sheet_rows.append(
             [
-                response.get("lastSubmittedTime", ""),
                 student_name,
                 score_label,
+                correct_answers_label,
+                total_questions_label,
+                percentage_label,
+                response.get("lastSubmittedTime", ""),
             ] + [answer["value"] for answer in question_answers]
         )
 
-    return headers, sheet_rows, ordered_responses
+    return headers, sheet_rows, ordered_responses, answer_headers
 
 
 def _get_public_questions(session: TestSession) -> list[dict]:
@@ -197,7 +324,8 @@ def _get_public_questions(session: TestSession) -> list[dict]:
 
 
 def _get_max_score(session: TestSession) -> int:
-    return sum(1 for question in session.questions_json or [] if _get_correct_answer_value(question))
+    answer_key_count, _ = _get_answer_key_stats(session)
+    return answer_key_count
 
 
 def _get_remaining_seconds(session: TestSession, attempt: TestAttempt, now=None) -> int:
@@ -300,7 +428,7 @@ def _evaluate_answers(session: TestSession, submitted_answers: list):
             selected_value = str(options[selected_option_index]).strip()
 
         correct_answer = _get_correct_answer_value(question)
-        is_correct = bool(correct_answer) and selected_value == correct_answer
+        is_correct = bool(correct_answer) and _answers_match(selected_value, correct_answer)
 
         if is_correct:
             score += 1
@@ -318,6 +446,7 @@ def _evaluate_answers(session: TestSession, submitted_answers: list):
 
 class ResultListAPIView(generics.ListAPIView):
     serializer_class = ResultSerializer
+    permission_classes = [HasGoogleSession]
 
     def get_queryset(self):
         queryset = Result.objects.select_related("discipline").all().order_by("-created_at")
@@ -332,13 +461,21 @@ class ResultListAPIView(generics.ListAPIView):
 class ResultViewSet(viewsets.ModelViewSet):
     queryset = Result.objects.all()
     serializer_class = ResultSerializer
+    permission_classes = [HasGoogleSession]
 
 
 class TestSessionViewSet(viewsets.ModelViewSet):
     serializer_class = TestSessionSerializer
+    permission_classes = [HasGoogleSession]
 
     def get_queryset(self):
-        queryset = TestSession.objects.all().order_by("-created_at")
+        connection = get_active_google_drive_connection(self.request)
+        if not connection:
+            return TestSession.objects.none()
+
+        queryset = TestSession.objects.filter(
+            material__owner_email__iexact=connection.google_email
+        ).order_by("-created_at")
         material_id = self.request.GET.get("material")
 
         if material_id:
@@ -363,10 +500,24 @@ class TestSessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        normalized_questions = [_normalize_question_payload(question) for question in questions]
+        missing_answer_keys = sum(1 for question in normalized_questions if not _get_correct_answer_value(question))
+
+        if missing_answer_keys:
+            return Response(
+                {
+                    "detail": (
+                        "AI тесттің кей сұрақтары үшін дұрыс жауап анықталмады. "
+                        "Тестті қайта жасап көріңіз."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            question_count = int(request.data.get("question_count") or len(questions) or 5)
+            question_count = int(request.data.get("question_count") or len(normalized_questions) or 5)
         except (TypeError, ValueError):
-            question_count = len(questions) or 5
+            question_count = len(normalized_questions) or 5
 
         try:
             duration_minutes = int(request.data.get("duration_minutes") or 20)
@@ -394,6 +545,9 @@ class TestSessionViewSet(viewsets.ModelViewSet):
         session_title = f"{material.title} test"
 
         try:
+            from .google_forms_service import add_questions_to_form, create_google_form
+            from .google_sheets_service import create_results_sheet
+
             form = create_google_form(connection, session_title)
             form_id = form.get("formId", "")
             form_url = form.get("responderUri", "")
@@ -401,7 +555,7 @@ class TestSessionViewSet(viewsets.ModelViewSet):
             if not form_id or not form_url:
                 raise ValueError("Google Form did not return formId/responderUri")
 
-            add_questions_to_form(connection, form_id, questions)
+            add_questions_to_form(connection, form_id, normalized_questions)
             sheet = create_results_sheet(connection, f"{session_title} results")
 
             session = TestSession.objects.create(
@@ -410,8 +564,8 @@ class TestSessionViewSet(viewsets.ModelViewSet):
                 form_id=form_id,
                 form_url=form_url,
                 results_sheet_url=sheet.get("spreadsheet_url", ""),
-                questions_json=questions,
-                question_count=min(question_count, len(questions) or question_count),
+                questions_json=normalized_questions,
+                question_count=min(question_count, len(normalized_questions) or question_count),
                 duration_minutes=duration_minutes,
             )
         except Exception as exc:
@@ -425,6 +579,8 @@ class TestSessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="responses")
     def responses(self, request, pk=None):
         session = self.get_object()
+        answer_key_count, question_count = _get_answer_key_stats(session)
+        scoring_ready = answer_key_count > 0
 
         if session.form_id:
             connection = _get_session_google_connection(request, session.material)
@@ -434,9 +590,12 @@ class TestSessionViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_401_UNAUTHORIZED,
                 )
             try:
+                from .google_forms_service import get_form_questions, get_form_responses
+                from .google_sheets_service import extract_spreadsheet_id, sync_sheet_data
+
                 responses = get_form_responses(connection, session.form_id)
                 form_questions = get_form_questions(connection, session.form_id)
-                headers, sheet_rows, ordered_responses = _build_external_response_payload(
+                headers, sheet_rows, ordered_responses, answer_headers = _build_external_response_payload(
                     session=session,
                     form_questions=form_questions,
                     responses=responses,
@@ -458,10 +617,13 @@ class TestSessionViewSet(viewsets.ModelViewSet):
                 "form_id": session.form_id,
                 "form_url": session.form_url,
                 "results_sheet_url": session.results_sheet_url,
-                "question_titles": headers[3:],
+                "question_titles": answer_headers,
                 "responses": ordered_responses,
                 "response_count": len(ordered_responses),
                 "sheet_synced": bool(spreadsheet_id),
+                "scoring_ready": scoring_ready,
+                "answer_key_count": answer_key_count,
+                "question_count": question_count,
             })
 
         question_titles, ordered_responses = _build_internal_response_payload(session)
@@ -476,6 +638,9 @@ class TestSessionViewSet(viewsets.ModelViewSet):
             "responses": ordered_responses,
             "response_count": len(ordered_responses),
             "sheet_synced": False,
+            "scoring_ready": scoring_ready,
+            "answer_key_count": answer_key_count,
+            "question_count": question_count,
         })
 
 

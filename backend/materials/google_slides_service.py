@@ -104,6 +104,7 @@ def create_presentation_from_outline(
     subtitle: str,
     slides: list[dict],
     folder_id: str = "",
+    language: str = "kaz",
 ) -> dict:
     slides_service, drive_service = _build_services(connection)
     safe_title = " ".join((title or "").split()) or "AI Slides"
@@ -216,6 +217,68 @@ def create_presentation_from_outline(
                 }
             },
         ])
+
+    closing_slide_id = _safe_object_id("closing_slide")
+    closing_title_id = _safe_object_id("closing_title")
+    closing_subtitle_id = _safe_object_id("closing_subtitle")
+    closing_title = "Спасибо за внимание" if language == "rus" else "Назарларыңызға рахмет"
+    closing_subtitle = "Сұрақтарыңыз болса, қоя аласыздар." if language != "rus" else "Если есть вопросы, можете задать их."
+
+    requests.extend([
+        {
+            "createSlide": {
+                "objectId": closing_slide_id,
+                "slideLayoutReference": {"predefinedLayout": "BLANK"},
+            }
+        },
+        _text_box_request(closing_title_id, closing_slide_id, 72, 140, 560, 80),
+        _text_box_request(closing_subtitle_id, closing_slide_id, 96, 250, 500, 42),
+        {"insertText": {"objectId": closing_title_id, "insertionIndex": 0, "text": closing_title}},
+        {"insertText": {"objectId": closing_subtitle_id, "insertionIndex": 0, "text": closing_subtitle}},
+        {
+            "updateTextStyle": {
+                "objectId": closing_title_id,
+                "textRange": {"type": "ALL"},
+                "style": {
+                    "bold": True,
+                    "fontSize": _pt(28),
+                    "foregroundColor": {
+                        "opaqueColor": {"rgbColor": {"red": 0.13, "green": 0.17, "blue": 0.31}}
+                    },
+                },
+                "fields": "bold,fontSize,foregroundColor",
+            }
+        },
+        {
+            "updateParagraphStyle": {
+                "objectId": closing_title_id,
+                "textRange": {"type": "ALL"},
+                "style": {"alignment": "CENTER"},
+                "fields": "alignment",
+            }
+        },
+        {
+            "updateTextStyle": {
+                "objectId": closing_subtitle_id,
+                "textRange": {"type": "ALL"},
+                "style": {
+                    "fontSize": _pt(15),
+                    "foregroundColor": {
+                        "opaqueColor": {"rgbColor": {"red": 0.29, "green": 0.35, "blue": 0.48}}
+                    },
+                },
+                "fields": "fontSize,foregroundColor",
+            }
+        },
+        {
+            "updateParagraphStyle": {
+                "objectId": closing_subtitle_id,
+                "textRange": {"type": "ALL"},
+                "style": {"alignment": "CENTER"},
+                "fields": "alignment",
+            }
+        },
+    ])
 
     if default_slide_id:
         requests.append({"deleteObject": {"objectId": default_slide_id}})

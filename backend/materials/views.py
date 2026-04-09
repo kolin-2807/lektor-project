@@ -1,12 +1,22 @@
 import os
+import json
 import re
+import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from googleapiclient.errors import HttpError
+from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
+try:
+    from googleapiclient.errors import HttpError
+except ImportError:  # pragma: no cover - optional dependency in some environments
+    class HttpError(Exception):
+        pass
 
 from academics.models import Discipline
 from ai_services.assistant_service import detect_assistant_intent
@@ -14,15 +24,27 @@ from ai_services.gemini_service import generate_slide_outline_from_text, generat
 from ai_services.stt_service import transcribe_audio
 from users.models import get_active_google_drive_connection, resolve_google_drive_connection
 
-from .google_drive_service import (
-    delete_material_file,
-    download_material_bytes,
-    extract_material_text,
-    upload_material_file,
-)
-from .google_slides_service import create_presentation_from_outline
 from .models import Material
 from .serializers import MaterialSerializer
+
+MAX_ASSISTANT_COMMAND_CHARS = 500
+MAX_ASSISTANT_AUDIO_BYTES = 15 * 1024 * 1024
+
+
+def _require_google_session(request, owner_email: str = ""):
+    connection = (
+        resolve_google_drive_connection(request, owner_email=owner_email)
+        if owner_email
+        else get_active_google_drive_connection(request)
+    )
+
+    if connection:
+        return connection, None
+
+    return None, Response(
+        {"detail": "Google login required."},
+        status=status.HTTP_401_UNAUTHORIZED,
+    )
 
 
 def _resolve_material_language(request, material):
@@ -34,6 +56,8 @@ def _build_material_source_text(material, language: str, connection=None) -> str
     extracted_text = ""
 
     if connection and material.drive_file_id:
+        from .google_drive_service import download_material_bytes, extract_material_text
+
         try:
             file_bytes = download_material_bytes(connection, material.drive_file_id, material.mime_type)
             extracted_text = extract_material_text(
@@ -87,9 +111,47 @@ def _format_google_api_error(exc, fallback_message: str) -> str:
     return error_text or fallback_message
 
 
+def _get_material_preview_kind(material) -> str:
+    suffix = Path(material.original_filename or material.title or "").suffix.lower()
+    normalized_mime = (material.mime_type or "").lower()
+
+    if normalized_mime.startswith("image/") or suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}:
+        return "image"
+    if normalized_mime == "application/pdf" or suffix == ".pdf":
+        return "pdf"
+    if normalized_mime.startswith("video/") or suffix in {".mp4", ".webm", ".ogg", ".mov"}:
+        return "video"
+    if normalized_mime.startswith("audio/") or suffix in {".mp3", ".wav", ".oga", ".m4a"}:
+        return "audio"
+    if normalized_mime.startswith("text/") or suffix in {".txt", ".md", ".csv", ".json", ".xml", ".html"}:
+        return "text"
+
+    return "external"
+
+
+def _parse_assistant_context(raw_context) -> dict:
+    if isinstance(raw_context, dict):
+        return raw_context
+
+    if isinstance(raw_context, str) and raw_context.strip():
+        try:
+            parsed = json.loads(raw_context)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+
+    return {}
+
+
 @api_view(["GET"])
 def material_list(request):
-    queryset = Material.objects.all().order_by("title")
+    connection, auth_error = _require_google_session(request)
+    if auth_error:
+        return auth_error
+
+    queryset = Material.objects.filter(
+        owner_email__iexact=connection.google_email
+    ).order_by("title")
 
     discipline_id = request.GET.get("discipline_id")
     if discipline_id:
@@ -101,9 +163,9 @@ def material_list(request):
 
 @api_view(["POST"])
 def upload_material(request):
-    connection = get_active_google_drive_connection(request)
-    if not connection:
-        return Response({"detail": "Google Drive is not connected."}, status=401)
+    connection, auth_error = _require_google_session(request)
+    if auth_error:
+        return auth_error
 
     discipline_id = request.data.get("discipline")
     category = (request.data.get("category") or "").strip().lower()
@@ -122,12 +184,18 @@ def upload_material(request):
     if category not in allowed_categories:
         return Response({"detail": "Material category is invalid."}, status=400)
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline,
+        id=discipline_id,
+        owner_email__iexact=connection.google_email,
+    )
     created_materials = []
     errors = []
 
     for uploaded_file in uploaded_files:
         try:
+            from .google_drive_service import upload_material_file
+
             drive_meta = upload_material_file(connection, discipline, category, uploaded_file)
 
             material = Material.objects.create(
@@ -147,14 +215,15 @@ def upload_material(request):
             errors.append(
                 {
                     "filename": Path(getattr(uploaded_file, "name", "material")).name,
-                    "detail": str(error),
+                    "detail": _format_google_api_error(error, "Material upload failed."),
                 }
             )
 
     if not created_materials:
+        first_error_detail = errors[0]["detail"] if errors else "Material upload failed."
         return Response(
             {
-                "detail": "Material upload failed.",
+                "detail": first_error_detail,
                 "errors": errors,
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -172,13 +241,52 @@ def upload_material(request):
     )
 
 
+@xframe_options_exempt
+@api_view(["GET"])
+def preview_material(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
+
+    if not material.drive_file_id:
+        if material.cloud_url:
+            return HttpResponseRedirect(material.cloud_url)
+        return Response({"detail": "Material preview is unavailable."}, status=status.HTTP_404_NOT_FOUND)
+
+    preview_kind = _get_material_preview_kind(material)
+    if preview_kind == "external":
+        if material.cloud_url:
+            return HttpResponseRedirect(material.cloud_url)
+        return Response({"detail": "Material preview is unavailable."}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        from .google_drive_service import download_material_bytes
+
+        file_bytes = download_material_bytes(connection, material.drive_file_id, material.mime_type)
+    except Exception as exc:
+        return Response(
+            {"detail": _format_google_api_error(exc, "Material preview failed")},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    filename = Path(material.original_filename or material.title or "material").name
+    response = HttpResponse(file_bytes, content_type=material.mime_type or "application/octet-stream")
+    response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
+    return response
+
+
 @api_view(["DELETE"])
 def delete_material(request, material_id):
     material = get_object_or_404(Material, id=material_id)
-    connection = get_active_google_drive_connection(request)
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
 
     if connection and material.drive_file_id:
         try:
+            from .google_drive_service import delete_material_file
+
             delete_material_file(connection, material.drive_file_id)
         except Exception:
             pass
@@ -198,12 +306,9 @@ def generate_material_test(request, material_id):
         question_count = 5
     question_count = max(3, min(question_count, 25))
 
-    connection = resolve_google_drive_connection(request, owner_email=material.owner_email)
-    if material.drive_file_id and not connection:
-        return Response(
-            {"detail": "Осы материалды жүктеген Google аккаунтымен қайта қосылыңыз."},
-            status=401,
-        )
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
     source_text = _build_material_source_text(material, language, connection=connection)
 
     try:
@@ -223,18 +328,17 @@ def generate_material_slides(request, material_id):
     if material.category != "lecture":
         return Response({"detail": "Slides are available only for lecture materials."}, status=400)
 
-    connection = resolve_google_drive_connection(request, owner_email=material.owner_email)
-    if not connection:
-        return Response(
-            {"detail": "Осы материалды жүктеген Google аккаунтымен қайта қосылыңыз."},
-            status=401,
-        )
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
 
     language = _resolve_material_language(request, material)
     source_text = _build_material_source_text(material, language, connection=connection)
 
     try:
-        outline = generate_slide_outline_from_text(source_text, language=language, slide_count=6)
+        from .google_slides_service import create_presentation_from_outline
+
+        outline = generate_slide_outline_from_text(source_text, language=language, slide_count=7)
         presentation_title = (outline.get("presentation_title") or material.title or "AI Slides").strip()
         presentation_subtitle = (
             outline.get("presentation_subtitle")
@@ -251,6 +355,7 @@ def generate_material_slides(request, material_id):
             subtitle=presentation_subtitle,
             slides=content_slides,
             folder_id=material.drive_folder_id,
+            language=language,
         )
 
         material.slides_presentation_id = presentation_meta.get("presentation_id", "")
@@ -276,12 +381,26 @@ def generate_material_slides(request, material_id):
 
 @api_view(["POST"])
 def assistant_command(request):
-    user_text = request.data.get("text", "").strip()
+    user_text = str(request.data.get("text") or "").strip()
+    assistant_context = _parse_assistant_context(request.data.get("context"))
 
     if not user_text:
         return Response({"error": "Text is required"}, status=400)
 
-    result = detect_assistant_intent(user_text)
+    if len(user_text) > MAX_ASSISTANT_COMMAND_CHARS:
+        return Response(
+            {"detail": "Assistant command is too long."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = detect_assistant_intent(user_text, context=assistant_context)
+    except Exception as exc:
+        return Response(
+            {"detail": str(exc) or "AI assistant is temporarily unavailable."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
     return Response(result)
 
 
@@ -292,15 +411,31 @@ def transcribe_voice(request):
     if not audio_file:
         return Response({"error": "Audio file is required"}, status=400)
 
-    temp_path = f"temp_{audio_file.name}"
+    if getattr(audio_file, "size", 0) <= 0:
+        return Response({"error": "Audio file is empty."}, status=400)
 
-    with open(temp_path, "wb+") as destination:
+    if getattr(audio_file, "size", 0) > MAX_ASSISTANT_AUDIO_BYTES:
+        return Response(
+            {"detail": "Audio file is too large."},
+            status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        )
+
+    suffix = Path(audio_file.name or "voice.webm").suffix or ".webm"
+    temp_path = ""
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as destination:
+        temp_path = destination.name
         for chunk in audio_file.chunks():
             destination.write(chunk)
 
     try:
         text = transcribe_audio(temp_path)
         return Response({"text": text})
+    except Exception as exc:
+        return Response(
+            {"detail": str(exc) or "Speech-to-text service is temporarily unavailable."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)

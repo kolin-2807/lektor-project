@@ -5,6 +5,7 @@ from .views import (
     generate_material_slides,
     generate_material_test,
     material_list,
+    preview_material,
     transcribe_voice,
     upload_material,
 )
@@ -12,6 +13,7 @@ from .views import (
 urlpatterns = [
     path("materials/", material_list, name="material-list"),
     path("materials/upload/", upload_material, name="material-upload"),
+    path("materials/<int:material_id>/preview/", preview_material, name="material-preview"),
     path("materials/<int:material_id>/", delete_material, name="material-delete"),
     path("materials/<int:material_id>/generate-slides/", generate_material_slides, name="generate-material-slides"),
     path("materials/<int:material_id>/generate-test/", generate_material_test, name="generate-material-test"),

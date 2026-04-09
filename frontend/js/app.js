@@ -3,7 +3,7 @@ const runtimeApiBase = window.__APP_CONFIG__?.apiBase?.trim();
 const isLocalStaticPreview = ["127.0.0.1:5500", "localhost:5500"].includes(window.location.host);
 const API_BASE = runtimeApiBase || (isLocalStaticPreview ? LOCAL_API_BASE : `${window.location.origin}/api`);
 
-const profileState = {
+const DEFAULT_PROFILE_STATE = {
   fullName: "Каламан Ерболат Тлеуханұлы",
   roleLabel: "Лектор: ст.преподаватель",
   roleShort: "ст.преподаватель",
@@ -12,6 +12,8 @@ const profileState = {
   bio: "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
   avatarUrl: ""
 };
+
+const profileState = { ...DEFAULT_PROFILE_STATE };
 
 let subjects = [];
 let coursesData = [];
@@ -63,8 +65,13 @@ const UI_TEXT = {
     disciplineCreating: "Қосылып жатыр...",
     disciplineTitleRequired: "Пән атауын енгізіңіз.",
     disciplineCreateError: "Пәнді қосу кезінде қате шықты.",
+    addInlineDiscipline: "Пән қосу",
     disciplineMenu: "Пән әрекеттері",
     disciplineDelete: "Жою",
+    deleteMaterialAction: "Материалды жою",
+    deletingMaterialAction: "Материал жойылып жатыр...",
+    deleteDisciplineAction: "Пәнді жою",
+    deleteDisciplineConfirm: ({ title }) => `«${title}» пәнін толық жою керек пе?`,
     confirmDelete: "Жоюды растау",
     cancel: "Бас тарту",
     disciplineDeleting: "Жойылып жатыр...",
@@ -97,6 +104,11 @@ const UI_TEXT = {
     resultsSheetUnavailable: "Нәтижелер кестесінің сілтемесі әлі дайын емес.",
     resultsSyncError: "Нәтижелерді жаңарту кезінде қате шықты.",
     resultsOpenedHere: "Нәтижелер осы жерде ашылды.",
+    resultsScoringMissing: "Бұл тестте дұрыс жауап кілті сақталмаған, сондықтан балл мен пайыз есептелмейді.",
+    resultsScoreUnavailable: "Есептелмейді",
+    resultsRegenerateHint: "Нақты балл көру үшін тестті қайта жасаңыз.",
+    openResultsSheet: "Google Sheets-та ашу",
+    downloadResults: "Нәтижелерді жүктеп алу",
     nameMissing: "Аты көрсетілмеген",
     answerMissing: "Жауап жоқ",
     submittedAt: "Жіберілген уақыты",
@@ -112,12 +124,22 @@ const UI_TEXT = {
     email: "Email",
     bio: "Био",
     sheetFrameTitle: "Тест нәтижелері",
+    authLogin: "Кіру",
+    authModalTitle: "Жүйеге кіру",
+    authModalText: "Материалдарды жүктеу мен профильді сақтау үшін Google арқылы кіріңіз.",
+    authGoogle: "Google арқылы жалғастыру",
+    authGooglePending: "Google-ға өту...",
+    authModalNote: "Google аккаунты бар болса кіресіз, жаңа болса тіркелу автоматты жүреді.",
+    authRequiredHome: "Файлдар мен пәндерді көру үшін алдымен Google арқылы кіріңіз.",
+    authRequiredDisciplines: "Пәндер мен материалдар кіруден кейін ашылады.",
+    authRequiredAction: "Алдымен жүйеге Google арқылы кіріңіз.",
     uploadMaterial: "Материал қосу",
     connectDrive: "Google Drive қосу",
     driveConnected: ({ email }) => `Google Drive қосылды: ${email}`,
     driveNotConnected: "Google Drive әлі қосылмаған.",
     driveNotConfigured: "Google Drive OAuth әлі бапталмаған.",
     driveConnectError: "Google Drive қосу кезінде қате шықты.",
+    logoutError: "Шығу кезінде қате шықты.",
     materialUploading: "Материал жүктеліп жатыр...",
     materialUploadDone: ({ title }) => `"${title}" материалы жүктелді.`,
     materialUploadError: "Материалды жүктеу кезінде қате шықты.",
@@ -172,8 +194,13 @@ const UI_TEXT = {
     disciplineCreating: "Добавляется...",
     disciplineTitleRequired: "Введите название дисциплины.",
     disciplineCreateError: "Не удалось добавить дисциплину.",
+    addInlineDiscipline: "Добавить дисциплину",
     disciplineMenu: "Действия дисциплины",
     disciplineDelete: "Удалить",
+    deleteMaterialAction: "Удалить материал",
+    deletingMaterialAction: "Материал удаляется...",
+    deleteDisciplineAction: "Удалить дисциплину",
+    deleteDisciplineConfirm: ({ title }) => `Удалить дисциплину «${title}» полностью?`,
     confirmDelete: "Подтвердить удаление",
     cancel: "Отмена",
     disciplineDeleting: "Удаляется...",
@@ -206,6 +233,11 @@ const UI_TEXT = {
     resultsSheetUnavailable: "Ссылка на таблицу результатов пока не готова.",
     resultsSyncError: "Произошла ошибка при обновлении результатов.",
     resultsOpenedHere: "Результаты открыты здесь.",
+    resultsScoringMissing: "Для этого теста не сохранился ключ правильных ответов, поэтому баллы и проценты не рассчитываются.",
+    resultsScoreUnavailable: "Не рассчитано",
+    resultsRegenerateHint: "Чтобы видеть точные баллы, пересоздайте тест.",
+    openResultsSheet: "Открыть в Google Sheets",
+    downloadResults: "Скачать результаты",
     nameMissing: "Имя не указано",
     answerMissing: "Нет ответа",
     submittedAt: "Время отправки",
@@ -221,12 +253,22 @@ const UI_TEXT = {
     email: "Email",
     bio: "Био",
     sheetFrameTitle: "Результаты теста",
+    authLogin: "Войти",
+    authModalTitle: "Вход в систему",
+    authModalText: "Чтобы загружать материалы и сохранять профиль, войдите через Google.",
+    authGoogle: "Продолжить с Google",
+    authGooglePending: "Переход в Google...",
+    authModalNote: "Если аккаунт уже есть, вы войдете. Если нет, регистрация пройдет автоматически.",
+    authRequiredHome: "Чтобы видеть файлы и дисциплины, сначала войдите через Google.",
+    authRequiredDisciplines: "Дисциплины и материалы откроются после входа.",
+    authRequiredAction: "Сначала войдите в систему через Google.",
     uploadMaterial: "Добавить материал",
     connectDrive: "Подключить Google Drive",
     driveConnected: ({ email }) => `Google Drive подключен: ${email}`,
     driveNotConnected: "Google Drive еще не подключен.",
     driveNotConfigured: "Google Drive OAuth еще не настроен.",
     driveConnectError: "Не удалось подключить Google Drive.",
+    logoutError: "Не удалось выйти из аккаунта.",
     materialUploading: "Материал загружается...",
     materialUploadDone: ({ title }) => `Материал "${title}" загружен.`,
     materialUploadError: "Не удалось загрузить материал.",
@@ -280,32 +322,36 @@ Object.assign(UI_TEXT.kaz, {
   homeLogo: "Негізгі бетке өту",
   voiceAssistantLabel: "ИИ ассистент",
   voiceHelpLabel: "Жылдам көмек",
-  voiceHelpTitle: "Жылдам көмек",
-  voiceHelpIntro: "Көмекші қысқа және нақты командаларды жақсы түсінеді.",
+  voiceHelpTitle: "Дауыстық көмекші",
+  voiceHelpIntro: "Жүйені дауыс арқылы басқаруға болады. Қысқа әрі нақты айтсаңыз, көмекші сұрағыңызды тезірек түсінеді.\n\nМысалы:",
   voiceHelpSteps: [
-    "Алдымен не керек екенін айтыңыз: курс, материал, тест немесе нәтиже.",
-    "Бір сұрауда бір әрекет берсеңіз, жауап дәлірек шығады."
+    "Қай бөлім керек екенін айтыңыз: материал, тест немесе нәтиже.",
+    "Бір сұрауда бір ғана әрекет айтқаныңыз дұрыс.",
+    "Сұранысты анық айтсаңыз, жауап дәл шығады."
   ],
   voiceInputPlaceholder: "",
   voiceSendLabel: "Жіберу",
   voiceInputEmpty: "Алдымен сұрағыңызды жазыңыз немесе айтыңыз.",
   voiceLiveCaptured: ({ text }) => `Тыңдалды: ${text}`,
+  voiceAcknowledged: "Түсіндім, орындаймын.",
 });
 
 Object.assign(UI_TEXT.rus, {
   homeLogo: "Перейти на главную страницу",
   voiceAssistantLabel: "ИИ ассистент",
   voiceHelpLabel: "Быстрая помощь",
-  voiceHelpTitle: "Быстрая помощь",
-  voiceHelpIntro: "Помощник лучше всего понимает короткие и точные команды.",
+  voiceHelpTitle: "Голосовой помощник",
+  voiceHelpIntro: "Системой можно управлять голосом. Если говорить коротко и конкретно, помощник быстрее поймет запрос.\n\nНапример:",
   voiceHelpSteps: [
-    "Сначала скажите, что именно нужно: курс, материал, тест или результаты.",
-    "Если в одном запросе одна задача, ответ обычно получается точнее."
+    "Скажите, какой раздел нужен: материал, тест или результат.",
+    "Лучше указывать только одно действие в одном запросе.",
+    "Чем точнее сформулирован запрос, тем точнее будет ответ."
   ],
   voiceInputPlaceholder: "",
   voiceSendLabel: "Отправить",
   voiceInputEmpty: "Сначала введите запрос или продиктуйте его.",
   voiceLiveCaptured: ({ text }) => `Распознано: ${text}`,
+  voiceAcknowledged: "Понял, выполняю.",
 });
 
 const typeOrder = [
@@ -319,6 +365,7 @@ const typeOrder = [
 const APP_STATE_KEY = "lektor-teacher-state-v1";
 const TEST_CONFIG_KEY = "lektor-test-config-v1";
 const PUBLIC_TEST_ATTEMPT_KEY = "lektor-public-test-attempt-v1";
+const PROFILE_STATE_KEY = "lektor-profile-state-v1";
 
 const DISCIPLINE_THEMES = [
   {
@@ -372,12 +419,16 @@ const dropdownEmail = document.getElementById("dropdownEmail");
 const profileBtn = document.getElementById("profileBtn");
 const profileDropdown = document.getElementById("profileDropdown");
 const topbarRight = document.querySelector(".topbar-right");
+const authActions = document.getElementById("authActions");
+const authOpenBtn = document.getElementById("authOpenBtn");
+const profileShell = document.getElementById("profileShell");
 
 const cardsGrid = document.getElementById("cardsGrid");
 
 const backBtn = document.getElementById("backBtn");
 const subjectCoverTop = document.getElementById("subjectCoverTop");
 const subjectCoverCopy = document.querySelector(".subject-cover-copy");
+const subjectCourseBannerBadge = document.getElementById("subjectCourseBannerBadge");
 const subjectTitle = document.getElementById("subjectTitle");
 const subjectTitleInput = document.getElementById("subjectTitleInput");
 const subjectCourse = document.getElementById("subjectCourse");
@@ -408,10 +459,12 @@ const materialManagerPanel = document.getElementById("materialManagerPanel");
 const materialManagerActions = document.getElementById("materialManagerActions");
 const uploadMenuWrap = document.getElementById("uploadMenuWrap");
 const uploadModeMenu = document.getElementById("uploadModeMenu");
+const addInlineDisciplineBtn = document.getElementById("addInlineDisciplineBtn");
 const uploadMaterialBtn = document.getElementById("uploadMaterialBtn");
 const uploadSingleMaterialBtn = document.getElementById("uploadSingleMaterialBtn");
 const uploadFolderMaterialBtn = document.getElementById("uploadFolderMaterialBtn");
 const deleteMaterialBtn = document.getElementById("deleteMaterialBtn");
+const deleteDisciplineBtn = document.getElementById("deleteDisciplineBtn");
 const singleMaterialUploadInput = document.getElementById("singleMaterialUploadInput");
 const folderMaterialUploadInput = document.getElementById("folderMaterialUploadInput");
 const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscreenBtn");
@@ -438,6 +491,10 @@ const openResultsSheetBtn = document.getElementById("openResultsSheetBtn") || {
   disabled: true,
   addEventListener() {}
 };
+const downloadResultsBtn = document.getElementById("downloadResultsBtn") || {
+  disabled: true,
+  addEventListener() {}
+};
 
 const openVoiceBtn = document.getElementById("openVoiceBtn");
 const openVoiceHelpBtn = document.getElementById("openVoiceHelpBtn");
@@ -457,6 +514,13 @@ const voiceHelpExamples = document.getElementById("voiceHelpExamples");
 const voiceInputLabel = document.getElementById("voiceInputLabel");
 const voiceInput = document.getElementById("voiceInput");
 const voiceSendBtn = document.getElementById("voiceSendBtn");
+
+const authModal = document.getElementById("authModal");
+const authModalTitle = document.getElementById("authModalTitle");
+const authModalText = document.getElementById("authModalText");
+const authModalNote = document.getElementById("authModalNote");
+const authGoogleBtn = document.getElementById("authGoogleBtn");
+const authGoogleBtnText = document.getElementById("authGoogleBtnText");
 
 const profileModal = document.getElementById("profileModal");
 const avatarEditPreview = document.getElementById("avatarEditPreview");
@@ -513,6 +577,7 @@ let selectedSubject = null;
 let activeType = "lecture";
 let selectedMaterialId = null;
 let activeSubjectPanel = "materials";
+let isDisciplineAccessLocked = false;
 let openedDisciplineMenuId = null;
 let confirmingDisciplineDeleteId = null;
 let deletingDisciplineId = null;
@@ -545,12 +610,27 @@ let driveConnection = {
   google_email: "",
   google_name: "",
 };
+let isAuthSubmitting = false;
 let isMaterialUploading = false;
 
 let mediaRecorder = null;
 let recordedChunks = [];
 let voiceInterimBaseText = "";
 let isVoiceCaptureCancelled = false;
+let assistantCommandAbortController = null;
+let hasActiveVoiceDraft = false;
+let voiceDraftRestoreValue = "";
+let lastManualVoiceInputValue = "";
+let voiceActivityAudioContext = null;
+let voiceActivityAnimationFrameId = null;
+let voiceSilenceStartedAt = 0;
+let voiceHasDetectedSpeech = false;
+let voiceRecognitionSilenceTimerId = 0;
+let voiceRecognitionLastTranscript = "";
+let voiceRecognitionHasSpeech = false;
+
+const VOICE_ACTIVITY_THRESHOLD = 0.035;
+const VOICE_SILENCE_STOP_MS = 2200;
 
 function t(key, params = {}) {
   const dictionary = UI_TEXT[selectedRole] || UI_TEXT.kaz;
@@ -680,11 +760,18 @@ function applyStaticTranslations() {
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
   if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
   if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
+  if (openResultsSheetBtn) openResultsSheetBtn.textContent = t("openResultsSheet");
+  if (downloadResultsBtn) downloadResultsBtn.textContent = t("downloadResults");
   if (openTestDirectBtn) openTestDirectBtn.textContent = t("openTest");
   if (showQrBtn) showQrBtn.textContent = t("showQr");
   if (qrCodeLabel) qrCodeLabel.textContent = t("qrJoin");
   if (editProfileBtn) editProfileBtn.textContent = t("editProfile");
   if (logoutBtn) logoutBtn.textContent = t("logout");
+  if (authOpenBtn) authOpenBtn.textContent = t("authLogin");
+  if (authModalTitle) authModalTitle.textContent = t("authModalTitle");
+  if (authModalText) authModalText.textContent = t("authModalText");
+  if (authModalNote) authModalNote.textContent = t("authModalNote");
+  if (authGoogleBtnText) authGoogleBtnText.textContent = isAuthSubmitting ? t("authGooglePending") : t("authGoogle");
   if (profileModalTitle) profileModalTitle.textContent = t("profileModalTitle");
   if (qrModalTitle) qrModalTitle.textContent = t("qrModalTitle");
   if (playerDetailTitle) playerDetailTitle.textContent = t("participantTitle");
@@ -717,12 +804,15 @@ function applyStaticTranslations() {
   if (publicTestSubmitBtn) publicTestSubmitBtn.textContent = selectedRole === "kaz" ? "Тапсыру" : "Отправить";
   if (publicTestStudentNameInput) publicTestStudentNameInput.placeholder = selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз" : "Введите имя и фамилию";
   if (profileBtn) profileBtn.setAttribute("aria-label", t("editProfile"));
+  if (authOpenBtn) authOpenBtn.setAttribute("aria-label", t("authLogin"));
+  if (authGoogleBtn) authGoogleBtn.setAttribute("aria-label", t("authGoogle"));
 
   if (recognition) {
     recognition.lang = getSpeechLanguage();
   }
 
   renderVoiceHelp();
+  renderAuthState();
   renderDisciplinePreviewCard();
   renderDriveStatus();
   renderSlidesPreview();
@@ -768,6 +858,9 @@ function toUploadCategory(type) {
 async function fetchJSON(url, options = {}) {
   const requestOptions = { ...options };
   const method = (requestOptions.method || "GET").toUpperCase();
+  const shouldHandleUnauthorized = requestOptions.handleUnauthorized !== false;
+
+  delete requestOptions.handleUnauthorized;
 
   if (url.startsWith(API_BASE) && !requestOptions.credentials) {
     requestOptions.credentials = "include";
@@ -788,14 +881,22 @@ async function fetchJSON(url, options = {}) {
     : await response.text();
 
   if (!response.ok) {
+    const firstNestedError = Array.isArray(payload?.errors) ? payload.errors[0]?.detail : "";
     const detail =
       payload?.detail ||
+      firstNestedError ||
       payload?.title?.[0] ||
       payload?.course?.[0] ||
       payload?.language?.[0] ||
       `Request failed: ${response.status}`;
+
+    if (response.status === 401 && !url.includes("/results/public-test/") && shouldHandleUnauthorized) {
+      handleUnauthorizedAccess();
+    }
+
     const error = new Error(detail);
     error.payload = payload;
+    error.status = response.status;
     throw error;
   }
 
@@ -863,6 +964,60 @@ function buildPublicTestUrl(accessToken) {
   return url.toString();
 }
 
+function normalizeProfileStorageIdentity(email = "") {
+  return String(email || "").trim().toLowerCase() || "guest";
+}
+
+function getTeacherAppStateKey(email = driveConnection.google_email || profileState.email) {
+  return `${APP_STATE_KEY}:${normalizeProfileStorageIdentity(email)}`;
+}
+
+function getProfileStorageKey(email = driveConnection.google_email || profileState.email) {
+  return `${PROFILE_STATE_KEY}:${normalizeProfileStorageIdentity(email)}`;
+}
+
+function readStoredProfileState(email = driveConnection.google_email || profileState.email) {
+  try {
+    const raw = localStorage.getItem(getProfileStorageKey(email));
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.error("Profile state parse error:", error);
+    return null;
+  }
+}
+
+function applyStoredProfileState(email = driveConnection.google_email || profileState.email) {
+  const storedProfile = readStoredProfileState(email);
+  if (!storedProfile || typeof storedProfile !== "object") {
+    return false;
+  }
+
+  const nextUsername = String(storedProfile.username || "").trim();
+  const nextBio = String(storedProfile.bio || "").trim();
+  const nextAvatarUrl = typeof storedProfile.avatarUrl === "string" ? storedProfile.avatarUrl : "";
+
+  if (nextUsername) {
+    profileState.username = nextUsername;
+  }
+
+  if (nextBio) {
+    profileState.bio = nextBio;
+  }
+
+  profileState.avatarUrl = nextAvatarUrl;
+  return true;
+}
+
+function persistProfileState(email = driveConnection.google_email || profileState.email) {
+  const payload = {
+    username: String(profileState.username || "").trim(),
+    bio: String(profileState.bio || "").trim(),
+    avatarUrl: typeof profileState.avatarUrl === "string" ? profileState.avatarUrl : "",
+  };
+
+  localStorage.setItem(getProfileStorageKey(email), JSON.stringify(payload));
+}
+
 function getCurrentTestLaunchUrl(session = currentTestSession) {
   if (!session) return "";
   return session.form_url || session.public_url || buildPublicTestUrl(session.access_token);
@@ -870,7 +1025,7 @@ function getCurrentTestLaunchUrl(session = currentTestSession) {
 
 function readTeacherAppState() {
   try {
-    const raw = localStorage.getItem(APP_STATE_KEY);
+    const raw = localStorage.getItem(getTeacherAppStateKey());
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
     console.error("App state parse error:", error);
@@ -892,11 +1047,85 @@ function saveTeacherAppState() {
     isMaterialManagerOpen,
   };
 
-  localStorage.setItem(APP_STATE_KEY, JSON.stringify(payload));
+  localStorage.setItem(getTeacherAppStateKey(), JSON.stringify(payload));
 }
 
-function clearTeacherAppState() {
+function clearTeacherAppState(email = driveConnection.google_email || profileState.email) {
+  localStorage.removeItem(getTeacherAppStateKey(email));
   localStorage.removeItem(APP_STATE_KEY);
+}
+
+function getAuthRequiredWorkspaceMessage() {
+  return t("authRequiredDisciplines");
+}
+
+function promptGoogleLogin() {
+  window.alert(t("authRequiredAction"));
+  openAuthModal();
+}
+
+function renderLoginRequiredState() {
+  if (cardsGrid) {
+    cardsGrid.innerHTML = `
+      <div class="empty-state" style="grid-column:1 / -1;">
+        ${escapeHtml(getAuthRequiredWorkspaceMessage())}
+      </div>
+    `;
+  }
+}
+
+function resetProtectedAppData() {
+  subjects = [];
+  isDisciplineAccessLocked = false;
+  selectedCourseNumber = null;
+  selectedSubject = null;
+  selectedMaterialId = null;
+  activeSubjectPanel = "materials";
+  openedDisciplineMenuId = null;
+  confirmingDisciplineDeleteId = null;
+  deletingDisciplineId = null;
+  disciplineDeleteError = "";
+  currentTestSession = null;
+  generatedQuestions = [];
+  slidesErrorMessage = "";
+  isMaterialManagerOpen = false;
+  isUploadMenuOpen = false;
+
+  if (subjectSelect) subjectSelect.innerHTML = `<option value="">${t("subjectPlaceholder")}</option>`;
+  if (topicSelect) topicSelect.innerHTML = `<option value="">${t("topicPlaceholder")}</option>`;
+  if (resultsInfoText) resultsInfoText.textContent = "";
+  if (resultsSheetFrame) {
+    resultsSheetFrame.src = "about:blank";
+    resultsSheetFrame.srcdoc = "";
+  }
+
+  clearMaterialPreview();
+  renderSlidesPreview();
+  renderTestBlock(false);
+  renderResultsBlock();
+  showHome();
+  showCourseStage();
+  renderCourseCards();
+}
+
+function handleUnauthorizedAccess({ openLoginModal = false } = {}) {
+  driveConnection = {
+    ...driveConnection,
+    connected: false,
+    google_email: "",
+    google_name: "",
+  };
+
+  clearTeacherAppState();
+  resetProtectedAppData();
+  syncProfileWithDriveConnection();
+  renderProfile();
+  renderAuthState();
+  renderDriveStatus();
+
+  if (openLoginModal) {
+    openAuthModal();
+  }
 }
 
 function getPublicAttemptStorageKey(accessToken = publicTestSessionToken) {
@@ -923,6 +1152,72 @@ function clearStoredPublicAttempt(accessToken = publicTestSessionToken) {
   localStorage.removeItem(getPublicAttemptStorageKey(accessToken));
 }
 
+function stripAnswerPrefix(value) {
+  return String(value || "").replace(/^\s*[A-D0-9]+\s*[\).:\-]\s*/i, "").trim();
+}
+
+function resolveQuestionAnswerIndex(questionLike) {
+  const options = Array.isArray(questionLike?.options) ? questionLike.options : [];
+  const directIndex = Number(questionLike?.correct_option_index);
+  if (Number.isInteger(directIndex) && directIndex >= 0 && directIndex < options.length) {
+    return directIndex;
+  }
+
+  const answerCandidates = [
+    questionLike?.correct_answer,
+    questionLike?.answer,
+    questionLike?.correct,
+  ];
+
+  for (const candidate of answerCandidates) {
+    if (candidate === null || candidate === undefined || candidate === "") continue;
+
+    const normalizedCandidate = String(candidate).trim();
+    if (!normalizedCandidate) continue;
+
+    const numericCandidate = Number(normalizedCandidate);
+    if (Number.isInteger(numericCandidate) && numericCandidate >= 0 && numericCandidate < options.length) {
+      return numericCandidate;
+    }
+
+    const letterMatch = normalizedCandidate.match(/^\s*([A-D])(?:[\).:\-\s]|$)/i);
+    if (letterMatch) {
+      const optionIndex = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+      if (optionIndex >= 0 && optionIndex < options.length) {
+        return optionIndex;
+      }
+    }
+
+    const cleanedCandidate = stripAnswerPrefix(normalizedCandidate).toLowerCase();
+    const exactIndex = options.findIndex((option) => String(option || "").trim().toLowerCase() === normalizedCandidate.toLowerCase());
+    if (exactIndex >= 0) {
+      return exactIndex;
+    }
+
+    const cleanedIndex = options.findIndex((option) => stripAnswerPrefix(option).toLowerCase() === cleanedCandidate);
+    if (cleanedIndex >= 0) {
+      return cleanedIndex;
+    }
+  }
+
+  return -1;
+}
+
+function serializeGeneratedQuestion(question) {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const answerIndex = Number.isInteger(question?.answer) ? question.answer : resolveQuestionAnswerIndex(question);
+  const safeAnswerIndex = answerIndex >= 0 ? answerIndex : -1;
+  const rawAnswer = String(question?.answerRaw ?? question?.correct_answer ?? question?.answer ?? "").trim();
+
+  return {
+    question: question?.question || "",
+    options,
+    correct_answer: safeAnswerIndex >= 0 ? (options[safeAnswerIndex] || "") : rawAnswer,
+    correct_option_index: safeAnswerIndex,
+    answer: rawAnswer || (safeAnswerIndex >= 0 ? ["A", "B", "C", "D"][safeAnswerIndex] : ""),
+  };
+}
+
 function hydrateCurrentTestSession(sessionData) {
   if (!sessionData) {
     currentTestSession = null;
@@ -938,13 +1233,14 @@ function hydrateCurrentTestSession(sessionData) {
   const restoredQuestions = Array.isArray(sessionData.questions_json) ? sessionData.questions_json : [];
   generatedQuestions = restoredQuestions.map((item, index) => {
     const options = Array.isArray(item.options) ? item.options : [];
-    const resolvedAnswer = item.correct_option_index ?? options.findIndex(option => option === item.correct_answer);
+    const resolvedAnswer = resolveQuestionAnswerIndex(item);
 
     return {
       id: index + 1,
       question: item.question,
       options,
-      answer: Number.isInteger(resolvedAnswer) && resolvedAnswer >= 0 ? resolvedAnswer : 0,
+      answer: resolvedAnswer,
+      answerRaw: item.answer || item.correct_answer || "",
     };
   });
 
@@ -957,6 +1253,10 @@ function hydrateCurrentTestSession(sessionData) {
 }
 
 async function loadDriveStatus() {
+  const previousConnected = Boolean(driveConnection.connected);
+  const previousEmail = String(driveConnection.google_email || "").trim().toLowerCase();
+  const hadProtectedData = Boolean(subjects.length || selectedSubject || selectedCourseNumber || currentTestSession);
+
   try {
     driveConnection = await fetchJSON(`${API_BASE}/users/drive/status/`, {
       credentials: "include"
@@ -971,12 +1271,39 @@ async function loadDriveStatus() {
     };
   }
 
+  const nextEmail = String(driveConnection.google_email || "").trim().toLowerCase();
+  const didAccountChange =
+    previousConnected &&
+    driveConnection.connected &&
+    previousEmail &&
+    nextEmail &&
+    previousEmail !== nextEmail;
+
+  if (didAccountChange) {
+    clearTeacherAppState(previousEmail);
+    resetProtectedAppData();
+    appStateRestoreDone = false;
+  }
+
+  if (!driveConnection.connected && hadProtectedData) {
+    clearTeacherAppState();
+    resetProtectedAppData();
+  }
+
+  syncProfileWithDriveConnection();
+  renderProfile();
+  renderAuthState();
   renderDriveStatus();
   return driveConnection;
 }
 
 function renderDriveStatus() {
   ensureMaterialManagerLayout();
+
+  if (addInlineDisciplineBtn) {
+    addInlineDisciplineBtn.disabled = !selectedCourseNumber || isMaterialUploading || isMaterialDeleting;
+    addInlineDisciplineBtn.textContent = t("addInlineDiscipline");
+  }
 
   if (uploadMaterialBtn) {
     uploadMaterialBtn.disabled = !selectedSubject || isMaterialUploading || isMaterialDeleting;
@@ -998,6 +1325,11 @@ function renderDriveStatus() {
     deleteMaterialBtn.textContent = isMaterialDeleting ? getDeletingActionLabel() : getDeleteActionLabel();
   }
 
+  if (deleteDisciplineBtn) {
+    deleteDisciplineBtn.disabled = !selectedSubject || isMaterialUploading || isMaterialDeleting;
+    deleteDisciplineBtn.textContent = t("deleteDisciplineAction");
+  }
+
   renderMaterialManagerPanel();
 }
 
@@ -1014,9 +1346,29 @@ async function connectGoogleDrive() {
   } catch (error) {
     console.error("Drive connect error:", error);
     renderDriveStatus();
+    window.alert(error.message || t("driveConnectError"));
   }
 
   return false;
+}
+
+async function disconnectGoogleDrive() {
+  try {
+    await fetchJSON(`${API_BASE}/users/drive/disconnect/`, {
+      method: "POST",
+      credentials: "include"
+    });
+  } catch (error) {
+    console.error("Drive disconnect error:", error);
+    window.alert(error.message || t("logoutError"));
+    return false;
+  }
+
+  profileDropdown?.classList.remove("show");
+  closeModal(profileModal);
+  closeModal(authModal);
+  await loadDriveStatus();
+  return true;
 }
 
 async function uploadMaterialFiles(fileList) {
@@ -1063,6 +1415,7 @@ async function uploadMaterialFiles(fileList) {
   } catch (error) {
     console.error("Material upload error:", error);
     renderDriveStatus();
+    window.alert(error?.message || t("materialUploadError"));
   } finally {
     isMaterialUploading = false;
     renderDriveStatus();
@@ -1081,6 +1434,12 @@ async function deleteSelectedMaterial() {
     : `Материал "${material.title}" и связанные с ним тесты будут удалены. Продолжить?`;
 
   try {
+    if (!window.confirm(confirmMessage)) {
+      isMaterialDeleting = false;
+      renderDriveStatus();
+      return;
+    }
+
     await fetchJSON(`${API_BASE}/materials/${material.id}/`, {
       method: "DELETE"
     });
@@ -1212,6 +1571,7 @@ function closeModal(modal) {
 function saveProfile() {
   profileState.username = profileUsernameInput.value.trim() || profileState.username;
   profileState.bio = profileBioInput.value.trim() || profileState.bio;
+  persistProfileState();
   renderProfile();
   closeModal(profileModal);
 }
@@ -1262,6 +1622,14 @@ function getMaterialManagerToggleLabel() {
   return isMaterialManagerOpen ? "Скрыть загрузку" : "Загрузка материала";
 }
 
+function getDeleteActionLabel() {
+  return t("deleteMaterialAction");
+}
+
+function getDeletingActionLabel() {
+  return t("deletingMaterialAction");
+}
+
 function ensureMaterialManagerLayout() {
   return;
 }
@@ -1282,7 +1650,7 @@ function renderUploadMenu() {
 
 function renderMaterialManagerPanel() {
   ensureMaterialManagerLayout();
-  const canShowManager = Boolean(selectedSubject);
+  const canShowManager = Boolean(selectedCourseNumber);
   const isManagerOpen = canShowManager && isMaterialManagerOpen;
 
   if (!isManagerOpen) {
@@ -1295,7 +1663,7 @@ function renderMaterialManagerPanel() {
     toggleMaterialManagerBtn.setAttribute("title", label);
     toggleMaterialManagerBtn.setAttribute("aria-expanded", String(isManagerOpen));
     toggleMaterialManagerBtn.classList.toggle("is-open", isManagerOpen);
-    toggleMaterialManagerBtn.disabled = !selectedSubject;
+    toggleMaterialManagerBtn.disabled = !selectedCourseNumber;
   }
 
   if (materialManagerPanel) {
@@ -1330,6 +1698,84 @@ function renderProfile() {
   setAvatar(avatarEditPreview, profileState.avatarUrl, initials);
 }
 
+function syncProfileWithDriveConnection() {
+  const usesDefaultBio = Object.values(DEFAULT_PROFILE_BIOS).includes(profileState.bio);
+
+  if (driveConnection.connected) {
+    const googleName = String(driveConnection.google_name || "").trim();
+    const googleEmail = String(driveConnection.google_email || "").trim();
+
+    if (googleName) {
+      profileState.fullName = googleName;
+    }
+
+    if (googleEmail) {
+      profileState.email = googleEmail;
+      profileState.username = googleEmail.split("@")[0] || DEFAULT_PROFILE_STATE.username;
+    }
+
+    profileState.avatarUrl = "";
+
+    if (usesDefaultBio || !profileState.bio.trim()) {
+      profileState.bio = t("profileBioDefault");
+    }
+
+    applyStoredProfileState(googleEmail);
+
+    return;
+  }
+
+  profileState.fullName = DEFAULT_PROFILE_STATE.fullName;
+  profileState.email = DEFAULT_PROFILE_STATE.email;
+  profileState.username = DEFAULT_PROFILE_STATE.username;
+  profileState.avatarUrl = "";
+
+  if (usesDefaultBio || !profileState.bio.trim()) {
+    profileState.bio = t("profileBioDefault");
+  }
+}
+
+function renderAuthState() {
+  const isConnected = Boolean(driveConnection.connected);
+
+  if (authActions) {
+    authActions.classList.toggle("hidden", isConnected);
+  }
+
+  if (profileShell) {
+    profileShell.classList.toggle("hidden", !isConnected);
+  }
+
+  if (authOpenBtn) {
+    authOpenBtn.textContent = t("authLogin");
+  }
+
+  if (authModalTitle) {
+    authModalTitle.textContent = t("authModalTitle");
+  }
+
+  if (authModalText) {
+    authModalText.textContent = t("authModalText");
+  }
+
+  if (authModalNote) {
+    authModalNote.textContent = t("authModalNote");
+  }
+
+  if (authGoogleBtnText) {
+    authGoogleBtnText.textContent = isAuthSubmitting ? t("authGooglePending") : t("authGoogle");
+  }
+
+  if (authGoogleBtn) {
+    authGoogleBtn.disabled = isAuthSubmitting;
+  }
+}
+
+function openAuthModal() {
+  profileDropdown?.classList.remove("show");
+  openModal(authModal);
+}
+
 function updateBrandRoleLabel() {
   if (!brandRoleTitle) return;
   brandRoleTitle.textContent = selectedRole === "kaz" ? t("roleTeacher") : t("roleLecturer");
@@ -1353,6 +1799,10 @@ function renderDisciplinePreviewCard() {
 
 function openDisciplineModal() {
   if (!selectedCourseNumber || !disciplineModal) return;
+  if (!driveConnection.connected) {
+    promptGoogleLogin();
+    return;
+  }
   if (disciplineTitleInput) disciplineTitleInput.value = "";
   if (disciplineFormError) disciplineFormError.textContent = "";
   renderDisciplinePreviewCard();
@@ -1362,6 +1812,10 @@ function openDisciplineModal() {
 
 async function createDisciplineFromModal() {
   if (!disciplineTitleInput || !saveDisciplineBtn || !selectedCourseNumber) return;
+  if (!driveConnection.connected) {
+    promptGoogleLogin();
+    return;
+  }
 
   const title = disciplineTitleInput.value.trim();
   if (!title) {
@@ -1379,9 +1833,10 @@ async function createDisciplineFromModal() {
   saveDisciplineBtn.disabled = true;
   saveDisciplineBtn.textContent = t("disciplineCreating");
   if (disciplineFormError) disciplineFormError.textContent = "";
+  const shouldKeepManagerOpen = isMaterialManagerOpen;
 
   try {
-    await fetchJSON(`${API_BASE}/disciplines/`, {
+    const createdDiscipline = await fetchJSON(`${API_BASE}/disciplines/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -1396,6 +1851,19 @@ async function createDisciplineFromModal() {
 
     closeModal(disciplineModal);
     await loadDisciplinesForCourse(selectedCourseNumber);
+    const nextSubject = createdDiscipline?.id
+      ? getPreferredSubject(createdDiscipline.id)
+      : subjects.find(item => item.title.trim().toLowerCase() === title.toLowerCase()) || subjects[subjects.length - 1] || null;
+
+    if (nextSubject) {
+      await openSubject(nextSubject);
+      isMaterialManagerOpen = shouldKeepManagerOpen;
+      renderDriveStatus();
+    } else {
+      openEmptySubjectWorkspace(selectedCourseNumber);
+      isMaterialManagerOpen = shouldKeepManagerOpen;
+      renderDriveStatus();
+    }
   } catch (error) {
     console.error("Discipline create error:", error);
     if (disciplineFormError) {
@@ -1507,6 +1975,26 @@ async function deleteDiscipline(card) {
   }
 }
 
+async function deleteCurrentSubject() {
+  if (!selectedSubject) return;
+
+  const shouldDelete = window.confirm(
+    t("deleteDisciplineConfirm", { title: selectedSubject.title || t("subjectPlaceholder") })
+  );
+
+  if (!shouldDelete) {
+    return;
+  }
+
+  const shouldKeepManagerOpen = isMaterialManagerOpen;
+  await deleteDiscipline(selectedSubject);
+
+  if (!subjectView.classList.contains("hidden") && selectedCourseNumber) {
+    isMaterialManagerOpen = shouldKeepManagerOpen;
+    renderDriveStatus();
+  }
+}
+
 async function refreshInterfaceLanguage({ roleChanged = false } = {}) {
   const wasSubjectOpen = !subjectView.classList.contains("hidden");
   const previousSubjectId = selectedSubject?.id || null;
@@ -1593,6 +2081,7 @@ function getDisciplineLang(discipline) {
 
 async function openCourseDisciplines(courseNumber, preferredSubjectId = null) {
   selectedCourseNumber = courseNumber;
+  isDisciplineAccessLocked = false;
   disciplineStage.classList.add("hidden");
   await loadDisciplinesForCourse(courseNumber);
 
@@ -1608,6 +2097,7 @@ async function openCourseDisciplines(courseNumber, preferredSubjectId = null) {
 
 function showCourseStage() {
   selectedCourseNumber = null;
+  isDisciplineAccessLocked = false;
   openedDisciplineMenuId = null;
   confirmingDisciplineDeleteId = null;
   deletingDisciplineId = null;
@@ -1654,7 +2144,9 @@ async function loadCoursesFromApi() {
   try {
     coursesData = await fetchJSON(`${API_BASE}/courses/`);
     renderCourseCards();
-    await restoreTeacherAppState();
+    if (driveConnection.connected) {
+      await restoreTeacherAppState();
+    }
   } catch (error) {
     console.error("Courses load error:", error);
     courseGrid.innerHTML = `<div class="empty-state">${t("coursesLoadError")}</div>`;
@@ -1707,11 +2199,14 @@ async function loadDisciplinesForCourse(courseNumber) {
 
     if (!courseId) {
       subjects = [];
+      isDisciplineAccessLocked = false;
       renderDisciplineCards();
       return;
     }
 
-    const disciplines = await fetchJSON(`${API_BASE}/disciplines/?course_id=${courseId}&language=${selectedRole}`);
+    const disciplines = await fetchJSON(`${API_BASE}/disciplines/?course_id=${courseId}&language=${selectedRole}`, {
+      handleUnauthorized: false
+    });
 
     subjects = disciplines
       .map((discipline, index) => ({
@@ -1727,10 +2222,18 @@ async function loadDisciplinesForCourse(courseNumber) {
       }))
       .filter(item => item.groupLang === selectedRole);
 
+    isDisciplineAccessLocked = false;
     renderDisciplineCards();
   } catch (error) {
     console.error("Disciplines load error:", error);
     subjects = [];
+    isDisciplineAccessLocked = error?.status === 401;
+
+    if (isDisciplineAccessLocked) {
+      renderLoginRequiredState();
+      return;
+    }
+
     renderDisciplineCards();
   }
 }
@@ -1823,7 +2326,7 @@ function renderDisciplineCards() {
   if (!subjects.length) {
     cardsGrid.innerHTML = `
       <div class="empty-state" style="grid-column:1 / -1;">
-        ${t("disciplinesNotFound")}
+        ${escapeHtml(isDisciplineAccessLocked ? getAuthRequiredWorkspaceMessage() : t("disciplinesNotFound"))}
       </div>
     `;
   }
@@ -1839,13 +2342,17 @@ function mapMaterialFromApi(item) {
     title: item.title,
     desc: item.description || t("materialDescriptionMissing"),
     fileUrl: item.cloud_url,
+    previewUrl: item.id ? `${API_BASE}/materials/${item.id}/preview/` : item.cloud_url,
     formUrl: item.form_url || "",
     resultsSheetUrl: item.results_sheet_url || "",
     slidesUrl: item.slides_url || "",
     slidesEmbedUrl: item.slides_embed_url || "",
     slidesDownloadUrl: item.slides_download_url || "",
     slidesPresentationId: item.slides_presentation_id || "",
-    createdAt: item.created_at || ""
+    createdAt: item.created_at || "",
+    mimeType: item.mime_type || "",
+    originalFilename: item.original_filename || "",
+    driveFileId: item.drive_file_id || "",
   };
 }
 
@@ -1875,6 +2382,10 @@ async function openSubject(subject) {
   }
 
   await loadDriveStatus();
+
+  if (!selectedSubject) {
+    return;
+  }
 
   const existingType = typeOrder.find(t => selectedSubject.materials.some(m => m.type === t.key));
   activeType = existingType ? existingType.key : "lecture";
@@ -1906,6 +2417,7 @@ function showHome() {
   homeView.classList.remove("hidden");
   disciplineStage.classList.add("hidden");
   courseStage.classList.remove("hidden");
+  isDisciplineAccessLocked = false;
   selectedSubject = null;
   slidesErrorMessage = "";
   isMaterialManagerOpen = false;
@@ -1937,11 +2449,157 @@ function getSelectedMaterial() {
   return list.find(m => m.id === selectedMaterialId) || null;
 }
 
+function findSubjectById(subjectId) {
+  return subjects.find(item => Number(item.id) === Number(subjectId)) || null;
+}
+
+function getAssistantSubjectSnapshots() {
+  return subjects.map(item => ({
+    id: Number(item.id),
+    title: item.title,
+    course_number: Number(item.courseNumber || selectedCourseNumber || 0),
+  }));
+}
+
+function getAssistantMaterialSnapshots() {
+  if (!selectedSubject?.materials?.length) {
+    return [];
+  }
+
+  return selectedSubject.materials.map(item => ({
+    id: Number(item.id),
+    title: item.title,
+    type: item.type,
+    subject_id: Number(selectedSubject.id || 0),
+    course_number: Number(selectedSubject.courseNumber || selectedCourseNumber || 0),
+  }));
+}
+
+function buildAssistantContext() {
+  const material = getSelectedMaterial();
+
+  return {
+    selected_role: selectedRole,
+    current_view: subjectView?.classList.contains("hidden") ? "home" : "subject",
+    active_panel: activeSubjectPanel,
+    selected_course_number: selectedCourseNumber,
+    selected_subject: selectedSubject
+      ? {
+          id: Number(selectedSubject.id),
+          title: selectedSubject.title,
+          course_number: Number(selectedSubject.courseNumber || selectedCourseNumber || 0),
+        }
+      : null,
+    selected_material: material
+      ? {
+          id: Number(material.id),
+          title: material.title,
+          type: material.type,
+          subject_id: Number(selectedSubject?.id || 0),
+          course_number: Number(selectedSubject?.courseNumber || selectedCourseNumber || 0),
+        }
+      : null,
+    available_subjects: getAssistantSubjectSnapshots(),
+    available_materials: getAssistantMaterialSnapshots(),
+    has_generated_test: generatedQuestions.length > 0,
+    has_results: Boolean(currentTestSession),
+  };
+}
+
+async function ensureAssistantSubjectContext({ courseNumber = null, subjectId = null } = {}) {
+  const normalizedCourseNumber = Number(courseNumber) || Number(selectedCourseNumber) || null;
+  const normalizedSubjectId = Number(subjectId) || null;
+
+  if (!selectedSubject && !subjects.length) {
+    const fallbackCourseNumber = normalizedCourseNumber || Number(coursesData?.[0]?.number || 0) || null;
+    if (fallbackCourseNumber) {
+      await openCourseDisciplines(fallbackCourseNumber, normalizedSubjectId);
+      if (selectedSubject) {
+        return selectedSubject;
+      }
+    }
+  }
+
+  if (normalizedCourseNumber && Number(selectedCourseNumber) !== normalizedCourseNumber) {
+    await openCourseDisciplines(normalizedCourseNumber, normalizedSubjectId);
+    return selectedSubject;
+  }
+
+  if (!selectedSubject && normalizedCourseNumber) {
+    await openCourseDisciplines(normalizedCourseNumber, normalizedSubjectId);
+    return selectedSubject;
+  }
+
+  if (normalizedSubjectId && Number(selectedSubject?.id) !== normalizedSubjectId) {
+    const nextSubject = findSubjectById(normalizedSubjectId);
+    if (nextSubject) {
+      await openSubject(nextSubject);
+    } else if (normalizedCourseNumber) {
+      await openCourseDisciplines(normalizedCourseNumber, normalizedSubjectId);
+    }
+  }
+
+  if (!selectedSubject) {
+    const fallbackSubject = normalizedSubjectId
+      ? findSubjectById(normalizedSubjectId)
+      : getPreferredSubject();
+
+    if (fallbackSubject) {
+      await openSubject(fallbackSubject);
+    }
+  }
+
+  return selectedSubject;
+}
+
+async function syncAssistantMaterialSelection({
+  courseNumber = null,
+  subjectId = null,
+  materialId = null,
+  materialType = "",
+} = {}) {
+  await ensureAssistantSubjectContext({ courseNumber, subjectId });
+
+  if (!selectedSubject) {
+    return null;
+  }
+
+  const normalizedMaterialType = typeof materialType === "string" ? materialType.trim().toLowerCase() : "";
+  if (normalizedMaterialType) {
+    activeType = normalizedMaterialType;
+  }
+
+  const subjectMaterials = Array.isArray(selectedSubject.materials) ? selectedSubject.materials : [];
+  const matchedMaterial = subjectMaterials.find(item => Number(item.id) === Number(materialId));
+
+  if (matchedMaterial) {
+    activeType = matchedMaterial.type || activeType;
+    selectedMaterialId = matchedMaterial.id;
+  } else if (normalizedMaterialType) {
+    const firstByType = subjectMaterials.find(item => item.type === normalizedMaterialType);
+    if (firstByType) {
+      selectedMaterialId = firstByType.id;
+    }
+  }
+
+  populateMaterialTypeSelect();
+  populateTopicSelect();
+  renderDriveStatus();
+  await loadLatestTestSessionForSelectedMaterial();
+  clearMaterialPreview();
+  renderSlidesPreview();
+  renderTestBlock();
+  await renderResultsBlock();
+  saveTeacherAppState();
+
+  return getSelectedMaterial();
+}
+
 function populateSubjectSelect() {
   if (!subjectSelect) return;
 
   if (!subjects.length) {
-    subjectSelect.innerHTML = `<option value="">${t("subjectNotFound")}</option>`;
+    subjectSelect.innerHTML = `<option value="">${isDisciplineAccessLocked ? escapeHtml(getAuthRequiredWorkspaceMessage()) : t("subjectNotFound")}</option>`;
     subjectSelect.disabled = true;
     return;
   }
@@ -1962,6 +2620,7 @@ function openEmptySubjectWorkspace(courseNumber) {
   isMaterialManagerOpen = false;
   isUploadMenuOpen = false;
   activeType = "lecture";
+  activeSubjectPanel = "materials";
   selectedMaterialId = null;
   resetTestState();
 
@@ -1993,7 +2652,11 @@ function renderSubjectHeader() {
   if (subjectTitle) {
     subjectTitle.classList.toggle("hidden", isEditingSubjectTitle);
   }
-  subjectCourse.textContent = selectedSubject?.course || (selectedCourseNumber ? formatCourseLabel(selectedCourseNumber) : "");
+  const currentCourseLabel = selectedSubject?.course || (selectedCourseNumber ? formatCourseLabel(selectedCourseNumber) : "");
+  subjectCourse.textContent = currentCourseLabel;
+  if (subjectCourseBannerBadge) {
+    subjectCourseBannerBadge.textContent = currentCourseLabel;
+  }
   if (subjectCoverTop) {
     subjectCoverTop.dataset.courseNumber = String(courseNumber);
     subjectCoverTop.style.backgroundImage = "";
@@ -2013,7 +2676,7 @@ function populateMaterialTypeSelect() {
   if (!materialTypeSelect) return;
 
   if (!selectedSubject) {
-    materialTypeSelect.innerHTML = `<option value="">${t("subjectSelectFirst")}</option>`;
+    materialTypeSelect.innerHTML = `<option value="">${isDisciplineAccessLocked ? escapeHtml(getAuthRequiredWorkspaceMessage()) : t("subjectSelectFirst")}</option>`;
     materialTypeSelect.disabled = true;
     return;
   }
@@ -2036,7 +2699,7 @@ function populateTopicSelect() {
   if (!topicSelect) return;
 
   if (!selectedSubject) {
-    topicSelect.innerHTML = `<option value="">${t("subjectSelectFirst")}</option>`;
+    topicSelect.innerHTML = `<option value="">${isDisciplineAccessLocked ? escapeHtml(getAuthRequiredWorkspaceMessage()) : t("subjectSelectFirst")}</option>`;
     topicSelect.disabled = true;
     return;
   }
@@ -2067,6 +2730,20 @@ function getPreviewKindFromUrl(url) {
   return "external";
 }
 
+function getPreviewKind(item) {
+  const mime = String(item?.mimeType || "").toLowerCase();
+  const name = String(item?.originalFilename || item?.title || "").toLowerCase();
+  const ext = name.split("?")[0].split("#")[0].split(".").pop() || "";
+
+  if (mime.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
+  if (mime === "application/pdf" || ext === "pdf") return "pdf";
+  if (mime.startsWith("video/") || ["mp4", "webm", "ogg", "mov"].includes(ext)) return "video";
+  if (mime.startsWith("audio/") || ["mp3", "wav", "oga", "m4a"].includes(ext)) return "audio";
+  if (mime.startsWith("text/") || ["txt", "md", "csv", "json", "xml", "html"].includes(ext)) return "text";
+
+  return getPreviewKindFromUrl(item?.fileUrl || "");
+}
+
 function upsertSelectedSubjectMaterial(materialPayload) {
   if (!selectedSubject || !materialPayload) return null;
 
@@ -2090,7 +2767,7 @@ function clearMaterialPreview() {
 
 function renderMaterialPreview() {
   if (!selectedSubject) {
-    materialPreview.innerHTML = `<div class="empty-state">${t("subjectSelectFirst")}</div>`;
+    materialPreview.innerHTML = `<div class="empty-state">${escapeHtml(isDisciplineAccessLocked ? getAuthRequiredWorkspaceMessage() : t("subjectSelectFirst"))}</div>`;
     return;
   }
 
@@ -2108,17 +2785,20 @@ function renderMaterialPreview() {
         ${getDisciplineCoverMarkup(selectedSubject, "preview-discipline-cover")}
       </div>
     `;
-  const kind = getPreviewKindFromUrl(item.fileUrl);
+  const kind = getPreviewKind(item);
+  const inlinePreviewUrl = item.previewUrl || item.fileUrl;
 
   if (item.fileUrl) {
-    if (kind === "pdf" || kind === "external") {
-      previewInner = `<iframe src="${item.fileUrl}" loading="lazy"></iframe>`;
+    if (kind === "pdf" || kind === "text") {
+      previewInner = `<iframe src="${inlinePreviewUrl}" loading="lazy"></iframe>`;
     } else if (kind === "image") {
-      previewInner = `<img src="${item.fileUrl}" alt="${escapeHtml(item.title)}" />`;
+      previewInner = `<img src="${inlinePreviewUrl}" alt="${escapeHtml(item.title)}" />`;
     } else if (kind === "video") {
-      previewInner = `<video src="${item.fileUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#0a1020;border-radius:18px;"></video>`;
+      previewInner = `<video src="${inlinePreviewUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#0a1020;border-radius:18px;"></video>`;
     } else if (kind === "audio") {
-      previewInner = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;"><audio src="${item.fileUrl}" controls style="width:min(560px,100%);"></audio></div>`;
+      previewInner = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;"><audio src="${inlinePreviewUrl}" controls style="width:min(560px,100%);"></audio></div>`;
+    } else if (kind === "external") {
+      previewInner = `<iframe src="${item.fileUrl}" loading="lazy"></iframe>`;
     }
   }
 
@@ -2229,7 +2909,10 @@ function renderSlidesPreview() {
   if (!selectedSubject) {
     slidesErrorMessage = "";
     setSlidesStatus("");
-    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("subjectSelectFirst"));
+    slidesPreview.innerHTML = buildSlidesEmptyCard(
+      t("slidesEmptyTitle"),
+      isDisciplineAccessLocked ? getAuthRequiredWorkspaceMessage() : t("subjectSelectFirst")
+    );
     return;
   }
 
@@ -2354,14 +3037,147 @@ function updateActionButtonsState() {
 }
 
 function buildInlineQrUrl(value) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value || "Satbayev Edu Assistant")}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value || "Lektor")}`;
 }
 
 function convertGoogleSheetToEmbed(url) {
   if (!url) return "";
-  if (url.includes("/pubhtml")) return url;
-  if (url.includes("/edit")) return url.replace("/edit", "/preview");
-  return url;
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.pathname.includes("/pubhtml")) {
+      return parsed.toString();
+    }
+
+    if (parsed.pathname.includes("/edit")) {
+      parsed.searchParams.set("rm", "minimal");
+      return parsed.toString();
+    }
+
+    return parsed.toString();
+  } catch (error) {
+    console.error("Invalid Google Sheet URL:", error);
+    return url;
+  }
+}
+
+function buildGoogleSheetDownloadUrl(url, format = "xlsx") {
+  if (!url) return "";
+
+  const matched = String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!matched?.[1]) return "";
+
+  return `https://docs.google.com/spreadsheets/d/${matched[1]}/export?format=${encodeURIComponent(format)}`;
+}
+
+function buildResultsSummaryDoc(title, responses = [], options = {}) {
+  const labels = selectedRole === "kaz"
+    ? {
+        participants: "Тапсырғандар",
+        average: "Орташа пайыз",
+        best: "Үздік балл",
+        percent: "Пайыз",
+        noData: "Нәтиже табылмады",
+      }
+    : {
+        participants: "Участников",
+        average: "Средний процент",
+        best: "Лучший балл",
+        percent: "Процент",
+        noData: "Результаты не найдены",
+      };
+
+  const normalizedResponses = Array.isArray(responses) ? responses : [];
+  const scoringReady = options.scoringReady !== false;
+  const averagePercent = scoringReady && normalizedResponses.length
+    ? Math.round(normalizedResponses.reduce((sum, item) => sum + (Number(item.percentage) || 0), 0) / normalizedResponses.length)
+    : 0;
+  const bestScoreLabel = scoringReady && normalizedResponses.length
+    ? normalizedResponses.reduce((best, item) => {
+        const current = Number(item.score) || 0;
+        const bestValue = Number(best.score) || 0;
+        return current > bestValue ? item : best;
+      }, normalizedResponses[0]).score_label || "-"
+    : t("resultsScoreUnavailable");
+
+  const summaryNote = !scoringReady
+    ? `
+      <div style="padding:16px 18px;border-radius:18px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;line-height:1.55;">
+        <div style="font-weight:800;margin-bottom:6px;">${escapeHtml(t("resultsScoringMissing"))}</div>
+        <div style="font-size:14px;">${escapeHtml(t("resultsRegenerateHint"))}</div>
+      </div>
+    `
+    : "";
+
+  const rowsHtml = normalizedResponses.map((response, index) => {
+    const submittedAt = response.submitted_at
+      ? new Date(response.submitted_at).toLocaleString(selectedRole === "kaz" ? "kk-KZ" : "ru-RU")
+      : "-";
+    const scoreLabel = scoringReady ? escapeHtml(response.score_label || "-") : escapeHtml(t("resultsScoreUnavailable"));
+    const percentLabel = scoringReady ? `${Number(response.percentage) || 0}%` : "—";
+
+    return `
+      <tr>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#475569;">${index + 1}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:700;">${escapeHtml(response.student_name || t("nameMissing"))}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:34px;padding:0 14px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800;">${scoreLabel}</span>
+        </td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:700;">${percentLabel}</td>
+        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#475569;">${escapeHtml(submittedAt)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `
+    <html>
+      <body style="margin:0;padding:28px;background:#f8fafc;color:#0f172a;font-family:Arial,sans-serif;">
+        <div style="display:grid;gap:16px;">
+          <div>
+            <h2 style="margin:0 0 8px;font-size:28px;line-height:1.2;">${escapeHtml(title || t("results"))}</h2>
+          </div>
+
+          ${summaryNote}
+
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
+            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.participants}</div>
+              <div style="font-size:28px;font-weight:800;color:#0f172a;">${normalizedResponses.length}</div>
+            </div>
+            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.average}</div>
+              <div style="font-size:28px;font-weight:800;color:#0f172a;">${scoringReady ? `${averagePercent}%` : "—"}</div>
+            </div>
+            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.best}</div>
+              <div style="font-size:28px;font-weight:800;color:#0f172a;">${escapeHtml(bestScoreLabel)}</div>
+            </div>
+          </div>
+
+          <div style="border-radius:22px;overflow:hidden;border:1px solid #dbe3f0;background:#ffffff;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead style="background:#eaf1ff;">
+                <tr>
+                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableNumber")}</th>
+                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableName")}</th>
+                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableScore")}</th>
+                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${labels.percent}</th>
+                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableTime")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml || `
+                  <tr>
+                    <td colspan="5" style="padding:28px 16px;text-align:center;color:#64748b;">${labels.noData}</td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
 }
 
 function makeQuestion(index, topicTitle) {
@@ -2412,12 +3228,7 @@ async function saveEditedQuestions() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          questions_json: generatedQuestions.map((q) => ({
-            question: q.question,
-            options: q.options,
-            correct_answer: q.options[q.answer] || "",
-            correct_option_index: q.answer,
-          })),
+          questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
           question_count: generatedQuestions.length,
         }),
       });
@@ -2492,43 +3303,47 @@ function renderTestBlock(showQrInline = false) {
 
 async function renderResultsBlock() {
   const material = getSelectedMaterial();
+  let latestSession = null;
 
   resultsSheetFrame.src = "about:blank";
   resultsSheetFrame.srcdoc = "";
 
   if (!material) {
-    resultsInfoText.textContent = t("selectMaterialFirst");
+    resultsInfoText.textContent = "";
     openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    downloadResultsBtn.disabled = !(currentTestSession?.results_sheet_url);
     updateActionButtonsState();
     return;
   }
 
   resultsInfoText.textContent = t("resultsLoading");
   openResultsSheetBtn.disabled = true;
+  downloadResultsBtn.disabled = true;
   updateActionButtonsState();
 
   try {
-    const latestSession = await getLatestSessionForSelectedMaterial();
+    latestSession = await getLatestSessionForSelectedMaterial();
 
     if (!latestSession) {
-      resultsInfoText.textContent = t("noTestSession");
+      resultsInfoText.textContent = "";
       openResultsSheetBtn.disabled = true;
+      downloadResultsBtn.disabled = true;
       updateActionButtonsState();
       return;
     }
 
-    const sheetUrl = latestSession.results_sheet_url || "";
-    const responsesResponse = await fetch(`${API_BASE}/results/test-sessions/${latestSession.id}/responses/`);
-
-    if (!responsesResponse.ok) {
-      throw new Error(`Responses request failed: ${responsesResponse.status}`);
-    }
-
-    const data = await responsesResponse.json();
+    const data = await fetchJSON(`${API_BASE}/results/test-sessions/${latestSession.id}/responses/`);
     const responses = data.responses || [];
+    const sheetUrl = data.results_sheet_url || latestSession.results_sheet_url || "";
+    const scoringReady = data.scoring_ready !== false;
+    currentTestSession = {
+      ...latestSession,
+      ...data,
+      id: latestSession.id
+    };
 
     if (!responses.length) {
-      resultsInfoText.textContent = t("noStudentResponses");
+      resultsInfoText.textContent = "";
       resultsSheetFrame.srcdoc = `
         <html>
           <body style="font-family: Arial, sans-serif; padding: 20px;">
@@ -2538,97 +3353,136 @@ async function renderResultsBlock() {
         </html>
       `;
       openResultsSheetBtn.disabled = !sheetUrl;
+      downloadResultsBtn.disabled = !sheetUrl;
       updateActionButtonsState();
       return;
     }
 
-    const rowsHtml = responses.map((response, index) => {
-      const submittedAt = response.submitted_at
-        ? new Date(response.submitted_at).toLocaleString(selectedRole === "kaz" ? "kk-KZ" : "ru-RU")
-        : "-";
-
-      return `
-        <tr>
-          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${index + 1}</td>
-          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${escapeHtml(response.student_name || t("nameMissing"))}</td>
-          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;font-weight:700;">${escapeHtml(response.score_label || "-")}</td>
-          <td style="padding:12px 14px;border-bottom:1px solid #e5e7eb;">${escapeHtml(submittedAt)}</td>
-        </tr>
-      `;
-    }).join("");
-
-    resultsInfoText.textContent = t("resultsFound", { count: data.response_count || responses.length });
-    resultsSheetFrame.srcdoc = `
-      <html>
-        <body style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc; color:#0f172a;">
-          <h2 style="margin-top:0; margin-bottom:8px;">${escapeHtml(data.title)}</h2>
-          <table style="width:100%; border-collapse:collapse; background:#ffffff; border-radius:14px; overflow:hidden;">
-            <thead style="background:#e2e8f0; text-align:left;">
-              <tr>
-                <th style="padding:12px 14px;">${t("tableNumber")}</th>
-                <th style="padding:12px 14px;">${t("tableName")}</th>
-                <th style="padding:12px 14px;">${t("tableScore")}</th>
-                <th style="padding:12px 14px;">${t("tableTime")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
+    resultsInfoText.textContent = "";
+    resultsSheetFrame.src = "about:blank";
+    resultsSheetFrame.srcdoc = buildResultsSummaryDoc(data.title, responses, { scoringReady });
 
     openResultsSheetBtn.disabled = !sheetUrl;
+    downloadResultsBtn.disabled = !sheetUrl;
     updateActionButtonsState();
   } catch (error) {
     console.error("RESULTS LOAD ERROR:", error);
-    resultsInfoText.textContent = t("resultsLoadError");
+    const fallbackSheetUrl =
+      latestSession?.results_sheet_url ||
+      currentTestSession?.results_sheet_url ||
+      "";
+
+    if (fallbackSheetUrl) {
+      resultsInfoText.textContent = "";
+      resultsSheetFrame.src = "about:blank";
+      resultsSheetFrame.srcdoc = `
+        <html>
+          <body style="margin:0;padding:28px;background:#f8fafc;color:#0f172a;font-family:Arial,sans-serif;">
+            <div style="padding:24px;border-radius:24px;background:#ffffff;border:1px solid #dbe3f0;">
+              <h3 style="margin:0 0 12px;font-size:24px;">${escapeHtml(t("results"))}</h3>
+              <p style="margin:0;color:#64748b;line-height:1.6;">${escapeHtml(error?.message || t("resultsLoadError"))}</p>
+            </div>
+          </body>
+        </html>
+      `;
+      openResultsSheetBtn.disabled = false;
+      downloadResultsBtn.disabled = false;
+      updateActionButtonsState();
+      return;
+    }
+
+    resultsInfoText.textContent = "";
     resultsSheetFrame.src = "about:blank";
     resultsSheetFrame.srcdoc = "";
     openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
+    downloadResultsBtn.disabled = !(currentTestSession?.results_sheet_url);
     updateActionButtonsState();
   }
+}
+
+async function syncResultsSheetSession() {
+  const latestSession = await getLatestSessionForSelectedMaterial();
+  const sessionId = latestSession?.id;
+  const sheetUrl = latestSession?.results_sheet_url || "";
+
+  if (!sessionId || !sheetUrl) {
+    return { latestSession, sheetUrl };
+  }
+
+  try {
+    const syncData = await fetchJSON(`${API_BASE}/results/test-sessions/${sessionId}/responses/`);
+    currentTestSession = {
+      ...latestSession,
+      ...syncData,
+      id: sessionId
+    };
+  } catch (error) {
+    console.error("RESULTS SHEET SYNC ERROR:", error);
+    return {
+      latestSession,
+      sheetUrl,
+      syncError: error
+    };
+  }
+
+  return {
+    latestSession: currentTestSession,
+    sheetUrl: currentTestSession.results_sheet_url || sheetUrl
+  };
 }
 
 async function openResultsSheetDirect() {
   switchSubjectPanel("results");
 
-  const latestSession = await getLatestSessionForSelectedMaterial();
-  const sessionId = latestSession?.id;
-  const sheetUrl = latestSession?.results_sheet_url || "";
+  try {
+    const { sheetUrl, syncError } = await syncResultsSheetSession();
 
-  if (!sheetUrl) {
-    alert(t("resultsSheetUnavailable"));
-    return;
-  }
-
-  if (sessionId) {
-    try {
-      const syncResponse = await fetch(`${API_BASE}/results/test-sessions/${sessionId}/responses/`);
-
-      if (!syncResponse.ok) {
-        throw new Error(`Results sync failed: ${syncResponse.status}`);
-      }
-
-      const syncData = await syncResponse.json();
-      currentTestSession = {
-        ...latestSession,
-        ...syncData,
-        id: sessionId
-      };
-    } catch (error) {
-      console.error("RESULTS SHEET SYNC ERROR:", error);
-      alert(t("resultsSyncError"));
+    if (!sheetUrl) {
+      alert(t("resultsSheetUnavailable"));
       return;
     }
-  }
 
-  resultsInfoText.textContent = t("resultsOpenedHere");
-  resultsSheetFrame.srcdoc = "";
-  resultsSheetFrame.src = convertGoogleSheetToEmbed(sheetUrl);
-  openResultsSheetBtn.disabled = false;
-  updateActionButtonsState();
+    resultsInfoText.textContent = "";
+    window.open(sheetUrl, "_blank", "noopener");
+    openResultsSheetBtn.disabled = false;
+    downloadResultsBtn.disabled = false;
+    updateActionButtonsState();
+    if (syncError) {
+      console.warn("Results sheet opened without sync:", syncError);
+    }
+  } catch (error) {
+    console.error("RESULTS SHEET OPEN ERROR:", error);
+    alert(error?.message || t("resultsSyncError"));
+  }
+}
+
+async function downloadResultsSheet() {
+  switchSubjectPanel("results");
+
+  try {
+    const { sheetUrl, syncError } = await syncResultsSheetSession();
+
+    if (!sheetUrl) {
+      alert(t("resultsSheetUnavailable"));
+      return;
+    }
+
+    const downloadUrl = buildGoogleSheetDownloadUrl(sheetUrl, "xlsx");
+    if (!downloadUrl) {
+      alert(t("resultsSheetUnavailable"));
+      return;
+    }
+
+    window.open(downloadUrl, "_blank", "noopener");
+    downloadResultsBtn.disabled = false;
+    updateActionButtonsState();
+    if (syncError) {
+      console.warn("Results download started without sync:", syncError);
+    }
+  } catch (error) {
+    console.error("RESULTS DOWNLOAD ERROR:", error);
+    alert(error?.message || t("resultsSyncError"));
+  }
 }
 
 function openTestDirect() {
@@ -2702,8 +3556,9 @@ async function createAiQuestions() {
     generatedQuestions = data.test.map((item, index) => ({
       id: index + 1,
       question: item.question,
-      options: item.options,
-      answer: ["A", "B", "C", "D"].indexOf(item.answer)
+      options: Array.isArray(item.options) ? item.options : [],
+      answer: resolveQuestionAnswerIndex(item),
+      answerRaw: item.answer || "",
     }));
 
     const sessionResponse = await fetch(`${API_BASE}/results/test-sessions/create-from-ai/`, {
@@ -2715,12 +3570,7 @@ async function createAiQuestions() {
         material_id: currentMaterial.id,
         question_count: testConfig.questionCount,
         duration_minutes: testConfig.durationMinutes,
-        questions: generatedQuestions.map((q) => ({
-          question: q.question,
-          options: q.options,
-          correct_answer: q.options[q.answer] || "",
-          correct_option_index: q.answer
-        }))
+        questions: generatedQuestions.map((q) => serializeGeneratedQuestion(q))
       })
     });
 
@@ -2732,12 +3582,7 @@ async function createAiQuestions() {
     hydrateCurrentTestSession({
       ...sessionData,
       material: currentMaterial.id,
-      questions_json: generatedQuestions.map((q) => ({
-        question: q.question,
-        options: q.options,
-        correct_answer: q.options[q.answer] || "",
-        correct_option_index: q.answer,
-      })),
+      questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
     });
 
     renderTestBlock(false);
@@ -3133,39 +3978,302 @@ function normalizeVoiceText(text) {
     .replace(/\s+/g, " ");
 }
 
+function detectAssistantReplyLanguage(text) {
+  const rawText = String(text || "").toLowerCase();
+  const normalized = normalizeVoiceText(text);
+  const kazakhCharMatch = /[әіңғүұқөһі]/i.test(rawText);
+  const kazakhHints = [
+    "сәлем",
+    "көмек",
+    "қалай",
+    "қайда",
+    "неге",
+    "материалдарды",
+    "нәтижелерді",
+    "тестті",
+    "слайдтарды",
+    "аш",
+  ];
+  const russianHints = [
+    "привет",
+    "здравствуй",
+    "как",
+    "где",
+    "почему",
+    "открой",
+    "материалы",
+    "результаты",
+    "тест",
+    "слайды",
+  ];
+
+  let kazakhScore = kazakhCharMatch ? 2 : 0;
+  let russianScore = 0;
+
+  kazakhScore += kazakhHints.filter(item => normalized.includes(item)).length;
+  russianScore += russianHints.filter(item => normalized.includes(item)).length;
+
+  if (kazakhScore > russianScore && kazakhScore > 0) {
+    return "kaz";
+  }
+
+  if (russianScore > kazakhScore && russianScore > 0) {
+    return "rus";
+  }
+
+  return selectedRole;
+}
+
+function selectLocalizedAssistantReply(language, kazakhText, russianText) {
+  return language === "rus" ? russianText : kazakhText;
+}
+
+function buildLocalAssistantFallback(transcript) {
+  const normalized = normalizeVoiceText(transcript);
+  if (!normalized) {
+    return null;
+  }
+
+  const language = detectAssistantReplyLanguage(transcript);
+  const hasSystemAction = ["аш", "открой", "покажи", "жаса", "создай", "generate", "баста", "start"].some(item => normalized.includes(item));
+  const isGreeting = ["сәлем", "салам", "салем", "қайырлы күн", "привет", "hello", "hi"].some(item => normalized.includes(item));
+  const isThanks = ["рақмет", "рахмет", "спасибо", "thanks", "thank you"].some(item => normalized.includes(item));
+  const isWhoAreYou = ["сен кімсің", "өзің кімсің", "кімсің", "кто ты", "who are you"].some(item => normalized.includes(item));
+  const isHowAreYou = ["қалайсың", "жағдайың қалай", "халың қалай", "как дела", "how are you"].some(item => normalized.includes(item));
+  const asksHow = ["қалай", "қайда", "неге", "what", "how", "where", "как", "где", "почему"].some(item => normalized.includes(item));
+
+  if (isGreeting && !hasSystemAction) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Сәлем! Мен материалдар, тесттер, слайдтар және нәтижелер бойынша көмектесе аламын.",
+      "Здравствуйте! Я могу помочь с материалами, тестами, слайдами и результатами.",
+    );
+  }
+
+  if (isThanks && !hasSystemAction) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Әрқашан көмектесемін.",
+      "Всегда рад помочь.",
+    );
+  }
+
+  if (isWhoAreYou) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Мен осы жүйедегі дауыстық көмекшімін. Қай бөлім керек болса, айтып жіберіңіз.",
+      "Я голосовой помощник этой системы. Скажите, какой раздел вам нужен.",
+    );
+  }
+
+  if (isHowAreYou) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Жақсымын. Сізге қалай көмектесейін?",
+      "Все хорошо. Чем помочь?",
+    );
+  }
+
+  if (asksHow && normalized.includes("тест")) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Тест бөліміне өту үшін «тестті аш» деңіз. Ал жаңа тест керек болса «тест жасап бер» деп айтыңыз.",
+      "Чтобы перейти в тесты, скажите «открой тест». Если нужен новый тест, скажите «создай тест».",
+    );
+  }
+
+  if (asksHow && normalized.includes("материал")) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Материалдарды ашу үшін «материалдарды аш» деп айтыңыз.",
+      "Чтобы открыть материалы, скажите «открой материалы».",
+    );
+  }
+
+  if (asksHow && (normalized.includes("нәтиже") || normalized.includes("результ"))) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Нәтижелерді көру үшін «нәтижелерді аш» деп айтыңыз.",
+      "Чтобы посмотреть результаты, скажите «открой результаты».",
+    );
+  }
+
+  if (asksHow && (normalized.includes("слайд") || normalized.includes("презентац"))) {
+    return selectLocalizedAssistantReply(
+      language,
+      "Слайдтарды ашу үшін «слайдтарды аш» деңіз. Ал жаңасын жасау үшін «слайд жасап бер» деп айтыңыз.",
+      "Чтобы открыть слайды, скажите «открой слайды». Чтобы создать новые, скажите «создай слайды».",
+    );
+  }
+
+  return null;
+}
+
 async function sendAudioToAssistant(audioBlob) {
   const formData = new FormData();
   formData.append("audio", audioBlob, "voice.webm");
 
-  const response = await fetch(`${API_BASE}/assistant/transcribe/`, {
+  return fetchJSON(`${API_BASE}/assistant/transcribe/`, {
     method: "POST",
     body: formData
   });
-
-  if (!response.ok) {
-    throw new Error(`Transcribe request failed: ${response.status}`);
-  }
-
-  return response.json();
 }
 
-async function sendTextToAssistant(text) {
-  const response = await fetch(`${API_BASE}/assistant/command/`, {
+async function sendTextToAssistant(text, signal) {
+  return fetchJSON(`${API_BASE}/assistant/command/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({
+      text,
+      context: buildAssistantContext(),
+    }),
+    signal,
   });
-
-  if (!response.ok) {
-    throw new Error(`Assistant command failed: ${response.status}`);
-  }
-
-  return response.json();
 }
 
-async function submitVoiceInput(customText) {
+function cancelAssistantRequest() {
+  if (!assistantCommandAbortController) {
+    return;
+  }
+
+  assistantCommandAbortController.abort();
+  assistantCommandAbortController = null;
+}
+
+function beginVoiceDraftSession() {
+  if (hasActiveVoiceDraft) {
+    return;
+  }
+
+  voiceDraftRestoreValue = "";
+  hasActiveVoiceDraft = true;
+}
+
+function resetVoiceDraftSession() {
+  if (!hasActiveVoiceDraft) {
+    return;
+  }
+
+  if (voiceInput) {
+    voiceInput.value = voiceDraftRestoreValue;
+  }
+
+  voiceDraftRestoreValue = "";
+  hasActiveVoiceDraft = false;
+}
+
+function stopVoiceActivityMonitor() {
+  if (voiceActivityAnimationFrameId) {
+    cancelAnimationFrame(voiceActivityAnimationFrameId);
+    voiceActivityAnimationFrameId = 0;
+  }
+
+  if (voiceActivityAudioContext) {
+    voiceActivityAudioContext.close().catch(() => {});
+    voiceActivityAudioContext = null;
+  }
+
+  voiceSilenceStartedAt = 0;
+  voiceHasDetectedSpeech = false;
+}
+
+function stopVoiceRecognitionSilenceTimer() {
+  if (!voiceRecognitionSilenceTimerId) {
+    return;
+  }
+
+  clearTimeout(voiceRecognitionSilenceTimerId);
+  voiceRecognitionSilenceTimerId = 0;
+}
+
+function resetVoiceRecognitionSession() {
+  stopVoiceRecognitionSilenceTimer();
+  voiceRecognitionLastTranscript = "";
+  voiceRecognitionHasSpeech = false;
+}
+
+function scheduleVoiceRecognitionStop() {
+  stopVoiceRecognitionSilenceTimer();
+
+  if (!voiceRecognitionHasSpeech) {
+    return;
+  }
+
+  voiceRecognitionSilenceTimerId = window.setTimeout(() => {
+    voiceRecognitionSilenceTimerId = 0;
+
+    if (recognition && isListening && !isVoiceCaptureCancelled) {
+      stopVoiceCapture();
+    }
+  }, VOICE_SILENCE_STOP_MS);
+}
+
+async function startVoiceActivityMonitor(stream) {
+  stopVoiceActivityMonitor();
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    return;
+  }
+
+  const audioContext = new AudioContextClass();
+  voiceActivityAudioContext = audioContext;
+
+  if (audioContext.state === "suspended") {
+    try {
+      await audioContext.resume();
+    } catch (error) {
+      console.warn("Voice activity monitor resume failed:", error);
+    }
+  }
+
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.15;
+
+  const sourceNode = audioContext.createMediaStreamSource(stream);
+  sourceNode.connect(analyser);
+
+  const sampleBuffer = new Uint8Array(analyser.fftSize);
+
+  const tick = () => {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") {
+      stopVoiceActivityMonitor();
+      return;
+    }
+
+    analyser.getByteTimeDomainData(sampleBuffer);
+
+    let peak = 0;
+    for (let index = 0; index < sampleBuffer.length; index += 1) {
+      const normalizedSample = Math.abs((sampleBuffer[index] - 128) / 128);
+      if (normalizedSample > peak) {
+        peak = normalizedSample;
+      }
+    }
+
+    if (peak >= VOICE_ACTIVITY_THRESHOLD) {
+      voiceHasDetectedSpeech = true;
+      voiceSilenceStartedAt = 0;
+    } else if (voiceHasDetectedSpeech) {
+      if (!voiceSilenceStartedAt) {
+        voiceSilenceStartedAt = performance.now();
+      } else if (performance.now() - voiceSilenceStartedAt >= VOICE_SILENCE_STOP_MS) {
+        stopVoiceCapture();
+        return;
+      }
+    }
+
+    voiceActivityAnimationFrameId = requestAnimationFrame(tick);
+  };
+
+  voiceActivityAnimationFrameId = requestAnimationFrame(tick);
+}
+
+async function submitVoiceInput(customText, options = {}) {
+  const { source = "manual" } = options;
   const message = (customText ?? voiceInput?.value ?? "").trim();
 
   if (!message) {
@@ -3173,28 +4281,103 @@ async function submitVoiceInput(customText) {
     return;
   }
 
-  if (voiceInput) {
+  if (voiceInput && source !== "voice") {
     voiceInput.value = message;
   }
 
-  await handleAssistantCommand(message);
+  if (source === "voice") {
+    if (voiceInput) {
+      voiceInput.value = "";
+    }
+    setVoiceState("idle", t("voiceAcknowledged"));
+    speakAssistantReply(t("voiceAcknowledged"));
+    resetVoiceDraftSession();
+  }
+
+  await handleAssistantCommand(message, { source });
 }
 
 async function handleAssistantAction(assistantData) {
   if (!assistantData) return;
 
+  const selectionPayload = {
+    courseNumber: assistantData.course_number,
+    subjectId: assistantData.subject_id,
+    materialId: assistantData.material_id,
+    materialType: assistantData.material_type,
+  };
+
+  if (assistantData.action === "show_help") {
+    setVoicePanelOpen(true);
+    setVoiceHelpOpen(true);
+    return;
+  }
+
+  if (assistantData.action === "go_home") {
+    showHome();
+    return;
+  }
+
+  if (assistantData.action === "open_course") {
+    if (assistantData.course_number) {
+      await openCourseDisciplines(Number(assistantData.course_number), assistantData.subject_id || null);
+    }
+    return;
+  }
+
+  if (assistantData.action === "open_subject") {
+    await ensureAssistantSubjectContext(selectionPayload);
+    switchSubjectPanel("materials");
+    renderMaterialPreview();
+    return;
+  }
+
+  if ([
+    "select_material",
+    "open_materials",
+    "open_test",
+    "open_results",
+    "open_slides",
+    "generate_test",
+    "generate_slides",
+    "open_qr",
+    "start_test",
+  ].includes(assistantData.action)) {
+    await syncAssistantMaterialSelection(selectionPayload);
+  }
+
+  if (assistantData.action === "select_material") {
+    switchSubjectPanel("materials");
+    renderMaterialPreview();
+    return;
+  }
+
   if (assistantData.action === "open_materials") {
     switchSubjectPanel("materials");
+    renderMaterialPreview();
     return;
   }
 
   if (assistantData.action === "open_test") {
     switchSubjectPanel("test");
+    renderTestBlock(false);
     return;
   }
 
   if (assistantData.action === "open_results") {
     switchSubjectPanel("results");
+    await renderResultsBlock();
+    return;
+  }
+
+  if (assistantData.action === "open_slides") {
+    switchSubjectPanel("slides");
+    renderSlidesPreview();
+    return;
+  }
+
+  if (assistantData.action === "generate_slides") {
+    await generateSlidesForSelectedMaterial();
     return;
   }
 
@@ -3205,9 +4388,6 @@ async function handleAssistantAction(assistantData) {
   }
 
   if (assistantData.action === "open_course") {
-    if (assistantData.course_number) {
-      await openCourseDisciplines(Number(assistantData.course_number));
-    }
     return;
   }
 
@@ -3234,7 +4414,11 @@ async function handleAssistantAction(assistantData) {
   }
 
   if (assistantData.action === "go_back") {
-    showHome();
+    if (!subjectView.classList.contains("hidden")) {
+      showHome();
+    } else {
+      showCourseStage();
+    }
     return;
   }
 }
@@ -3249,6 +4433,53 @@ function setVoiceState(state, text) {
   voiceStatus.textContent = normalizedText;
 }
 
+function sanitizeSpeechText(text) {
+  return String(text || "")
+    .replace(/["«»]/g, "")
+    .replace(/\bQR\b/gi, selectedRole === "kaz" ? "кью ар код" : "ку эр код")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildAssistantSpeechReply(assistantData, fallbackText = "") {
+  const fallback = sanitizeSpeechText(fallbackText);
+  if (!assistantData || selectedRole !== "kaz") {
+    return fallback;
+  }
+
+  const subjectTitle = sanitizeSpeechText(assistantData.subject_title || "");
+  const materialTitle = sanitizeSpeechText(assistantData.material_title || "");
+  const courseNumber = Number(assistantData.course_number) || 0;
+
+  const speechMap = {
+    show_help: "Түсіндім, көмекті ашып беремін.",
+    go_home: "Түсіндім, басты бетке өтемін.",
+    go_back: "Түсіндім, артқа қайтарамын.",
+    open_materials: "Түсіндім, материалдарды ашып беремін.",
+    open_test: "Түсіндім, тест бөлімін ашып беремін.",
+    open_results: "Түсіндім, нәтижелерді ашып беремін.",
+    open_slides: "Түсіндім, слайдтарды ашып беремін.",
+    open_qr: "Түсіндім, кью ар кодты ашып беремін.",
+    start_test: "Түсіндім, тестті бастаймын.",
+    generate_test: "Түсіндім, тест жасап беремін.",
+    generate_slides: "Түсіндім, слайд жасап беремін.",
+  };
+
+  if (assistantData.action === "open_course" && courseNumber) {
+    return `Түсіндім, ${courseNumber}-курсты ашып беремін.`;
+  }
+
+  if (assistantData.action === "open_subject" && subjectTitle) {
+    return `Түсіндім, ${subjectTitle} пәнін ашып беремін.`;
+  }
+
+  if (assistantData.action === "select_material" && materialTitle) {
+    return `Түсіндім, ${materialTitle} материалын ашып беремін.`;
+  }
+
+  return speechMap[assistantData.action] || fallback;
+}
+
 function speakAssistantReply(text) {
   if (!text || !("speechSynthesis" in window)) {
     return;
@@ -3257,26 +4488,35 @@ function speakAssistantReply(text) {
   const synth = window.speechSynthesis;
   synth.cancel();
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(sanitizeSpeechText(text));
   const voices = synth.getVoices();
-  const preferredVoice =
-    (selectedRole === "kaz" && (
+  let preferredVoice = null;
+
+  if (selectedRole === "kaz") {
+    preferredVoice =
       voices.find(v => v.lang === "kk-KZ") ||
-      voices.find(v => v.lang.startsWith("kk"))
-    )) ||
-    voices.find(v => v.lang === "ru-RU") ||
-    voices.find(v => v.lang.startsWith("ru")) ||
-    voices.find(v => v.lang === "en-US") ||
-    voices[0];
+      voices.find(v => v.lang?.startsWith("kk")) ||
+      voices.find(v => /kazakh|қазақ/i.test(v.name || "")) ||
+      null;
+  } else {
+    preferredVoice =
+      voices.find(v => v.lang === "ru-RU") ||
+      voices.find(v => v.lang?.startsWith("ru")) ||
+      voices.find(v => v.lang === "en-US") ||
+      voices[0] ||
+      null;
+  }
 
   if (preferredVoice) {
     utterance.voice = preferredVoice;
-    utterance.lang = preferredVoice.lang;
+    utterance.lang = preferredVoice.lang || getSpeechLanguage();
+  } else if (selectedRole === "kaz") {
+    utterance.lang = "kk-KZ";
   } else {
     utterance.lang = getSpeechLanguage();
   }
 
-  utterance.rate = 1;
+  utterance.rate = selectedRole === "kaz" ? 0.92 : 1;
   utterance.pitch = 1;
   utterance.volume = 1;
 
@@ -3285,6 +4525,7 @@ function speakAssistantReply(text) {
 
 function stopVoiceCapture() {
   isVoiceCaptureCancelled = false;
+  stopVoiceRecognitionSilenceTimer();
 
   if (recognition && isListening) {
     recognition.stop();
@@ -3301,6 +4542,7 @@ function stopVoiceCapture() {
 
 function cancelVoiceCapture() {
   isVoiceCaptureCancelled = true;
+  stopVoiceRecognitionSilenceTimer();
 
   if (recognition && isListening) {
     if (typeof recognition.abort === "function") {
@@ -3324,6 +4566,8 @@ async function startMediaRecorderCapture() {
 
   recordedChunks = [];
   mediaRecorder = new MediaRecorder(stream);
+  voiceSilenceStartedAt = 0;
+  voiceHasDetectedSpeech = false;
 
   mediaRecorder.onstart = () => {
     setVoiceState("listening", t("voiceListening"));
@@ -3355,19 +4599,22 @@ async function startMediaRecorderCapture() {
       }
 
       setVoiceState("idle", t("voiceLiveCaptured", { text: capturedText }));
-      await submitVoiceInput(mergedText);
+      await submitVoiceInput(mergedText, { source: "voice" });
     } catch (error) {
       console.error("TRANSCRIBE ERROR:", error);
       setVoiceState("idle", t("voiceRequestError"));
       speakAssistantReply(t("voiceSorry"));
     } finally {
+      stopVoiceActivityMonitor();
       stream.getTracks().forEach(track => track.stop());
+      resetVoiceDraftSession();
       voiceInterimBaseText = "";
       isVoiceCaptureCancelled = false;
     }
   };
 
   mediaRecorder.start();
+  await startVoiceActivityMonitor(stream);
 }
 
 async function toggleListening(event) {
@@ -3383,9 +4630,11 @@ async function toggleListening(event) {
     return;
   }
 
-  voiceInterimBaseText = voiceInput?.value.trim() || "";
-  if (voiceInterimBaseText) {
-    voiceInterimBaseText += " ";
+  beginVoiceDraftSession();
+  voiceInterimBaseText = "";
+  resetVoiceRecognitionSession();
+  if (voiceInput) {
+    voiceInput.value = "";
   }
 
   try {
@@ -3402,43 +4651,70 @@ async function toggleListening(event) {
   } catch (error) {
     console.error("MIC ACCESS ERROR:", error);
     setVoiceState("idle", t("micDenied"));
+    resetVoiceDraftSession();
     voiceInterimBaseText = "";
   }
 }
 
-async function handleAssistantCommand(transcript) {
+async function handleAssistantCommand(transcript, options = {}) {
+  const { source = "manual" } = options;
+  const cleanTranscript = String(transcript || "").trim();
+  if (!cleanTranscript) {
+    setVoiceState("idle", t("voiceInputEmpty"));
+    return;
+  }
+
+  const localReply = buildLocalAssistantFallback(cleanTranscript);
+  if (localReply) {
+    setVoiceState("idle", localReply);
+    speakAssistantReply(localReply);
+    return;
+  }
+
+  cancelAssistantRequest();
+  const abortController = new AbortController();
+  assistantCommandAbortController = abortController;
+
   try {
-    setVoiceState("idle", t("voiceUnderstood", { text: transcript }));
-
-    const response = await fetch(`${API_BASE}/assistant/command/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ text: transcript })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+    if (source !== "voice") {
+      setVoiceState("idle", t("voiceUnderstood", { text: cleanTranscript }));
     }
 
-    const data = await response.json();
+    const data = await sendTextToAssistant(cleanTranscript, abortController.signal);
+    const spokenReply = buildAssistantSpeechReply(data, data.reply || "");
+    const visibleReply = data.reply || spokenReply;
 
-    if (data.reply) {
-      setVoiceState("idle", data.reply);
+    if (visibleReply) {
+      setVoiceState("idle", visibleReply);
+    }
 
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(data.reply);
-        utterance.lang = getSpeechLanguage();
-        window.speechSynthesis.speak(utterance);
-      }
+    if (spokenReply) {
+      speakAssistantReply(spokenReply);
     }
 
     await handleAssistantAction(data);
   } catch (error) {
+    if (error?.name === "AbortError") {
+      return;
+    }
+
     console.error("Assistant command error:", error);
-    setVoiceState("idle", t("voiceRequestError"));
+    const detailedReply = String(error?.message || "").trim();
+    const visibleReply =
+      detailedReply && !/^Request failed:/i.test(detailedReply)
+        ? detailedReply
+        : t("voiceRequestError");
+    const spokenReply =
+      detailedReply && !/^Request failed:/i.test(detailedReply)
+        ? detailedReply
+        : t("voiceSorry");
+
+    setVoiceState("idle", visibleReply);
+    speakAssistantReply(spokenReply);
+  } finally {
+    if (assistantCommandAbortController === abortController) {
+      assistantCommandAbortController = null;
+    }
   }
 }
 
@@ -3452,71 +4728,97 @@ function initSpeechRecognition() {
 
   recognition = new SpeechRecognition();
   recognition.lang = getSpeechLanguage();
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
 
   recognition.onstart = () => {
     isListening = true;
+    resetVoiceRecognitionSession();
     setVoiceState("listening", t("voiceListening"));
   };
 
   recognition.onerror = (event) => {
     isListening = false;
+    stopVoiceRecognitionSilenceTimer();
     if (isVoiceCaptureCancelled) {
       setVoiceState("idle", t("voiceReady"));
+      resetVoiceDraftSession();
+      resetVoiceRecognitionSession();
       isVoiceCaptureCancelled = false;
       return;
     }
     setVoiceState("idle", t("errorLabel", { error: event.error }));
   };
 
-  recognition.onend = () => {
+  recognition.onend = async () => {
     isListening = false;
     voiceCore.classList.remove("listening");
+    const completeTranscript = String(voiceRecognitionLastTranscript || "").trim();
+    const shouldSubmitTranscript = !isVoiceCaptureCancelled && completeTranscript;
+    resetVoiceRecognitionSession();
+    voiceInterimBaseText = "";
+
+    if (shouldSubmitTranscript) {
+      try {
+        setVoiceState("idle", t("voiceLiveCaptured", { text: completeTranscript }));
+        await submitVoiceInput(completeTranscript, { source: "voice" });
+      } finally {
+        isVoiceCaptureCancelled = false;
+      }
+      return;
+    }
+
     if (!voiceStatus.textContent || voiceStatus.textContent === t("voiceListening")) {
       setVoiceState("idle", t("voiceReady"));
     }
-    voiceInterimBaseText = "";
+    resetVoiceDraftSession();
     isVoiceCaptureCancelled = false;
   };
 
-  recognition.onresult = async (event) => {
+  recognition.onresult = (event) => {
     if (isVoiceCaptureCancelled) {
       return;
     }
 
-    let interimTranscript = "";
-    let finalTranscript = "";
+    let finalParts = [];
+    let interimParts = [];
 
-    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    for (let index = 0; index < event.results.length; index += 1) {
       const result = event.results[index];
-      const transcriptPart = result[0]?.transcript || "";
+      const transcriptPart = (result[0]?.transcript || "").trim();
+
+      if (!transcriptPart) {
+        continue;
+      }
 
       if (result.isFinal) {
-        finalTranscript += transcriptPart;
+        finalParts.push(transcriptPart);
       } else {
-        interimTranscript += transcriptPart;
+        interimParts.push(transcriptPart);
       }
     }
 
-    const draftTranscript = `${voiceInterimBaseText}${finalTranscript || interimTranscript}`.trim();
-    if (voiceInput && draftTranscript) {
-      voiceInput.value = draftTranscript;
-    }
+    const finalTranscript = finalParts.join(" ").trim();
+    const interimTranscript = interimParts.join(" ").trim();
+    const draftTranscript = [voiceInterimBaseText, finalTranscript, interimTranscript]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
 
-    if (interimTranscript && !finalTranscript) {
-      setVoiceState("listening", draftTranscript);
+    if (!draftTranscript) {
       return;
     }
 
-    if (finalTranscript) {
-      const completeTranscript = `${voiceInterimBaseText}${finalTranscript}`.trim();
-      if (voiceInput) {
-        voiceInput.value = completeTranscript;
-      }
-      setVoiceState("idle", t("voiceLiveCaptured", { text: finalTranscript.trim() }));
-      await submitVoiceInput(completeTranscript);
+    voiceRecognitionLastTranscript = draftTranscript;
+    voiceRecognitionHasSpeech = true;
+
+    if (voiceInput) {
+      voiceInput.value = draftTranscript;
     }
+
+    setVoiceState("listening", draftTranscript);
+    scheduleVoiceRecognitionStop();
   };
 }
 
@@ -3527,14 +4829,30 @@ if (profileBtn) {
   });
 }
 
+if (authOpenBtn) {
+  authOpenBtn.addEventListener("click", () => {
+    openAuthModal();
+  });
+}
+
+if (authGoogleBtn) {
+  authGoogleBtn.addEventListener("click", async () => {
+    if (isAuthSubmitting) return;
+    isAuthSubmitting = true;
+    renderAuthState();
+    await connectGoogleDrive();
+    isAuthSubmitting = false;
+    renderAuthState();
+  });
+}
+
 document.getElementById("editProfileBtn").addEventListener("click", () => {
   profileDropdown.classList.remove("show");
   openModal(profileModal);
 });
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  alert("Шығу функциясы.");
-  profileDropdown.classList.remove("show");
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+  await disconnectGoogleDrive();
 });
 
 if (roleTitleBtn) {
@@ -3542,15 +4860,6 @@ if (roleTitleBtn) {
     e.stopPropagation();
     roleMenu.classList.toggle("hidden");
   });
-}
-
-const logoutBtnNode = document.getElementById("logoutBtn");
-if (logoutBtnNode) {
-  logoutBtnNode.addEventListener("click", (event) => {
-    event.stopImmediatePropagation();
-    alert(t("logoutPlaceholder"));
-    profileDropdown.classList.remove("show");
-  }, true);
 }
 
 roleMenuItems.forEach(btn => {
@@ -3572,23 +4881,15 @@ if (homeLogoBtn) {
 function handleDriveReturnParams() {
   const params = new URLSearchParams(window.location.search);
   const driveStatus = params.get("drive");
-  const email = params.get("email");
   const message = params.get("message");
 
-  if (!driveStatus && !email && !message) {
+  if (!driveStatus && !message) {
     return;
   }
 
   window.history.replaceState({}, "", window.location.pathname);
 
-  if (driveStatus === "connected" && email) {
-    renderDriveStatus();
-    loadDriveStatus();
-    return;
-  }
-
   if (driveStatus === "error") {
-    renderDriveStatus();
     window.alert(message || t("driveConnectError"));
   }
 }
@@ -3605,7 +4906,7 @@ if (backBtn) {
 
 if (toggleMaterialManagerBtn) {
   toggleMaterialManagerBtn.addEventListener("click", () => {
-    if (!selectedSubject) return;
+    if (!selectedCourseNumber) return;
     isMaterialManagerOpen = !isMaterialManagerOpen;
     if (!isMaterialManagerOpen) {
       isUploadMenuOpen = false;
@@ -3643,6 +4944,13 @@ if (subjectTitleInput) {
   });
 }
 
+if (addInlineDisciplineBtn) {
+  addInlineDisciplineBtn.addEventListener("click", () => {
+    if (!selectedCourseNumber || isMaterialUploading || isMaterialDeleting) return;
+    openDisciplineModal();
+  });
+}
+
 if (subjectSelect) {
   subjectSelect.addEventListener("change", async () => {
     const nextSubjectId = Number(subjectSelect.value);
@@ -3677,7 +4985,7 @@ if (uploadMaterialBtn) {
     if (!selectedSubject || isMaterialUploading) return;
 
     if (!driveConnection.connected) {
-      await connectGoogleDrive();
+      promptGoogleLogin();
       return;
     }
 
@@ -3708,6 +5016,13 @@ if (deleteMaterialBtn) {
   deleteMaterialBtn.addEventListener("click", async () => {
     if (!selectedSubject || !getSelectedMaterial()) return;
     await deleteSelectedMaterial();
+  });
+}
+
+if (deleteDisciplineBtn) {
+  deleteDisciplineBtn.addEventListener("click", async () => {
+    if (!selectedSubject || isMaterialUploading || isMaterialDeleting) return;
+    await deleteCurrentSubject();
   });
 }
 
@@ -4012,8 +5327,9 @@ createAiQuestions = async function createAiQuestionsOverride() {
     generatedQuestions = data.test.map((item, index) => ({
       id: index + 1,
       question: item.question,
-      options: item.options,
-      answer: ["A", "B", "C", "D"].indexOf(item.answer)
+      options: Array.isArray(item.options) ? item.options : [],
+      answer: resolveQuestionAnswerIndex(item),
+      answerRaw: item.answer || "",
     }));
 
     const sessionData = await fetchJSON(`${API_BASE}/results/test-sessions/create-from-ai/`, {
@@ -4025,23 +5341,13 @@ createAiQuestions = async function createAiQuestionsOverride() {
         material_id: currentMaterial.id,
         question_count: testConfig.questionCount,
         duration_minutes: testConfig.durationMinutes,
-        questions: generatedQuestions.map((q) => ({
-          question: q.question,
-          options: q.options,
-          correct_answer: q.options[q.answer] || "",
-          correct_option_index: q.answer
-        }))
+        questions: generatedQuestions.map((q) => serializeGeneratedQuestion(q))
       })
     });
     hydrateCurrentTestSession({
       ...sessionData,
       material: currentMaterial.id,
-      questions_json: generatedQuestions.map((q) => ({
-        question: q.question,
-        options: q.options,
-        correct_answer: q.options[q.answer] || "",
-        correct_option_index: q.answer,
-      })),
+      questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
     });
 
     renderTestBlock(false);
@@ -4129,6 +5435,10 @@ if (openResultsSheetBtn) {
   openResultsSheetBtn.addEventListener("click", openResultsSheetDirect);
 }
 
+if (downloadResultsBtn) {
+  downloadResultsBtn.addEventListener("click", downloadResultsSheet);
+}
+
 if (publicTestStartBtn) {
   publicTestStartBtn.addEventListener("click", startPublicTest);
 }
@@ -4161,6 +5471,7 @@ if (openVoiceBtn) {
     const shouldOpen = !voicePanel.classList.contains("show");
     if (!shouldOpen) {
       cancelVoiceCapture();
+      cancelAssistantRequest();
     }
     setVoicePanelOpen(shouldOpen);
   });
@@ -4169,6 +5480,7 @@ if (openVoiceBtn) {
 if (closeVoiceBtn) {
   closeVoiceBtn.addEventListener("click", () => {
     cancelVoiceCapture();
+    cancelAssistantRequest();
     setVoicePanelOpen(false);
   });
 }
@@ -4200,6 +5512,12 @@ if (voiceSendBtn) {
 }
 
 if (voiceInput) {
+  voiceInput.addEventListener("input", () => {
+    if (!hasActiveVoiceDraft) {
+      lastManualVoiceInputValue = voiceInput.value || "";
+    }
+  });
+
   voiceInput.addEventListener("keydown", async (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -4222,6 +5540,7 @@ if (avatarFileInput) {
     const reader = new FileReader();
     reader.onload = () => {
       profileState.avatarUrl = reader.result;
+      persistProfileState();
       renderProfile();
     };
     reader.readAsDataURL(file);
@@ -4238,7 +5557,7 @@ document.querySelectorAll("[data-close-modal]").forEach((btn) => {
   });
 });
 
-[profileModal, disciplineModal, testModal, qrModal, playerDetailModal].forEach(modal => {
+[authModal, profileModal, disciplineModal, testModal, qrModal, playerDetailModal].forEach(modal => {
   if (!modal) return;
   modal.addEventListener("click", (e) => {
     if (e.target === modal) closeModal(modal);
@@ -4273,14 +5592,15 @@ async function bootstrapApp() {
   loadStoredTestConfig();
   applyStaticTranslations();
   renderProfile();
+  renderAuthState();
 
   if (await initPublicTestMode()) {
     return;
   }
 
   handleDriveReturnParams();
-  loadDriveStatus();
-  loadCoursesFromApi();
+  await loadDriveStatus();
+  await loadCoursesFromApi();
   initSpeechRecognition();
   setVoiceState("idle", t("voiceReady"));
 }

@@ -13,9 +13,14 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional dependency in some environments
+    def load_dotenv(*args, **kwargs):
+        return False
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-from dotenv import load_dotenv
 load_dotenv(BASE_DIR / ".env")
 
 # Quick-start development settings - unsuitable for production
@@ -148,6 +153,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5500",
     *[origin.rstrip("/") for origin in _split_env_list("CORS_ALLOWED_ORIGINS")],
 ]
+
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(PUBLIC_APP_ORIGIN)

@@ -12,6 +12,7 @@ from .google_oauth import (
     build_frontend_redirect_url,
     build_google_drive_flow,
     credentials_to_dict,
+    exchange_google_oauth_code,
     fetch_google_userinfo,
     is_google_drive_oauth_ready,
     is_local_oauth_redirect,
@@ -29,7 +30,7 @@ def drive_status(request):
     connection = _get_session_connection(request)
     return Response(
         {
-            "configured": is_google_drive_oauth_ready(),
+            "configured": is_google_drive_oauth_ready(request),
             "connected": connection is not None,
             "google_email": connection.google_email if connection else "",
             "google_name": connection.google_name if connection else "",
@@ -39,7 +40,7 @@ def drive_status(request):
 
 @api_view(["GET"])
 def drive_connect(request):
-    if not is_google_drive_oauth_ready():
+    if not is_google_drive_oauth_ready(request):
         return Response(
             {
                 "detail": "Google Drive OAuth әлі бапталмаған. Google Cloud-та Web OAuth client қосу керек."
@@ -47,10 +48,11 @@ def drive_connect(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
-    flow = build_google_drive_flow()
+    flow = build_google_drive_flow(request=request)
     authorization_url, state = flow.authorization_url(
         access_type="offline",
-        prompt="consent",
+        # Always reopen Google's account picker so users can switch accounts.
+        prompt="select_account consent",
     )
 
     request.session[SESSION_OAUTH_STATE_KEY] = state
@@ -62,9 +64,10 @@ def drive_connect(request):
 
 @require_GET
 def drive_callback(request):
-    if not is_google_drive_oauth_ready():
+    if not is_google_drive_oauth_ready(request):
         return HttpResponseRedirect(
             build_frontend_redirect_url(
+                request,
                 drive="error",
                 message="google_drive_oauth_not_configured",
             )
@@ -72,9 +75,10 @@ def drive_callback(request):
 
     expected_state = request.session.get(SESSION_OAUTH_STATE_KEY)
     incoming_state = request.GET.get("state")
-    if (not expected_state or expected_state != incoming_state) and not is_local_oauth_redirect():
+    if (not expected_state or expected_state != incoming_state) and not is_local_oauth_redirect(request):
         return HttpResponseRedirect(
             build_frontend_redirect_url(
+                request,
                 drive="error",
                 message="invalid_google_oauth_state",
             )
@@ -84,6 +88,7 @@ def drive_callback(request):
     if not authorization_code:
         return HttpResponseRedirect(
             build_frontend_redirect_url(
+                request,
                 drive="error",
                 message="missing_google_oauth_code",
             )
@@ -91,12 +96,13 @@ def drive_callback(request):
 
     code_verifier = request.session.get(SESSION_OAUTH_CODE_VERIFIER_KEY) or None
     try:
-        flow = build_google_drive_flow(state=incoming_state, code_verifier=code_verifier)
-        flow.fetch_token(code=authorization_code)
+        flow = build_google_drive_flow(request=request, state=incoming_state, code_verifier=code_verifier)
+        exchange_google_oauth_code(flow, authorization_code)
     except Exception as exc:
         print("Google Drive token exchange error:", repr(exc))
         return HttpResponseRedirect(
             build_frontend_redirect_url(
+                request,
                 drive="error",
                 message=f"google_drive_token_exchange_failed:{exc.__class__.__name__}",
             )
@@ -109,6 +115,7 @@ def drive_callback(request):
     if not email:
         return HttpResponseRedirect(
             build_frontend_redirect_url(
+                request,
                 drive="error",
                 message="google_email_not_received",
             )
@@ -129,6 +136,7 @@ def drive_callback(request):
 
     return HttpResponseRedirect(
         build_frontend_redirect_url(
+            request,
             drive="connected",
             email=connection.google_email,
         )
