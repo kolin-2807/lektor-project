@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lektor</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260409-02" />
+  <link rel="stylesheet" href="./css/style.css?v=20260411-09" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -238,7 +238,20 @@
               <div class="content-view hidden" id="testPane">
                 <div class="test-qr-board">
                   <div class="test-qr-card">
-                    <p id="testInfoText" class="test-ready-inline"></p>
+                    <div class="test-info-row">
+                      <div class="test-ready-inline hidden" id="testInfoCard">
+                        <div class="test-ready-topline">
+                          <span class="test-ready-state hidden" id="testInfoState"></span>
+                          <span class="test-ready-meta" id="testInfoText"></span>
+                        </div>
+                        <p class="test-ready-note hidden" id="testInfoHint"></p>
+                      </div>
+
+                      <div class="test-info-actions">
+                        <button class="small-btn hidden" id="previewTestBtn" type="button">Тестті қарау</button>
+                        <button class="small-btn primary hidden" id="launchTestBtn" type="button">Тестті бастау</button>
+                      </div>
+                    </div>
 
                     <div class="test-settings-panel" id="testSettingsPanel">
                       <div class="test-settings-grid">
@@ -258,14 +271,17 @@
                       </div>
                     </div>
 
-                    <img
-                      id="qrImageInline"
-                      alt="QR code"
-                      style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"
-                    />
+                    <div class="test-qr-stack">
+                      <img
+                        id="qrImageInline"
+                        alt="QR code"
+                        style="display:none;width:240px;height:240px;border-radius:20px;background:#fff;padding:12px;"
+                      />
 
-                    <div class="test-qr-actions">
-                      <button class="small-btn primary" id="openTestDirectBtn" type="button">Тестті ашу</button>
+                      <div class="test-qr-caption hidden" id="testQrCaption">
+                        <div class="test-qr-caption-title" id="testQrCaptionTitle">QR кодты студенттерге көрсетіңіз</div>
+                        <p class="test-qr-caption-text" id="testQrCaptionText">Студенттер телефонмен сканерлеп, Google Form-ға өтеді.</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -475,6 +491,7 @@
           <button class="small-btn primary hidden" id="saveTestBtn" type="button">Сақтау</button>
         </div>
 
+        <div class="test-modal-summary" id="testModalSummary"></div>
         <div class="question-edit-list" id="testQuestionsContainer"></div>
       </div>
     </div>
@@ -506,6 +523,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260409-03"></script>
+  <script src="./js/app.js?v=20260411-09"></script>
 </body>
 </html>

@@ -365,32 +365,33 @@ const typeOrder = [
 const APP_STATE_KEY = "lektor-teacher-state-v1";
 const TEST_CONFIG_KEY = "lektor-test-config-v1";
 const PUBLIC_TEST_ATTEMPT_KEY = "lektor-public-test-attempt-v1";
+const PUBLIC_TEST_DEVICE_KEY = "lektor-public-test-device-v1";
 const PROFILE_STATE_KEY = "lektor-profile-state-v1";
 
 const DISCIPLINE_THEMES = [
   {
     coverClass: "discipline-cover-1",
-    background: "linear-gradient(135deg, #275fa0 0%, #3e87d5 52%, #1c3e6d 100%)"
+    background: "linear-gradient(135deg, #2b629d 0%, #4f94da 52%, #1b406f 100%)"
   },
   {
     coverClass: "discipline-cover-2",
-    background: "linear-gradient(135deg, #127277 0%, #27a0a1 52%, #114a54 100%)"
+    background: "linear-gradient(135deg, #12787d 0%, #2ea9ab 52%, #114d57 100%)"
   },
   {
     coverClass: "discipline-cover-3",
-    background: "linear-gradient(135deg, #c1792a 0%, #e5a548 52%, #8f541d 100%)"
+    background: "linear-gradient(135deg, #197f9e 0%, #58b9d3 52%, #0f5871 100%)"
   },
   {
     coverClass: "discipline-cover-4",
-    background: "linear-gradient(135deg, #3554a6 0%, #6b7ce8 54%, #262f73 100%)"
+    background: "linear-gradient(135deg, #2b73b8 0%, #5292da 54%, #214f95 100%)"
   },
   {
     coverClass: "discipline-cover-5",
-    background: "linear-gradient(135deg, #7a4d9f 0%, #b37ce3 54%, #4f2f74 100%)"
+    background: "linear-gradient(135deg, #4d76ae 0%, #7ba4d4 54%, #385886 100%)"
   },
   {
     coverClass: "discipline-cover-6",
-    background: "linear-gradient(135deg, #965034 0%, #d0805f 54%, #6c3624 100%)"
+    background: "linear-gradient(135deg, #477e9f 0%, #75b8ca 54%, #2f617d 100%)"
   }
 ];
 
@@ -471,11 +472,17 @@ const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscree
 const openSlidesFullscreenBtn = document.getElementById("openSlidesFullscreenBtn");
 const downloadSlidesBtn = document.getElementById("downloadSlidesBtn");
 
+const testInfoRow = testPane?.querySelector(".test-info-row");
+const testInfoCard = document.getElementById("testInfoCard");
+const testInfoState = document.getElementById("testInfoState");
 const testInfoText = document.getElementById("testInfoText");
+const testInfoHint = document.getElementById("testInfoHint");
 const qrImageInline = document.getElementById("qrImageInline");
 const openTestDirectBtn = document.getElementById("openTestDirectBtn");
 const showQrBtn = document.getElementById("showQrBtn");
 const buildTestBtn = document.getElementById("buildTestBtn");
+const previewTestBtn = document.getElementById("previewTestBtn");
+const launchTestBtn = document.getElementById("launchTestBtn");
 const testSettingsPanel = document.getElementById("testSettingsPanel");
 const testQuestionCountInput = document.getElementById("testQuestionCountInput");
 const testDurationInput = document.getElementById("testDurationInput");
@@ -484,6 +491,9 @@ const testSettingsHint = document.getElementById("testSettingsHint");
 const testQrBoard = testPane?.querySelector(".test-qr-board");
 const testQrCard = testPane?.querySelector(".test-qr-card");
 const testQrActions = testPane?.querySelector(".test-qr-actions");
+const testQrCaption = document.getElementById("testQrCaption");
+const testQrCaptionTitle = document.getElementById("testQrCaptionTitle");
+const testQrCaptionText = document.getElementById("testQrCaptionText");
 
 const resultsInfoText = document.getElementById("resultsInfoText") || { textContent: "" };
 const resultsSheetFrame = document.getElementById("resultsSheetFrame");
@@ -534,6 +544,7 @@ const saveProfileBtn = document.getElementById("saveProfileBtn");
 
 const testModal = document.getElementById("testModal");
 const testModalTitle = document.getElementById("testModalTitle");
+const testModalSummary = document.getElementById("testModalSummary");
 const testQuestionsContainer = document.getElementById("testQuestionsContainer");
 const editTestBtn = document.getElementById("editTestBtn");
 const saveTestBtn = document.getElementById("saveTestBtn");
@@ -600,6 +611,7 @@ let publicTestSession = null;
 let publicTestAttempt = null;
 let publicTestCountdownTimer = null;
 let publicTestAnswers = [];
+let teacherTestStatusTimer = null;
 
 let generatedQuestions = [];
 let currentTestSession = null;
@@ -793,6 +805,7 @@ function applyStaticTranslations() {
   }
   if (editTestBtn) editTestBtn.textContent = t("edit");
   if (saveTestBtn) saveTestBtn.textContent = t("save");
+  if (previewTestBtn) previewTestBtn.textContent = selectedRole === "kaz" ? "Тестті қарау" : "Посмотреть тест";
   if (testModalTitle) testModalTitle.textContent = isEditingTest ? t("testModalEdit") : t("testModalView");
   if (resultsSheetFrame) resultsSheetFrame.title = t("sheetFrameTitle");
   if (buildTestBtn) buildTestBtn.textContent = selectedRole === "kaz" ? "Тестті құрастыру" : "Собрать тест";
@@ -964,6 +977,148 @@ function buildPublicTestUrl(accessToken) {
   return url.toString();
 }
 
+function getPublicTestDeviceId() {
+  let deviceId = localStorage.getItem(PUBLIC_TEST_DEVICE_KEY);
+  if (deviceId) {
+    return deviceId;
+  }
+
+  if (window.crypto?.randomUUID) {
+    deviceId = window.crypto.randomUUID();
+  } else {
+    deviceId = `device-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+  }
+
+  localStorage.setItem(PUBLIC_TEST_DEVICE_KEY, deviceId);
+  return deviceId;
+}
+
+function getSessionRemainingSeconds(session = currentTestSession) {
+  const expiresAt = session?.public_expires_at;
+  if (!expiresAt) {
+    return Number(session?.remaining_seconds ?? (session?.duration_minutes || 0) * 60) || 0;
+  }
+
+  const expiresAtMs = new Date(expiresAt).getTime();
+  if (Number.isNaN(expiresAtMs)) {
+    return Number(session?.remaining_seconds || 0) || 0;
+  }
+
+  return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+}
+
+function getTeacherTestInfoState(session = currentTestSession) {
+  const questionCount = generatedQuestions.length || Number(session?.question_count) || testConfig.questionCount;
+  const durationMinutes = Number(session?.duration_minutes) || testConfig.durationMinutes;
+  const sessionStatus = String(session?.session_status || "").toLowerCase();
+  const remainingSeconds = getSessionRemainingSeconds(session);
+
+  if (sessionStatus === "live" && remainingSeconds > 0) {
+    return {
+      message: selectedRole === "kaz"
+        ? `Тест ашық · Жабылуына ${formatCountdown(remainingSeconds)} қалды`
+        : `Тест открыт · До закрытия ${formatCountdown(remainingSeconds)}`,
+      state: "live",
+    };
+  }
+
+  if (sessionStatus === "expired") {
+    return {
+      message: selectedRole === "kaz"
+        ? `Тест жабылды · ${questionCount} сұрақ · ${durationMinutes} мин`
+        : `Тест закрыт · ${questionCount} вопросов · ${durationMinutes} мин`,
+      state: "done",
+    };
+  }
+
+  return {
+    message: selectedRole === "kaz"
+      ? `Тест дайын · ${questionCount} сұрақ · ${durationMinutes} мин · QR әлі іске қосылмаған`
+      : `Тест готов · ${questionCount} вопросов · ${durationMinutes} мин · QR еще не запущен`,
+    state: "ready",
+  };
+}
+
+function buildPublicTestGateUrl(accessToken) {
+  if (!accessToken) return "";
+  return `${API_BASE}/results/public-test/${accessToken}/open/`;
+}
+
+function setOpenTestDirectDisabled(disabled = true) {
+  if (openTestDirectBtn) {
+    openTestDirectBtn.disabled = disabled;
+  }
+}
+
+function formatTeacherClock(value) {
+  if (!value) return "";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  return parsed.toLocaleTimeString(selectedRole === "kaz" ? "kk-KZ" : "ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getTeacherTestInfoState(session = currentTestSession) {
+  const questionCount = generatedQuestions.length || Number(session?.question_count) || testConfig.questionCount;
+  const durationMinutes = Number(session?.duration_minutes) || testConfig.durationMinutes;
+  const sessionStatus = String(session?.session_status || "").toLowerCase();
+  const remainingSeconds = getSessionRemainingSeconds(session);
+  const meta = selectedRole === "kaz"
+    ? `${questionCount} сұрақ · ${durationMinutes} мин`
+    : `${questionCount} вопросов · ${durationMinutes} мин`;
+  const closeClock = formatTeacherClock(session?.public_expires_at);
+
+  if (sessionStatus === "live" && remainingSeconds > 0) {
+    return {
+      state: "live",
+      label: selectedRole === "kaz" ? "Тест жүріп жатыр" : "Тест запущен",
+      meta,
+      hint: selectedRole === "kaz"
+        ? `${formatCountdown(remainingSeconds)} қалды${closeClock ? ` · ${closeClock}-де жабылады` : ""}`
+        : `${formatCountdown(remainingSeconds)} до закрытия${closeClock ? ` · закроется в ${closeClock}` : ""}`,
+      actionLabel: selectedRole === "kaz" ? "QR-ды ашу" : "Открыть QR",
+      qrTitle: selectedRole === "kaz" ? "QR кодты аудиторияға көрсетіңіз" : "Покажите QR аудитории",
+      qrHint: selectedRole === "kaz"
+        ? "Студенттер телефонмен сканерлеп, Google Form-ға бірден өтеді. Уақыт аяқталғанда форма автоматты түрде жабылады."
+        : "Студенты сканируют код телефоном и сразу переходят в Google Form.",
+    };
+  }
+
+  if (sessionStatus === "expired") {
+    return {
+      state: "done",
+      label: selectedRole === "kaz" ? "Тест жабылды" : "Тест закрыт",
+      meta,
+      hint: selectedRole === "kaz"
+        ? "Қажет болса жаңа уақытпен қайта бастауға болады."
+        : "При необходимости можно запустить тест заново с новым временем.",
+      actionLabel: selectedRole === "kaz" ? "Қайта бастау" : "Запустить снова",
+      qrTitle: selectedRole === "kaz" ? "QR терезесі жабық" : "QR-окно закрыто",
+      qrHint: selectedRole === "kaz"
+        ? "Қайта бастау батырмасы студенттер үшін жаңа уақыт терезесін ашады."
+        : "Повторный запуск откроет для студентов новое временное окно.",
+    };
+  }
+
+  return {
+    state: "ready",
+    label: selectedRole === "kaz" ? "Тест дайын" : "Тест готов",
+    meta,
+    hint: selectedRole === "kaz"
+      ? "Таймер тек «Тестті бастау» басылғаннан кейін жүреді."
+      : "Таймер начнется только после нажатия кнопки запуска теста.",
+    actionLabel: selectedRole === "kaz" ? "Тестті бастау" : "Запустить тест",
+    qrTitle: selectedRole === "kaz" ? "QR код тест басталғаннан кейін шығады" : "QR появится после запуска теста",
+    qrHint: selectedRole === "kaz"
+      ? "Тест басталған соң студенттер телефонмен сканерлеп, Google Form-ға өтеді."
+      : "После запуска студенты сканируют код и переходят к форме.",
+  };
+}
+
 function normalizeProfileStorageIdentity(email = "") {
   return String(email || "").trim().toLowerCase() || "guest";
 }
@@ -1023,6 +1178,11 @@ function getCurrentTestLaunchUrl(session = currentTestSession) {
   return session.form_url || session.public_url || buildPublicTestUrl(session.access_token);
 }
 
+function getCurrentTestJoinUrl(session = currentTestSession) {
+  if (!session) return "";
+  return buildPublicTestGateUrl(session.access_token) || session.form_url || session.public_url || buildPublicTestUrl(session.access_token);
+}
+
 function readTeacherAppState() {
   try {
     const raw = localStorage.getItem(getTeacherAppStateKey());
@@ -1075,6 +1235,8 @@ function renderLoginRequiredState() {
 }
 
 function resetProtectedAppData() {
+  stopTeacherTestStatusTimer();
+  stopPublicTestTimer();
   subjects = [];
   isDisciplineAccessLocked = false;
   selectedCourseNumber = null;
@@ -2794,7 +2956,7 @@ function renderMaterialPreview() {
     } else if (kind === "image") {
       previewInner = `<img src="${inlinePreviewUrl}" alt="${escapeHtml(item.title)}" />`;
     } else if (kind === "video") {
-      previewInner = `<video src="${inlinePreviewUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#0a1020;border-radius:18px;"></video>`;
+      previewInner = `<video src="${inlinePreviewUrl}" controls style="width:100%;height:100%;object-fit:contain;background:#102842;border-radius:14px;"></video>`;
     } else if (kind === "audio") {
       previewInner = `<div style="height:100%;display:flex;align-items:center;justify-content:center;padding:24px;"><audio src="${inlinePreviewUrl}" controls style="width:min(560px,100%);"></audio></div>`;
     } else if (kind === "external") {
@@ -3220,6 +3382,13 @@ async function saveEditedQuestions() {
     if (checked) question.answer = Number(checked.value);
   });
 
+  const durationInput = document.getElementById("testModalDurationInput");
+  if (durationInput) {
+    testConfig = clampTestConfig(generatedQuestions.length || testConfig.questionCount, durationInput.value);
+    syncTestConfigInputs();
+    saveStoredTestConfig();
+  }
+
   if (currentTestSession?.id) {
     try {
       const updated = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/`, {
@@ -3230,6 +3399,7 @@ async function saveEditedQuestions() {
         body: JSON.stringify({
           questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
           question_count: generatedQuestions.length,
+          duration_minutes: testConfig.durationMinutes,
         }),
       });
 
@@ -3239,6 +3409,8 @@ async function saveEditedQuestions() {
     }
   }
 
+  renderTestSettingsPanel();
+  renderTestBlock(false);
   renderQuestionModal(false);
 }
 
@@ -3249,7 +3421,7 @@ function renderTestBlock(showQrInline = false) {
   if (!material) {
     testInfoText.textContent = "";
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     showQrBtn.disabled = true;
     updateActionButtonsState();
     return;
@@ -3260,7 +3432,7 @@ function renderTestBlock(showQrInline = false) {
   if (!isLecture) {
     testInfoText.textContent = t("testLectureOnly");
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     showQrBtn.disabled = true;
     updateActionButtonsState();
     return;
@@ -3269,7 +3441,7 @@ function renderTestBlock(showQrInline = false) {
   if (!generatedQuestions.length) {
     testInfoText.textContent = "";
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     showQrBtn.disabled = true;
     updateActionButtonsState();
     return;
@@ -3282,7 +3454,7 @@ function renderTestBlock(showQrInline = false) {
 
   if (!publicUrl) {
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     showQrBtn.disabled = true;
     updateActionButtonsState();
     return;
@@ -3295,7 +3467,7 @@ function renderTestBlock(showQrInline = false) {
     qrImageInline.style.display = "none";
   }
 
-  openTestDirectBtn.disabled = false;
+  setOpenTestDirectDisabled(false);
   showQrBtn.disabled = false;
 
   updateActionButtonsState();
@@ -3485,8 +3657,46 @@ async function downloadResultsSheet() {
   }
 }
 
-function openTestDirect() {
+async function launchCurrentTestSession() {
+  if (!currentTestSession?.id) {
+    throw new Error(selectedRole === "kaz" ? "Тест сессиясы табылмады." : "Тестовая сессия не найдена.");
+  }
+
+  const payload = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/launch-public/`, {
+    method: "POST",
+  });
+
+  hydrateCurrentTestSession({
+    ...currentTestSession,
+    ...payload,
+  });
+  saveTeacherAppState();
+  return currentTestSession;
+}
+
+async function closeCurrentTestSessionWindow() {
+  if (!currentTestSession?.id) return;
+
+  const payload = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/close-public/`, {
+    method: "POST",
+  });
+
+  hydrateCurrentTestSession({
+    ...currentTestSession,
+    ...payload,
+  });
+  saveTeacherAppState();
+}
+
+async function openTestDirect() {
   if (!generatedQuestions.length) return;
+
+  try {
+    await launchCurrentTestSession();
+  } catch (error) {
+    alert(error?.message || t("formNotReady"));
+    return;
+  }
 
   const formUrl = getCurrentTestLaunchUrl();
 
@@ -3495,11 +3705,19 @@ function openTestDirect() {
     return;
   }
 
+  renderTestBlock(false);
   window.open(formUrl, "_blank");
 }
 
-function showQr() {
+async function showQr() {
   if (!generatedQuestions.length) return;
+
+  try {
+    await launchCurrentTestSession();
+  } catch (error) {
+    alert(error?.message || t("qrNotReady"));
+    return;
+  }
 
   const formUrl = getCurrentTestLaunchUrl();
 
@@ -3906,12 +4124,85 @@ async function initPublicTestMode() {
   return true;
 }
 
+function getProjectedTeacherCloseClock(durationMinutes, session = currentTestSession) {
+  if (!session?.public_started_at) {
+    return selectedRole === "kaz" ? "Тест басталған соң көрінеді" : "Появится после запуска теста";
+  }
+
+  const startedAtMs = new Date(session.public_started_at).getTime();
+  if (Number.isNaN(startedAtMs)) {
+    return selectedRole === "kaz" ? "Уақыт есептелмеді" : "Время не определено";
+  }
+
+  const projected = new Date(startedAtMs + Number(durationMinutes || 0) * 60 * 1000);
+  return formatTeacherClock(projected.toISOString()) || (selectedRole === "kaz" ? "Уақыт есептелмеді" : "Время не определено");
+}
+
+function renderTestModalSummary(editMode = false) {
+  if (!testModalSummary) return;
+
+  const info = getTeacherTestInfoState(currentTestSession);
+  const durationValue = Number(currentTestSession?.duration_minutes) || testConfig.durationMinutes;
+  const closeClock = getProjectedTeacherCloseClock(durationValue, currentTestSession);
+  const statusLabel = info.label || (selectedRole === "kaz" ? "Тест дайын" : "Тест готов");
+  const questionCountLabel = selectedRole === "kaz" ? "Сұрақ саны" : "Количество вопросов";
+  const durationLabel = selectedRole === "kaz" ? "Белсенді уақыт" : "Активное время";
+  const closeLabel = selectedRole === "kaz" ? "Жабылу уақыты" : "Время закрытия";
+  const statusTitle = selectedRole === "kaz" ? "Тест параметрлері" : "Параметры теста";
+  const closeHint = editMode && String(currentTestSession?.session_status || "").toLowerCase() === "live"
+    ? `<div class="test-modal-summary-note">${selectedRole === "kaz" ? "Уақытты сақтағаннан кейін жабылу мезгілі автоматты түрде жаңарады." : "После сохранения время закрытия обновится автоматически."}</div>`
+    : "";
+
+  testModalSummary.innerHTML = `
+    <div class="test-modal-summary-title">${statusTitle}</div>
+    <div class="test-modal-summary-grid">
+      <div class="test-modal-summary-field">
+        <span>${selectedRole === "kaz" ? "Күйі" : "Статус"}</span>
+        <strong>${escapeHtml(statusLabel)}</strong>
+      </div>
+      <div class="test-modal-summary-field">
+        <span>${questionCountLabel}</span>
+        <strong>${generatedQuestions.length}</strong>
+      </div>
+      <div class="test-modal-summary-field">
+        <span>${durationLabel}</span>
+        ${
+          editMode
+            ? `<input id="testModalDurationInput" class="edit-input test-modal-summary-input" type="number" min="5" max="180" value="${durationValue}" />`
+            : `<strong>${durationValue} ${selectedRole === "kaz" ? "мин" : "мин"}</strong>`
+        }
+      </div>
+      <div class="test-modal-summary-field">
+        <span>${closeLabel}</span>
+        <strong id="testModalCloseTimeValue">${escapeHtml(closeClock)}</strong>
+      </div>
+    </div>
+    ${closeHint}
+  `;
+
+  if (editMode) {
+    const modalDurationInput = document.getElementById("testModalDurationInput");
+    if (modalDurationInput) {
+      modalDurationInput.addEventListener("input", () => {
+        const nextConfig = clampTestConfig(generatedQuestions.length || testConfig.questionCount, modalDurationInput.value);
+        const closeValue = document.getElementById("testModalCloseTimeValue");
+
+        modalDurationInput.value = String(nextConfig.durationMinutes);
+        if (closeValue) {
+          closeValue.textContent = getProjectedTeacherCloseClock(nextConfig.durationMinutes, currentTestSession);
+        }
+      });
+    }
+  }
+}
+
 function renderQuestionModal(editMode = false) {
   isEditingTest = editMode;
   testModalTitle.textContent = editMode ? t("testModalEdit") : t("testModalView");
   editTestBtn.classList.toggle("hidden", editMode);
   saveTestBtn.classList.toggle("hidden", !editMode);
 
+  renderTestModalSummary(editMode);
   testQuestionsContainer.innerHTML = "";
 
   generatedQuestions.forEach((q, qIndex) => {
@@ -3935,15 +4226,15 @@ function renderQuestionModal(editMode = false) {
     } else {
       card.innerHTML = `
         <h4>${t("questionLabel", { number: qIndex + 1 })}</h4>
-        <div style="color:#fff;line-height:1.6;margin-bottom:12px;">${escapeHtml(q.question)}</div>
+        <div style="color:#17314b;line-height:1.6;margin-bottom:12px;">${escapeHtml(q.question)}</div>
         <div style="display:grid;gap:8px;">
           ${q.options.map((option, oIndex) => `
             <div style="
               min-height:44px;
-              border-radius:14px;
-              border:1px solid rgba(255,255,255,0.08);
-              background:${q.answer === oIndex ? "rgba(71,215,186,0.10)" : "#11192a"};
-              color:${q.answer === oIndex ? "#c6fff3" : "#d9e2ef"};
+              border-radius:12px;
+              border:1px solid ${q.answer === oIndex ? "rgba(0,93,176,0.22)" : "rgba(0,93,176,0.14)"};
+              background:${q.answer === oIndex ? "rgba(0,93,176,0.12)" : "#f5f8fc"};
+              color:${q.answer === oIndex ? "#0f5d9b" : "#17314b"};
               display:flex;
               align-items:center;
               gap:10px;
@@ -3953,7 +4244,7 @@ function renderQuestionModal(editMode = false) {
             ">
               <div style="
                 width:26px;height:26px;border-radius:50%;
-                background:rgba(255,255,255,0.06);
+                background:${q.answer === oIndex ? "rgba(0,93,176,0.18)" : "rgba(0,93,176,0.10)"};
                 display:flex;align-items:center;justify-content:center;
                 font-size:11px;font-weight:800;flex-shrink:0;
               ">${String.fromCharCode(65 + oIndex)}</div>
@@ -5154,9 +5445,109 @@ async function generateSlidesForSelectedMaterial() {
 }
 
 function setTestPanelInfo(message = "", state = "neutral") {
-  if (!testInfoText) return;
-  testInfoText.textContent = message || "";
-  testInfoText.classList.toggle("is-error", state === "error");
+  if (!testInfoText || !testInfoCard) return;
+
+  const options = arguments[2] && typeof arguments[2] === "object" ? arguments[2] : {};
+  const stateLabel = String(options.stateLabel || "").trim();
+  const metaText = String(options.metaText || message || "").trim();
+  const hintText = String(options.hintText || "").trim();
+  const actionLabel = String(options.actionLabel || "").trim();
+  const hasContent = Boolean(stateLabel || metaText || hintText);
+
+  testInfoCard.classList.toggle("hidden", !hasContent);
+  testInfoCard.dataset.state = state || "neutral";
+
+  if (testInfoRow) {
+    testInfoRow.classList.toggle("hidden", !hasContent && !actionLabel && previewTestBtn?.classList.contains("hidden"));
+  }
+
+  if (testInfoState) {
+    testInfoState.textContent = stateLabel;
+    testInfoState.classList.toggle("hidden", !stateLabel);
+  }
+
+  testInfoText.textContent = metaText;
+
+  if (testInfoHint) {
+    testInfoHint.textContent = hintText;
+    testInfoHint.classList.toggle("hidden", !hintText);
+  }
+
+  if (launchTestBtn) {
+    launchTestBtn.textContent = actionLabel;
+    launchTestBtn.dataset.state = state || "neutral";
+    launchTestBtn.disabled = Boolean(options.actionDisabled);
+    launchTestBtn.classList.toggle("hidden", !actionLabel);
+  }
+}
+
+function setTestQrCaption(title = "", text = "", visible = false) {
+  if (!testQrCaption) return;
+
+  const hasContent = Boolean(visible && (title || text));
+  testQrCaption.classList.toggle("hidden", !hasContent);
+
+  if (testQrCaptionTitle) {
+    testQrCaptionTitle.textContent = title || "";
+  }
+
+  if (testQrCaptionText) {
+    testQrCaptionText.textContent = text || "";
+  }
+}
+
+function stopTeacherTestStatusTimer() {
+  if (teacherTestStatusTimer) {
+    clearInterval(teacherTestStatusTimer);
+    teacherTestStatusTimer = null;
+  }
+}
+
+function syncTeacherTestPanelInfo(session = currentTestSession) {
+  if (!generatedQuestions.length) {
+    stopTeacherTestStatusTimer();
+    setTestPanelInfo("");
+    return;
+  }
+
+  const info = getTeacherTestInfoState(session);
+  setTestPanelInfo("", info.state, {
+    stateLabel: info.label,
+    metaText: info.meta,
+    hintText: info.hint,
+    actionLabel: info.actionLabel,
+  });
+}
+
+function startTeacherTestStatusTimer(session = currentTestSession) {
+  stopTeacherTestStatusTimer();
+
+  if (!session || String(session.session_status || "").toLowerCase() !== "live") {
+    return;
+  }
+
+  syncTeacherTestPanelInfo(session);
+  teacherTestStatusTimer = setInterval(() => {
+    if (!currentTestSession) {
+      stopTeacherTestStatusTimer();
+      return;
+    }
+
+    const remainingSeconds = getSessionRemainingSeconds(currentTestSession);
+    currentTestSession.remaining_seconds = remainingSeconds;
+
+    if (remainingSeconds <= 0) {
+      currentTestSession.session_status = "expired";
+      syncTeacherTestPanelInfo(currentTestSession);
+      stopTeacherTestStatusTimer();
+      closeCurrentTestSessionWindow().catch((error) => {
+        console.error("Test close sync error:", error);
+      });
+      return;
+    }
+
+    syncTeacherTestPanelInfo(currentTestSession);
+  }, 1000);
 }
 
 function setTestPaneMode(mode = "settings") {
@@ -5178,10 +5569,6 @@ function setTestPaneMode(mode = "settings") {
 
   if (testQrActions) {
     testQrActions.classList.toggle("hidden", !qrMode);
-  }
-
-  if (testInfoText) {
-    testInfoText.classList.toggle("hidden", qrMode || !testInfoText.textContent.trim());
   }
 }
 
@@ -5224,7 +5611,7 @@ renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
   if (!material) {
     setTestPanelInfo("");
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     if (showQrBtn) showQrBtn.disabled = true;
     setTestPaneMode("settings");
     updateActionButtonsState();
@@ -5234,7 +5621,7 @@ renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
   if (material.type !== "lecture") {
     setTestPanelInfo(t("testLectureOnly"), "error");
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     if (showQrBtn) showQrBtn.disabled = true;
     setTestPaneMode("settings");
     updateActionButtonsState();
@@ -5244,7 +5631,7 @@ renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
   if (!generatedQuestions.length) {
     setTestPanelInfo("");
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     if (showQrBtn) showQrBtn.disabled = true;
     setTestPaneMode("settings");
     updateActionButtonsState();
@@ -5265,7 +5652,7 @@ renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
 
   if (!publicUrl) {
     qrImageInline.style.display = "none";
-    openTestDirectBtn.disabled = true;
+    setOpenTestDirectDisabled(true);
     if (showQrBtn) showQrBtn.disabled = true;
     updateActionButtonsState();
     return;
@@ -5278,7 +5665,7 @@ renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
     qrImageInline.style.display = "none";
   }
 
-  openTestDirectBtn.disabled = !qrMode;
+  setOpenTestDirectDisabled(!qrMode);
   if (showQrBtn) showQrBtn.disabled = false;
   setTestPaneMode(qrMode ? "qr" : "settings");
   updateActionButtonsState();
@@ -5362,8 +5749,429 @@ createAiQuestions = async function createAiQuestionsOverride() {
   }
 };
 
+renderTestSettingsPanel = function renderTestSettingsPanelEnhanced() {
+  const material = getSelectedMaterial();
+  const isLecture = material?.type === "lecture";
+  const hasGeneratedTest = generatedQuestions.length > 0;
+
+  syncTestConfigInputs();
+
+  if (buildTestBtn) {
+    buildTestBtn.disabled = !isLecture || isTestGenerating;
+    buildTestBtn.textContent = isTestGenerating
+      ? (selectedRole === "kaz" ? "Жасалып жатыр..." : "Создается...")
+      : (selectedRole === "kaz" ? "Тест жасау" : "Создать тест");
+  }
+
+  if (previewTestBtn) {
+    previewTestBtn.disabled = !isLecture || !hasGeneratedTest || isTestGenerating;
+    previewTestBtn.classList.toggle("hidden", !isLecture || !hasGeneratedTest);
+  }
+
+  if (testQuestionCountInput) {
+    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testDurationInput) {
+    testDurationInput.disabled = !isLecture || isTestGenerating;
+  }
+
+  if (testSettingsTitle) {
+    testSettingsTitle.textContent = "";
+  }
+
+  if (testSettingsHint) {
+    if (!isLecture) {
+      testSettingsHint.textContent = t("testLectureOnly");
+    } else if (hasGeneratedTest) {
+      testSettingsHint.textContent = selectedRole === "kaz"
+        ? "QR іске қосылғаннан кейін уақыт барлық студентке ортақ жүреді. Алдымен тестті қарап, керек болса өңдеп алыңыз."
+        : "После запуска QR время станет общим для всех студентов. Сначала просмотрите тест и при необходимости отредактируйте его.";
+    } else {
+      testSettingsHint.textContent = selectedRole === "kaz"
+        ? "Сұрақ саны мен жалпы уақытты таңдаңыз. Таймер QR ашылған сәттен басталады."
+        : "Выберите количество вопросов и общее время. Таймер начнется в момент открытия QR.";
+    }
+  }
+};
+
+renderTestBlock = function renderTestBlockEnhanced(showQrInline = false) {
+  const material = getSelectedMaterial();
+  const qrMode = showQrInline === true;
+  renderTestSettingsPanel();
+  setTestPaneMode(qrMode ? "qr" : "settings");
+
+  if (!material) {
+    stopTeacherTestStatusTimer();
+    setTestPanelInfo("");
+    qrImageInline.style.display = "none";
+    setTestQrCaption("", "", false);
+    setOpenTestDirectDisabled(true);
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  if (material.type !== "lecture") {
+    stopTeacherTestStatusTimer();
+    setTestPanelInfo(t("testLectureOnly"), "error");
+    qrImageInline.style.display = "none";
+    setTestQrCaption("", "", false);
+    setOpenTestDirectDisabled(true);
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  if (!generatedQuestions.length) {
+    stopTeacherTestStatusTimer();
+    setTestPanelInfo("");
+    qrImageInline.style.display = "none";
+    setTestQrCaption("", "", false);
+    setOpenTestDirectDisabled(true);
+    if (showQrBtn) showQrBtn.disabled = true;
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  const launchUrl = getCurrentTestLaunchUrl();
+  const info = getTeacherTestInfoState(currentTestSession);
+  const canDisplayQr = qrMode && info.state === "live" && Boolean(launchUrl);
+  const canOpenDirect = info.state === "live" && Boolean(launchUrl);
+
+  syncTeacherTestPanelInfo(currentTestSession);
+
+  if (info.state === "live") {
+    startTeacherTestStatusTimer(currentTestSession);
+  } else {
+    stopTeacherTestStatusTimer();
+  }
+
+  if (!launchUrl) {
+    qrImageInline.style.display = "none";
+    setTestQrCaption("", "", false);
+    setOpenTestDirectDisabled(true);
+    if (showQrBtn) showQrBtn.disabled = true;
+    updateActionButtonsState();
+    return;
+  }
+
+  if (canDisplayQr) {
+    qrImageInline.src = buildInlineQrUrl(launchUrl);
+    qrImageInline.style.display = "block";
+    setTestQrCaption(info.qrTitle, info.qrHint, true);
+  } else {
+    qrImageInline.style.display = "none";
+    setTestQrCaption(info.qrTitle, info.qrHint, qrMode);
+  }
+
+  setOpenTestDirectDisabled(!canOpenDirect);
+  if (showQrBtn) showQrBtn.disabled = false;
+  setTestPaneMode(qrMode ? "qr" : "settings");
+  updateActionButtonsState();
+};
+
+startPublicTestTimer = function startPublicTestTimerEnhanced() {
+  stopPublicTestTimer();
+
+  if (!publicTestSession) {
+    publicTestTimer.textContent = "--:--";
+    return;
+  }
+
+  if (String(publicTestSession.session_status || "").toLowerCase() !== "live") {
+    const fallbackSeconds = Number(publicTestSession?.duration_minutes || 0) * 60;
+    publicTestTimer.textContent = publicTestSession?.session_status === "expired"
+      ? "00:00"
+      : (fallbackSeconds ? formatCountdown(fallbackSeconds) : "--:--");
+    return;
+  }
+
+  const updateTimer = () => {
+    const remaining = getSessionRemainingSeconds(publicTestSession);
+    publicTestSession.remaining_seconds = remaining;
+    publicTestTimer.textContent = formatCountdown(remaining);
+
+    if (remaining <= 0) {
+      publicTestSession.session_status = "expired";
+      if (publicTestAttempt?.status === "started") {
+        publicTestAttempt.status = "expired";
+      }
+      stopPublicTestTimer();
+      renderPublicTestState();
+    }
+  };
+
+  updateTimer();
+  publicTestCountdownTimer = setInterval(updateTimer, 1000);
+};
+
+renderPublicTestState = function renderPublicTestStateEnhanced() {
+  if (!publicTestView) return;
+
+  const session = publicTestSession;
+  const attempt = publicTestAttempt;
+  const sessionStatus = String(session?.session_status || "").toLowerCase();
+  const remainingSeconds = getSessionRemainingSeconds(session);
+
+  publicTestTitle.textContent = session?.title || (selectedRole === "kaz" ? "Тест" : "Тест");
+  publicTestCourse.textContent = session?.discipline_title || (selectedRole === "kaz" ? "Тест сессиясы" : "Тестовая сессия");
+  publicTestMeta.textContent = session
+    ? `${session.material_title} · ${session.question_count} ${selectedRole === "kaz" ? "сұрақ" : "вопросов"} · ${session.duration_minutes} ${selectedRole === "kaz" ? "мин" : "мин"}`
+    : "";
+
+  publicTestResultCard.classList.add("hidden");
+  publicTestQuestionsWrap.classList.add("hidden");
+  publicTestStartCard.classList.remove("hidden");
+  publicTestSubmitBtn.disabled = false;
+  publicTestStartBtn.disabled = false;
+  startPublicTestTimer();
+
+  if (!attempt) {
+    if (sessionStatus === "ready") {
+      publicTestStartBtn.disabled = true;
+      setPublicTestStatus(
+        selectedRole === "kaz"
+          ? "Тест әлі іске қосылған жоқ. Оқытушы QR-ды ашқаннан кейін ғана бастай аласыз."
+          : "Тест еще не запущен. Начать можно только после того, как преподаватель откроет QR.",
+        "info",
+      );
+      return;
+    }
+
+    if (sessionStatus === "expired") {
+      publicTestStartBtn.disabled = true;
+      publicTestTimer.textContent = "00:00";
+      setPublicTestStatus(
+        selectedRole === "kaz"
+          ? "Тест жабылды. Белгіленген уақыт аяқталды."
+          : "Тест закрыт. Отведенное время закончилось.",
+        "error",
+      );
+      return;
+    }
+
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? `Тест ашық. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`
+        : `Тест открыт. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+      "info",
+    );
+    return;
+  }
+
+  if (attempt.status === "submitted") {
+    publicTestStartCard.classList.add("hidden");
+    renderPublicResultCard(attempt);
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? "Бұл құрылғы үшін тест бұрын тапсырылған."
+        : "Для этого устройства тест уже был отправлен.",
+      "success",
+    );
+    publicTestTimer.textContent = sessionStatus === "live" ? formatCountdown(remainingSeconds) : "00:00";
+    persistPublicAttemptState();
+    return;
+  }
+
+  if (attempt.status === "expired" || sessionStatus === "expired") {
+    publicTestStartCard.classList.add("hidden");
+    publicTestResultCard.classList.remove("hidden");
+    publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Тест уақыты аяқталды. Енді тапсыру мүмкін емес." : "Время теста истекло. Отправить ответы больше нельзя."}</p>`;
+    setPublicTestStatus(
+      selectedRole === "kaz"
+        ? "Уақыт аяқталды. Бұл құрылғыдан тестке қайта кіруге болмайды."
+        : "Время истекло. Повторно войти в тест с этого устройства нельзя.",
+      "error",
+    );
+    publicTestTimer.textContent = "00:00";
+    clearStoredPublicAttempt(publicTestSessionToken);
+    return;
+  }
+
+  publicTestStartCard.classList.add("hidden");
+  publicTestQuestionsWrap.classList.remove("hidden");
+  publicTestStudentNameInput.value = attempt.student_name || "";
+  setPublicTestStatus(
+    selectedRole === "kaz"
+      ? `Тест жүріп жатыр. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`
+      : `Тест запущен. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+    "info",
+  );
+  renderPublicTestQuestions();
+  startPublicTestTimer();
+};
+
+loadPublicTestSession = async function loadPublicTestSessionEnhanced() {
+  if (!publicTestSessionToken) return;
+
+  const storedAttempt = readStoredPublicAttempt(publicTestSessionToken);
+  if (storedAttempt?.attemptToken) {
+    publicTestAttemptToken = storedAttempt.attemptToken;
+    publicTestAnswers = Array.isArray(storedAttempt.answers) ? storedAttempt.answers : [];
+  }
+
+  const params = new URLSearchParams();
+  if (publicTestAttemptToken) {
+    params.set("attempt_token", publicTestAttemptToken);
+  }
+  params.set("device_id", getPublicTestDeviceId());
+
+  const query = params.toString() ? `?${params.toString()}` : "";
+  const sessionPayload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/${query}`);
+  publicTestSession = sessionPayload;
+  publicTestAttempt = sessionPayload.attempt || null;
+
+  if (publicTestSession?.language && ["kaz", "rus"].includes(publicTestSession.language)) {
+    selectedRole = publicTestSession.language;
+    applyStaticTranslations();
+  }
+
+  if (!publicTestAttempt && storedAttempt?.studentName) {
+    publicTestStudentNameInput.value = storedAttempt.studentName;
+  }
+
+  if (publicTestAttempt?.attempt_token) {
+    publicTestAttemptToken = publicTestAttempt.attempt_token;
+  }
+
+  if ((!Array.isArray(publicTestAnswers) || !publicTestAnswers.length) && Array.isArray(publicTestAttempt?.answers)) {
+    publicTestAnswers = publicTestAttempt.answers.map(item => item.selected_option_index ?? null);
+  }
+
+  renderPublicTestState();
+};
+
+startPublicTest = async function startPublicTestEnhanced() {
+  if (!publicTestSessionToken) return;
+
+  const studentName = publicTestStudentNameInput.value.trim();
+  if (!studentName) {
+    setPublicTestStatus(
+      selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз." : "Введите имя и фамилию.",
+      "error",
+    );
+    publicTestStudentNameInput.focus();
+    return;
+  }
+
+  publicTestStartBtn.disabled = true;
+  setPublicTestStatus(selectedRole === "kaz" ? "Тест ашылып жатыр..." : "Тест открывается...", "info");
+
+  try {
+    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/start/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        student_name: studentName,
+        attempt_token: publicTestAttemptToken || undefined,
+        device_id: getPublicTestDeviceId(),
+      }),
+    });
+
+    publicTestSession = payload.session;
+    publicTestAttempt = payload.attempt;
+    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+    publicTestAnswers = new Array(publicTestSession?.questions?.length || 0).fill(null);
+    persistPublicAttemptState();
+    renderPublicTestState();
+  } catch (error) {
+    console.error("Public test start error:", error);
+    const payload = error.payload || {};
+
+    if (payload.session) {
+      publicTestSession = payload.session;
+    }
+
+    if (payload.attempt) {
+      publicTestAttempt = payload.attempt;
+      publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+      publicTestAnswers = Array.isArray(publicTestAttempt?.answers)
+        ? publicTestAttempt.answers.map(item => item.selected_option_index ?? null)
+        : publicTestAnswers;
+      persistPublicAttemptState();
+      renderPublicTestState();
+      return;
+    }
+
+    renderPublicTestState();
+    setPublicTestStatus(
+      error.message || (selectedRole === "kaz" ? "Тестті бастау мүмкін болмады." : "Не удалось начать тест."),
+      "error",
+    );
+  } finally {
+    publicTestStartBtn.disabled = false;
+  }
+};
+
+submitPublicTest = async function submitPublicTestEnhanced() {
+  if (!publicTestSessionToken || !publicTestAttemptToken) return;
+
+  publicTestSubmitBtn.disabled = true;
+  setPublicTestStatus(selectedRole === "kaz" ? "Жауаптар жіберіліп жатыр..." : "Ответы отправляются...", "info");
+
+  try {
+    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/submit/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        attempt_token: publicTestAttemptToken,
+        answers: publicTestAnswers,
+      }),
+    });
+
+    publicTestSession = payload.session;
+    publicTestAttempt = payload.attempt;
+    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
+    persistPublicAttemptState();
+    renderPublicTestState();
+  } catch (error) {
+    console.error("Public test submit error:", error);
+    const payload = error.payload || {};
+
+    if (payload.session) {
+      publicTestSession = payload.session;
+    }
+
+    if (payload.attempt) {
+      publicTestAttempt = payload.attempt;
+      renderPublicTestState();
+      return;
+    }
+
+    setPublicTestStatus(
+      error.message || (selectedRole === "kaz" ? "Тестті тапсыру мүмкін болмады." : "Не удалось отправить тест."),
+      "error",
+    );
+  } finally {
+    publicTestSubmitBtn.disabled = false;
+  }
+};
+
 if (buildTestBtn) {
   buildTestBtn.addEventListener("click", createAiQuestions);
+}
+
+if (previewTestBtn) {
+  previewTestBtn.addEventListener("click", () => {
+    if (!generatedQuestions.length) return;
+    renderQuestionModal(false);
+    openModal(testModal);
+  });
+}
+
+if (launchTestBtn) {
+  launchTestBtn.addEventListener("click", () => {
+    if (!generatedQuestions.length) return;
+    showQr();
+  });
 }
 
 if (testQuestionCountInput) {

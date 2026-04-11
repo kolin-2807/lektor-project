@@ -3,7 +3,10 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
-from PyPDF2 import PdfReader
+try:
+    from PyPDF2 import PdfReader
+except ImportError:  # pragma: no cover - optional dependency in some environments
+    PdfReader = None
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
@@ -191,6 +194,9 @@ def _extract_pptx_text(content: bytes) -> str:
 
 
 def _extract_pdf_text(content: bytes) -> str:
+    if PdfReader is None:
+        raise RuntimeError("PyPDF2 is not installed, PDF text extraction is unavailable.")
+
     reader = PdfReader(io.BytesIO(content))
     parts = []
     for page in reader.pages:

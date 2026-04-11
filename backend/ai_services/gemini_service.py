@@ -5,6 +5,7 @@ import time
 from contextlib import contextmanager
 
 from django.conf import settings
+import requests
 
 try:
     from google import genai
@@ -101,21 +102,51 @@ def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
     if not settings.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY tabylmady")
 
-    if genai is None:
-        raise RuntimeError("Google GenAI SDK is not installed.")
-
     with _bypass_broken_local_proxy():
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
         last_exc = None
 
         for model_name in _iter_gemini_models(model):
             for attempt_index in range(len(GEMINI_RETRY_DELAYS) + 1):
                 try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=prompt,
+                    if genai is not None:
+                        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                        response = client.models.generate_content(
+                            model=model_name,
+                            contents=prompt,
+                        )
+                        return (response.text or "").strip()
+
+                    response = requests.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
+                        headers={
+                            "x-goog-api-key": settings.GEMINI_API_KEY,
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "contents": [
+                                {
+                                    "parts": [
+                                        {
+                                            "text": prompt,
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        timeout=60,
                     )
-                    return (response.text or "").strip()
+                    response.raise_for_status()
+                    payload = response.json()
+                    candidates = payload.get("candidates") or []
+                    if not candidates:
+                        raise RuntimeError("Gemini returned no candidates.")
+
+                    parts = ((candidates[0].get("content") or {}).get("parts") or [])
+                    text_chunks = [str(part.get("text") or "").strip() for part in parts if str(part.get("text") or "").strip()]
+                    cleaned_text = "\n".join(text_chunks).strip()
+                    if not cleaned_text:
+                        raise RuntimeError("Gemini returned an empty response.")
+                    return cleaned_text
                 except Exception as exc:
                     last_exc = exc
 

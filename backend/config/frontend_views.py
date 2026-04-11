@@ -22,10 +22,21 @@ def _resolve_frontend_path(relative_path: str) -> Path:
 
 def frontend_index(_request):
     index_path = _resolve_frontend_path("index.html")
-    return FileResponse(index_path.open("rb"), content_type="text/html")
+    response = FileResponse(index_path.open("rb"), content_type="text/html")
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 def frontend_asset(_request, asset_kind: str, asset_path: str):
     file_path = _resolve_frontend_path(f"{asset_kind}/{asset_path}")
     content_type, _ = mimetypes.guess_type(file_path.name)
-    return FileResponse(file_path.open("rb"), content_type=content_type or "application/octet-stream")
+    response = FileResponse(file_path.open("rb"), content_type=content_type or "application/octet-stream")
+
+    if file_path.suffix in {".css", ".js"}:
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        response["Expires"] = "0"
+
+    return response

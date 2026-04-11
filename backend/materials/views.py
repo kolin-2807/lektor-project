@@ -90,6 +90,39 @@ def _build_material_source_text(material, language: str, connection=None) -> str
     """
 
 
+def _has_sufficient_material_text(material, source_text: str) -> bool:
+    normalized_source = " ".join(str(source_text or "").split())
+    normalized_title = " ".join(str(material.title or "").split())
+    normalized_description = " ".join(str(material.description or "").split())
+    normalized_category = " ".join(str(material.category or "").split())
+    normalized_discipline = " ".join(str(material.discipline.title or "").split())
+
+    wrappers = [
+        "Pan:",
+        "Material atauy:",
+        "Sipattamasy:",
+        "Kategoriyasy:",
+        "Material matini:",
+        "Discipline:",
+        "Material title:",
+        "Description:",
+        "Category:",
+        "Material text:",
+        normalized_title,
+        normalized_description,
+        normalized_category,
+        normalized_discipline,
+    ]
+
+    cleaned = normalized_source
+    for fragment in wrappers:
+        if fragment:
+            cleaned = cleaned.replace(fragment, " ")
+
+    cleaned = " ".join(cleaned.split())
+    return len(cleaned) >= 180
+
+
 def _format_google_api_error(exc, fallback_message: str) -> str:
     if not isinstance(exc, HttpError):
         return str(exc) or fallback_message
@@ -310,6 +343,17 @@ def generate_material_test(request, material_id):
     if auth_error:
         return auth_error
     source_text = _build_material_source_text(material, language, connection=connection)
+
+    if not _has_sufficient_material_text(material, source_text):
+        return Response(
+            {
+                "detail": (
+                    "Материал мәтіні толық оқылмады. Тест сұрақтары сапалы шығуы үшін файлдың ішкі мәтінін "
+                    "ашуға болатын DOCX, PPTX, PDF немесе мәтіндік форматты жүктеп, қайта көріңіз."
+                )
+            },
+            status=400,
+        )
 
     try:
         result = generate_test_from_text(source_text, language=language, question_count=question_count)

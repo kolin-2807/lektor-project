@@ -1,6 +1,8 @@
 import uuid
+from datetime import timedelta
 
 from django.db import models
+from django.utils import timezone
 from academics.models import Discipline
 
 
@@ -34,10 +36,31 @@ class TestSession(models.Model):
     questions_json = models.JSONField(default=list, blank=True)
     question_count = models.PositiveSmallIntegerField(default=5)
     duration_minutes = models.PositiveSmallIntegerField(default=20)
+    public_started_at = models.DateTimeField(null=True, blank=True)
+    public_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
+
+    def get_remaining_seconds(self, now=None) -> int:
+        if not self.public_expires_at:
+            return self.duration_minutes * 60
+
+        now = now or timezone.now()
+        remaining = int((self.public_expires_at - now).total_seconds())
+        return max(0, remaining)
+
+    def get_public_status(self, now=None) -> str:
+        if not self.public_started_at or not self.public_expires_at:
+            return "ready"
+        return "live" if self.get_remaining_seconds(now=now) > 0 else "expired"
+
+    def launch_public_window(self, now=None):
+        now = now or timezone.now()
+        self.public_started_at = now
+        self.public_expires_at = now + timedelta(minutes=self.duration_minutes)
+        return self
 
 
 class TestAttempt(models.Model):
@@ -57,6 +80,7 @@ class TestAttempt(models.Model):
     )
     student_name = models.CharField(max_length=255)
     student_identifier = models.CharField(max_length=255)
+    device_identifier = models.CharField(max_length=255, blank=True, default="")
     attempt_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     answers_json = models.JSONField(default=list, blank=True)
     score = models.PositiveSmallIntegerField(default=0)

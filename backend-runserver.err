@@ -20,3 +20,8 @@
 [09/Apr/2026 23:47:22] "GET /api/users/drive/status/ HTTP/1.1" 200 117
 [09/Apr/2026 23:47:22] "GET /api/results/test-sessions/?material=46 HTTP/1.1" 200 2
 [09/Apr/2026 23:47:22] "GET /api/results/test-sessions/?material=46 HTTP/1.1" 200 2
+forrtl: error (200): program aborting due to window-CLOSE event
+Image              PC                Routine            Line        Source             
+KERNELBASE.dll     00007FFE3E409DED  Unknown               Unknown  Unknown
+KERNEL32.DLL       00007FFE3FAFE8D7  Unknown               Unknown  Unknown
+ntdll.dll          00007FFE4192C48C  Unknown               Unknown  Unknown

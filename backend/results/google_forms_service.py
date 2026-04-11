@@ -13,6 +13,42 @@ def create_google_form(connection, title: str):
         return forms_service.forms().create(body=form_body).execute()
 
 
+def update_form_description(connection, form_id: str, description: str):
+    with bypass_broken_local_proxy():
+        creds = get_google_credentials(connection)
+        forms_service = build("forms", "v1", credentials=creds)
+        update = {
+            "requests": [
+                {
+                    "updateFormInfo": {
+                        "info": {
+                            "description": description,
+                        },
+                        "updateMask": "description",
+                    }
+                }
+            ]
+        }
+        forms_service.forms().batchUpdate(formId=form_id, body=update).execute()
+
+
+def set_form_publish_state(connection, form_id: str, *, is_published: bool, is_accepting_responses: bool):
+    with bypass_broken_local_proxy():
+        creds = get_google_credentials(connection)
+        forms_service = build("forms", "v1", credentials=creds)
+        forms_service.forms().setPublishSettings(
+            formId=form_id,
+            body={
+                "publishSettings": {
+                    "publishState": {
+                        "isPublished": is_published,
+                        "isAcceptingResponses": is_accepting_responses,
+                    }
+                }
+            },
+        ).execute()
+
+
 def add_questions_to_form(connection, form_id: str, questions: list):
     with bypass_broken_local_proxy():
         creds = get_google_credentials(connection)
