@@ -6,6 +6,7 @@ from .views import (
     generate_material_test,
     material_list,
     preview_material,
+    speak_assistant_reply,
     transcribe_voice,
     upload_material,
 )
@@ -18,5 +19,6 @@ urlpatterns = [
     path("materials/<int:material_id>/generate-slides/", generate_material_slides, name="generate-material-slides"),
     path("materials/<int:material_id>/generate-test/", generate_material_test, name="generate-material-test"),
     path("assistant/command/", assistant_command, name="assistant-command"),
+    path("assistant/speak/", speak_assistant_reply, name="assistant-speak"),
     path("assistant/transcribe/", transcribe_voice, name="assistant-transcribe"),
 ]

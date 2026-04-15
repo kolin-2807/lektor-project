@@ -18,6 +18,7 @@ ALLOWED_ACTIONS = {
     "open_materials",
     "open_test",
     "open_results",
+    "open_results_sheet",
     "open_slides",
     "generate_test",
     "generate_slides",
@@ -200,6 +201,16 @@ RESULTS_PHRASES = (
     "results",
 )
 
+RESULTS_SHEET_PHRASES = (
+    "google sheets",
+    "гугл шит",
+    "гугл таблиц",
+    "sheets",
+    "sheet",
+    "таблица",
+    "таблиц",
+)
+
 SLIDES_PHRASES = (
     "слайд",
     "слайдтар",
@@ -240,6 +251,16 @@ START_TEST_PHRASES = (
     "начни тест",
     "запусти тест",
     "start test",
+)
+
+QUESTION_COUNT_PATTERNS = (
+    re.compile(r"(\d{1,2})\s*(?:сұрақ|сурак|вопрос(?:а|ов)?|question)"),
+    re.compile(r"(?:сұрақ|сурак|вопрос(?:а|ов)?|question)s?\s*(\d{1,2})\b"),
+)
+
+DURATION_PATTERNS = (
+    re.compile(r"(\d{1,3})\s*(?:минут|мин|minute|min)\b"),
+    re.compile(r"(?:минут|мин|minute|min)\s*(\d{1,3})\b"),
 )
 
 OPEN_WORDS = (
@@ -353,6 +374,13 @@ def _reply(context: AssistantContext, kazakh: str, russian: str | None = None) -
     return kazakh
 
 
+ASSISTANT_NAME = getattr(settings, "VOICE_ASSISTANT_NAME", "Ayla").strip() or "Ayla"
+
+
+def _assistant_name(_: AssistantContext) -> str:
+    return ASSISTANT_NAME
+
+
 def _resolve_reply_role(raw_text: str, current_role: str = "kaz") -> str:
     text = str(raw_text or "").strip().lower()
     normalized_text = normalize_assistant_text(text)
@@ -457,6 +485,26 @@ def _extract_material_type(text: str) -> str:
     return ""
 
 
+def _extract_question_count(text: str) -> int | None:
+    for pattern in QUESTION_COUNT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            value = _safe_int(match.group(1))
+            if value is not None:
+                return max(3, min(value, 25))
+    return None
+
+
+def _extract_duration_minutes(text: str) -> int | None:
+    for pattern in DURATION_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            value = _safe_int(match.group(1))
+            if value is not None:
+                return max(5, min(value, 180))
+    return None
+
+
 def _looks_like_help_request(text: str) -> bool:
     return _contains_any(text, HELP_PHRASES)
 
@@ -507,12 +555,18 @@ def _looks_like_results_request(text: str) -> bool:
     return _contains_any(text, RESULTS_PHRASES)
 
 
+def _looks_like_results_sheet_request(text: str) -> bool:
+    return _contains_any(text, RESULTS_SHEET_PHRASES) and _looks_like_results_request(text)
+
+
 def _looks_like_slides_request(text: str) -> bool:
     return _contains_any(text, SLIDES_PHRASES)
 
 
 def _looks_like_materials_request(text: str) -> bool:
-    return _contains_any(text, MATERIALS_PHRASES)
+    return _contains_any(text, MATERIALS_PHRASES) or (
+        bool(_extract_material_type(text)) and _contains_any(text, OPEN_WORDS)
+    )
 
 
 def _looks_like_test_panel_request(text: str) -> bool:
@@ -571,6 +625,107 @@ def _find_best_entity_match(text: str, items: list[dict[str, Any]]) -> dict[str,
     return {**best_item, "score": round(best_score, 2)}
 
 
+def _reply_looks_russian(reply: str) -> bool:
+    normalized = normalize_assistant_text(reply)
+    russian_markers = (
+        "открою",
+        "перейду",
+        "верну",
+        "подготовлю",
+        "запущу",
+        "раздел",
+        "дисциплин",
+        "результат",
+        "главную",
+        "помощ",
+    )
+    kazakh_markers = (
+        "ашамын",
+        "өтемін",
+        "қайтарамын",
+        "дайындаймын",
+        "қосамын",
+        "бөлімін",
+        "нәтиже",
+        "көмек",
+    )
+    if any(marker in normalized for marker in kazakh_markers):
+        return False
+    return any(marker in normalized for marker in russian_markers)
+
+
+def _build_natural_action_reply(action: str, metadata: dict[str, Any], is_russian: bool) -> str:
+    subject_title = str(metadata.get("subject_title") or "").strip()
+    material_title = str(metadata.get("material_title") or "").strip()
+    course_number = _safe_int(metadata.get("course_number"))
+
+    if is_russian:
+        action_map = {
+            "show_help": "Хорошо, открою раздел помощи.",
+            "go_home": "Хорошо, перейду на главную страницу.",
+            "go_back": "Хорошо, верну на предыдущий экран.",
+            "open_materials": "Хорошо, открою раздел материалов.",
+            "open_test": "Хорошо, открою раздел тестов.",
+            "open_results": "Хорошо, открою результаты.",
+            "open_results_sheet": "Хорошо, открою результаты в Google Sheets.",
+            "open_slides": "Хорошо, открою раздел слайдов.",
+            "open_qr": "Хорошо, открою QR-код теста.",
+            "start_test": "Хорошо, запущу тест.",
+        }
+        if action == "open_subject" and subject_title:
+            return f"Хорошо, открою дисциплину «{subject_title}»."
+        if action == "select_material" and material_title:
+            return f"Хорошо, открою материал «{material_title}»."
+        if action == "generate_test" and material_title:
+            return f"Хорошо, подготовлю тест по материалу «{material_title}»."
+        if action == "generate_test":
+            return "Хорошо, подготовлю тест."
+        if action == "generate_slides" and material_title:
+            return f"Хорошо, подготовлю слайды по материалу «{material_title}»."
+        if action == "generate_slides":
+            return "Хорошо, подготовлю слайды."
+        if action == "open_course" and course_number:
+            return f"Хорошо, открою {course_number} курс."
+        return action_map.get(action, "")
+
+    action_map = {
+        "show_help": "Жарайды, көмек бөлімін ашамын.",
+        "go_home": "Жарайды, басты бетке өтемін.",
+        "go_back": "Жарайды, алдыңғы бетке қайтарамын.",
+        "open_materials": "Жарайды, материалдар бөлімін ашамын.",
+        "open_test": "Жарайды, тест бөлімін ашамын.",
+        "open_results": "Жарайды, нәтижелерді ашамын.",
+        "open_results_sheet": "Жарайды, нәтижелерді Google Sheets-та ашамын.",
+        "open_slides": "Жарайды, слайд бөлімін ашамын.",
+        "open_qr": "Жарайды, тесттің QR кодын ашамын.",
+        "start_test": "Жарайды, тестті іске қосамын.",
+    }
+    if action == "open_subject" and subject_title:
+        return f"Жарайды, «{subject_title}» пәнін ашамын."
+    if action == "select_material" and material_title:
+        return f"Жарайды, «{material_title}» материалын ашамын."
+    if action == "generate_test" and material_title:
+        return f"Жарайды, «{material_title}» материалы бойынша тест дайындаймын."
+    if action == "generate_test":
+        return "Жарайды, тест дайындаймын."
+    if action == "generate_slides" and material_title:
+        return f"Жарайды, «{material_title}» материалы бойынша слайд дайындаймын."
+    if action == "generate_slides":
+        return "Жарайды, слайд дайындаймын."
+    if action == "open_course" and course_number:
+        return f"Жарайды, {course_number}-курсты ашамын."
+    return action_map.get(action, "")
+
+
+def _style_assistant_reply(action: str, reply: str, metadata: dict[str, Any]) -> str:
+    clean_reply = str(reply or "").strip()
+    if action == "unknown" or not clean_reply:
+        return clean_reply
+
+    natural_reply = _build_natural_action_reply(action, metadata, is_russian=_reply_looks_russian(clean_reply))
+    return natural_reply or clean_reply
+
+
 def _pick_first_material_by_type(context: AssistantContext, material_type: str) -> dict[str, Any] | None:
     if not material_type:
         return None
@@ -604,10 +759,12 @@ def _build_response(action: str, reply: str, confidence: float = 0.9, **payload:
         for key, value in payload.items()
         if value not in (None, "", [], {})
     }
+    normalized_action = action if action in ALLOWED_ACTIONS else "unknown"
+    styled_reply = _style_assistant_reply(normalized_action, str(reply or "").strip(), clean_payload)
 
     return {
-        "action": action if action in ALLOWED_ACTIONS else "unknown",
-        "reply": str(reply or "").strip(),
+        "action": normalized_action,
+        "reply": styled_reply,
         "confidence": round(max(0.0, min(float(confidence), 1.0)), 2),
         "metadata": clean_payload,
         **clean_payload,
@@ -621,6 +778,7 @@ def _build_subject_response(
     course_number: int | None = None,
     reply: str = "",
     confidence: float = 0.9,
+    **extra_payload: Any,
 ) -> dict[str, Any]:
     resolved_course_number = course_number or _safe_int(subject.get("course_number") if subject else None) or context.selected_course_number
     return _build_response(
@@ -630,6 +788,7 @@ def _build_subject_response(
         subject_id=_safe_int(subject.get("id") if subject else None),
         subject_title=(subject or {}).get("title", ""),
         course_number=resolved_course_number,
+        **extra_payload,
     )
 
 
@@ -640,6 +799,7 @@ def _build_material_response(
     subject: dict[str, Any] | None = None,
     reply: str = "",
     confidence: float = 0.9,
+    **extra_payload: Any,
 ) -> dict[str, Any]:
     resolved_subject_id = _safe_int((material or {}).get("subject_id")) or _safe_int((subject or {}).get("id"))
     resolved_course_number = (
@@ -647,16 +807,18 @@ def _build_material_response(
         or _safe_int((subject or {}).get("course_number"))
         or context.selected_course_number
     )
+    resolved_material_type = str(extra_payload.pop("material_type", (material or {}).get("type", "")) or "").strip().lower()
     return _build_response(
         action=action,
         reply=reply,
         confidence=confidence,
         material_id=_safe_int((material or {}).get("id")),
         material_title=(material or {}).get("title", ""),
-        material_type=(material or {}).get("type", ""),
+        material_type=resolved_material_type,
         subject_id=resolved_subject_id,
         subject_title=(subject or {}).get("title", ""),
         course_number=resolved_course_number,
+        **extra_payload,
     )
 
 
@@ -765,6 +927,56 @@ def _build_local_question_response(text: str, context: AssistantContext) -> dict
                 "Чтобы открыть слайды, скажите «открой слайды». Если нужны новые слайды, скажите «создай слайды».",
             ),
             confidence=0.82,
+        )
+
+    return None
+
+
+def _build_smalltalk_response(text: str, context: AssistantContext) -> dict[str, Any] | None:
+    assistant_name = _assistant_name(context)
+
+    if _looks_like_greeting(text):
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                f"Сәлем. Мен {assistant_name}. Қай бөлім керек екенін айтыңыз, тез ашып беремін.",
+                f"Здравствуйте. Я {assistant_name}. Скажите, какой раздел нужен, и я быстро его открою.",
+            ),
+            confidence=0.99,
+        )
+
+    if _looks_like_thanks(text):
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                "Қуана көмектесемін. Қажет болса, жалғастырайық.",
+                "С радостью помогу. Если нужно, можем продолжать.",
+            ),
+            confidence=0.98,
+        )
+
+    if _looks_like_how_are_you(text):
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                "Жақсымын. Қай бөлім керек екенін айтыңыз, бірге тез шешеміз.",
+                "Все хорошо. Скажите, какой раздел нужен, и я быстро помогу.",
+            ),
+            confidence=0.97,
+        )
+
+    if _looks_like_who_are_you(text):
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                f"Мен {assistant_name}мын. Материал, тест, слайд және нәтижелер бойынша тез бағыт беретін дауыстық көмекшімін.",
+                f"Я {assistant_name}. Я голосовой помощник, который помогает с материалами, тестами, слайдами и результатами.",
+            ),
+            confidence=0.98,
         )
 
     return None
@@ -884,6 +1096,110 @@ User command:
     return result
 
 
+def _gemini_fallback(user_text: str, context: AssistantContext) -> dict[str, Any]:
+    if not settings.GEMINI_API_KEY:
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                "Мен жүйеде негізінен материал, тест, слайд және нәтижелер бойынша көмектесемін. Қай бөлім керек екенін айтыңыз.",
+                "Сейчас я в основном помогаю с материалами, тестами, слайдами и результатами. Скажите, какой раздел нужен.",
+            ),
+            confidence=0.2,
+        )
+
+    prompt = f"""
+You are {ASSISTANT_NAME}, a refined voice assistant for a university teacher dashboard.
+Understand the user command and return only valid JSON.
+
+Allowed actions:
+{sorted(ALLOWED_ACTIONS)}
+
+Allowed material types:
+{sorted(MATERIAL_TYPES)}
+
+Current UI context:
+{json.dumps({
+    "selected_role": context.selected_role,
+    "current_view": context.current_view,
+    "active_panel": context.active_panel,
+    "selected_course_number": context.selected_course_number,
+    "selected_subject": context.selected_subject,
+    "selected_material": context.selected_material,
+    "available_subjects": context.available_subjects,
+    "available_materials": context.available_materials,
+    "has_generated_test": context.has_generated_test,
+    "has_results": context.has_results,
+}, ensure_ascii=False)}
+
+Rules:
+- Use only the allowed actions.
+- If the request is ambiguous, return action="unknown" and ask a short clarifying question.
+- If the user is greeting you or asking a general question, return action="unknown" and answer naturally.
+- If the user asks a short conversational question, prefer a direct answer in reply instead of asking for clarification.
+- Sound calm, polished, warm, and intelligent, like a premium real assistant.
+- For action requests, reply in one short natural sentence.
+- For conversational replies, use one or two short sentences max.
+- Avoid robotic wording and repetitive confirmations.
+- Do not imitate or mention copyrighted fictional assistants.
+- Use subject_id and material_id only if they exist in the context.
+- reply must be short, natural, and in the user's UI language.
+- confidence must be between 0 and 1.
+- Return JSON only without markdown.
+
+Response JSON shape:
+{{
+  "action": "open_subject",
+  "reply": "Жарайды, Желілік қауіпсіздік пәнін ашамын.",
+  "subject_id": 12,
+  "subject_title": "Желілік қауіпсіздік",
+  "course_number": 3,
+  "material_id": 55,
+  "material_title": "15 апта дәрісі",
+  "material_type": "lecture",
+  "confidence": 0.76
+}}
+
+User command:
+{user_text}
+"""
+
+    try:
+        parsed = _clean_gemini_json_response(get_gemini_text_response(prompt))
+    except Exception:
+        return _build_response(
+            action="unknown",
+            reply=_reply(
+                context,
+                "Қазір толық жауап бере алмадым. Бірақ материал, тест, слайд және нәтижелер бойынша көмектесе аламын.",
+                "Сейчас не удалось дать полный ответ. Но я могу помочь с материалами, тестами, слайдами и результатами.",
+            ),
+            confidence=0.24,
+        )
+
+    action = str(parsed.get("action") or "unknown").strip()
+    if action not in ALLOWED_ACTIONS:
+        action = "unknown"
+
+    result = _build_response(
+        action=action,
+        reply=str(parsed.get("reply") or "").strip(),
+        confidence=float(parsed.get("confidence") or 0.55),
+        subject_id=_safe_int(parsed.get("subject_id")),
+        subject_title=str(parsed.get("subject_title") or "").strip(),
+        course_number=_safe_int(parsed.get("course_number")),
+        material_id=_safe_int(parsed.get("material_id")),
+        material_title=str(parsed.get("material_title") or "").strip(),
+        material_type=str(parsed.get("material_type") or "").strip().lower(),
+    )
+
+    if result.get("material_type") not in MATERIAL_TYPES:
+        result["metadata"].pop("material_type", None)
+        result.pop("material_type", None)
+
+    return result
+
+
 def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     text = normalize_assistant_text(user_text)
     parsed_context = _build_context(context)
@@ -917,6 +1233,8 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
     selected_material = _pick_selected_material(parsed_context)
     course_number = _extract_course_number(text)
     material_type = _extract_material_type(text)
+    question_count = _extract_question_count(text)
+    duration_minutes = _extract_duration_minutes(text)
 
     if _looks_like_help_request(text):
         return _build_response(
@@ -953,7 +1271,7 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
 
     if _looks_like_generate_slides_request(text):
         target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
-        if target_material and target_material.get("type") == "lecture":
+        if target_material:
             return _build_material_response(
                 action="generate_slides",
                 context=parsed_context,
@@ -976,9 +1294,9 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
             confidence=0.4,
         )
 
-    if _looks_like_generate_test_request(text):
+    if _looks_like_generate_test_request(text) and not _looks_like_start_test_request(text, parsed_context):
         target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
-        if target_material and target_material.get("type") == "lecture":
+        if target_material:
             return _build_material_response(
                 action="generate_test",
                 context=parsed_context,
@@ -990,6 +1308,8 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                     f'Создам тест по материалу "{target_material.get("title")}".',
                 ),
                 confidence=0.97,
+                question_count=question_count,
+                duration_minutes=duration_minutes,
             )
         return _build_response(
             action="unknown",
@@ -1003,7 +1323,7 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
 
     if _looks_like_open_qr_request(text):
         target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
-        if target_material and target_material.get("type") == "lecture":
+        if target_material:
             return _build_material_response(
                 action="open_qr",
                 context=parsed_context,
@@ -1028,7 +1348,7 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
 
     if _looks_like_start_test_request(text, parsed_context):
         target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
-        if target_material and target_material.get("type") == "lecture":
+        if target_material:
             return _build_material_response(
                 action="start_test",
                 context=parsed_context,
@@ -1040,13 +1360,16 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                     "Запускаю тест.",
                 ),
                 confidence=0.94,
+                question_count=question_count,
+                duration_minutes=duration_minutes,
             )
 
     if _looks_like_results_request(text):
-        target_material = matched_material or selected_material
+        target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
+        action_name = "open_results_sheet" if _looks_like_results_sheet_request(text) else "open_results"
         if target_material:
             return _build_material_response(
-                action="open_results",
+                action=action_name,
                 context=parsed_context,
                 material=target_material,
                 subject=matched_subject or selected_subject,
@@ -1056,9 +1379,10 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                     "Открываю раздел результатов.",
                 ),
                 confidence=0.95,
+                material_type=material_type or target_material.get("type", ""),
             )
         return _build_subject_response(
-            action="open_results",
+            action=action_name,
             context=parsed_context,
             subject=matched_subject or selected_subject,
             course_number=course_number,
@@ -1068,10 +1392,11 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                 "Открываю раздел результатов.",
             ),
             confidence=0.84,
+            material_type=material_type,
         )
 
     if _looks_like_slides_request(text):
-        target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type or "lecture") or selected_material
+        target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type) or selected_material
         if target_material:
             return _build_material_response(
                 action="open_slides",
@@ -1133,6 +1458,7 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
             course_number=course_number,
             reply=reply,
             confidence=0.93,
+            material_type=material_type,
         )
 
     if course_number:
@@ -1161,13 +1487,15 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                 "Открываю раздел материалов.",
             ),
             confidence=0.88,
+            material_type=material_type,
         )
 
     if _looks_like_test_panel_request(text):
+        target_material = matched_material or _pick_first_material_by_type(parsed_context, material_type) or selected_material
         return _build_material_response(
             action="open_test",
             context=parsed_context,
-            material=selected_material,
+            material=target_material,
             subject=selected_subject,
             reply=_reply(
                 parsed_context,
@@ -1175,6 +1503,9 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
                 "Открываю раздел тестов.",
             ),
             confidence=0.86,
+            material_type=material_type,
+            question_count=question_count,
+            duration_minutes=duration_minutes,
         )
 
     return _gemini_fallback(user_text, parsed_context)

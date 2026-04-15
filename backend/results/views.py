@@ -1,12 +1,14 @@
 import re
 from datetime import timedelta
 
+from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.permissions import BasePermission
 from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action, api_view
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 try:
@@ -214,7 +216,16 @@ def _format_percentage_value(score: int, max_score: int) -> int:
 def _get_results_sheet_headers(session: TestSession, answer_headers: list[str]) -> list[str]:
     language = getattr(session.material.discipline, "language", "kaz")
 
-    if language == "rus":
+    if language == "eng":
+        base_headers = [
+            "Student",
+            "Score",
+            "Correct answers",
+            "Total questions",
+            "Percent",
+            "Submitted at",
+        ]
+    elif language == "rus":
         base_headers = [
             "Студент",
             "Балл",
@@ -394,7 +405,21 @@ def _format_form_deadline_message(session: TestSession, now=None) -> str:
     remaining_minutes = max(1, (remaining_seconds + 59) // 60) if remaining_seconds else 0
     closes_at = timezone.localtime(session.public_expires_at) if session.public_expires_at else None
 
-    if session.material.discipline.language == "rus":
+    language = session.material.discipline.language
+
+    if language == "eng":
+        if _get_session_status(session, now=now) == "ready":
+            return "The test is prepared, but the teacher has not launched it yet."
+
+        if _get_session_status(session, now=now) == "expired":
+            return "The test is closed. The answer submission time has expired."
+
+        return (
+            f"The test is open. About {remaining_minutes} min left before closing. "
+            f"The form will close at {closes_at.strftime('%H:%M')}."
+        )
+
+    if language == "rus":
         if _get_session_status(session, now=now) == "ready":
             return "Тест подготовлен, но еще не запущен преподавателем."
 
@@ -423,7 +448,21 @@ def _format_form_deadline_message(session: TestSession, now=None) -> str:
     remaining_minutes = max(1, (remaining_seconds + 59) // 60) if remaining_seconds else 0
     closes_at = timezone.localtime(session.public_expires_at) if session.public_expires_at else None
 
-    if session.material.discipline.language == "rus":
+    language = session.material.discipline.language
+
+    if language == "eng":
+        if _get_session_status(session, now=now) == "ready":
+            return "The test is prepared, but the teacher has not launched it yet."
+
+        if _get_session_status(session, now=now) == "expired":
+            return "The test is closed. The answer submission time has expired."
+
+        return (
+            f"The test is open. About {remaining_minutes} min left before closing. "
+            f"The form will close at {closes_at.strftime('%H:%M')}."
+        )
+
+    if language == "rus":
         if _get_session_status(session, now=now) == "ready":
             return "РўРµСЃС‚ РїРѕРґРіРѕС‚РѕРІР»РµРЅ, РЅРѕ РµС‰Рµ РЅРµ Р·Р°РїСѓС‰РµРЅ РїСЂРµРїРѕРґР°РІР°С‚РµР»РµРј."
 
@@ -452,7 +491,21 @@ def _format_form_deadline_message(session: TestSession, now=None) -> str:
     remaining_minutes = max(1, (remaining_seconds + 59) // 60) if remaining_seconds else 0
     closes_at = timezone.localtime(session.public_expires_at) if session.public_expires_at else None
 
-    if session.material.discipline.language == "rus":
+    language = session.material.discipline.language
+
+    if language == "eng":
+        if _get_session_status(session, now=now) == "ready":
+            return "The test is prepared, but the teacher has not launched it yet."
+
+        if _get_session_status(session, now=now) == "expired":
+            return "The test is closed. The answer submission time has expired."
+
+        return (
+            f"The test is open. About {remaining_minutes} min left before closing. "
+            f"The form will close at {closes_at.strftime('%H:%M')}."
+        )
+
+    if language == "rus":
         if _get_session_status(session, now=now) == "ready":
             return "Тест подготовлен, но еще не запущен преподавателем."
 
@@ -749,18 +802,30 @@ class TestSessionViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         previous_session = serializer.instance
         previous_duration = previous_session.duration_minutes
-        session = serializer.save()
+        previous_questions = list(previous_session.questions_json or [])
 
-        if session.public_started_at and session.duration_minutes != previous_duration:
-            session.public_expires_at = session.public_started_at + timedelta(minutes=session.duration_minutes)
-            session.save(update_fields=["public_expires_at"])
+        with transaction.atomic():
+            session = serializer.save()
 
-        connection = _get_session_google_connection(self.request, session.material)
-        if connection:
-            try:
-                _sync_google_form_window(connection, session)
-            except Exception:
-                pass
+            if session.public_started_at and session.duration_minutes != previous_duration:
+                session.public_expires_at = session.public_started_at + timedelta(minutes=session.duration_minutes)
+                session.save(update_fields=["public_expires_at"])
+
+            connection = _get_session_google_connection(self.request, session.material)
+            if connection:
+                try:
+                    if session.form_id and (session.questions_json or []) != previous_questions:
+                        from .google_forms_service import replace_questions_in_form
+
+                        replace_questions_in_form(
+                            connection,
+                            session.form_id,
+                            session.questions_json or [],
+                            language=session.material.discipline.language,
+                        )
+                    _sync_google_form_window(connection, session)
+                except Exception as exc:
+                    raise ValidationError({"detail": _format_google_error(exc, "Google Form sync failed")}) from exc
 
     @action(detail=False, methods=["post"], url_path="create-from-ai")
     def create_from_ai(self, request):
@@ -834,7 +899,12 @@ class TestSessionViewSet(viewsets.ModelViewSet):
             if not form_id or not form_url:
                 raise ValueError("Google Form did not return formId/responderUri")
 
-            add_questions_to_form(connection, form_id, normalized_questions)
+            add_questions_to_form(
+                connection,
+                form_id,
+                normalized_questions,
+                language=material.discipline.language,
+            )
             sheet = create_results_sheet(connection, f"{session_title} results")
 
             session = TestSession.objects.create(
@@ -1052,6 +1122,13 @@ def public_test_open(request, access_token):
             pass
 
     if session_status == "ready":
+        if language == "eng":
+            return _render_public_gate_message(
+                "The test has not started yet",
+                "The teacher has not launched the QR yet. Please try again a little later.",
+                status_code=423,
+            )
+
         return _render_public_gate_message(
             "Тест әлі ашылған жоқ" if language == "kaz" else "Тест еще не запущен",
             (
@@ -1068,6 +1145,13 @@ def public_test_open(request, access_token):
     gate_cookie_name = f"lektor_test_gate_{session.id}"
     if request.COOKIES.get(gate_cookie_name) == "1":
         remaining_seconds = _get_session_remaining_seconds(session, now=now)
+        if language == "eng":
+            return _render_public_gate_message(
+                "The test cannot be reopened",
+                f"The QR was already opened on this device. About {remaining_seconds // 60} min left.",
+                status_code=409,
+            )
+
         return _render_public_gate_message(
             "Тест қайта ашылмайды" if language == "kaz" else "Тест нельзя открыть повторно",
             (

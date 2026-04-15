@@ -1,10 +1,10 @@
 ﻿<!DOCTYPE html>
 <html lang="kk">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lektor</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260411-09" />
+  <link rel="stylesheet" href="./css/style.css?v=20260415-56" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -60,6 +60,7 @@
             <div class="role-menu hidden" id="roleMenu">
               <button class="role-menu-item active" data-role-value="kaz" type="button">Оқытушы</button>
               <button class="role-menu-item" data-role-value="rus" type="button">Лектор</button>
+              <button class="role-menu-item" data-role-value="eng" type="button">Lektor</button>
             </div>
           </div>
         </div>
@@ -79,7 +80,7 @@
                 <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
                 <div class="profile-main">
                   <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
-                  <span id="dropdownRole">ст.преподаватель</span>
+                  <span id="dropdownRole">оқытушы</span>
                   <span id="dropdownEmail">kalaman@university.kz</span>
                 </div>
               </div>
@@ -190,11 +191,68 @@
             </div>
 
             <div class="control-actions-row" id="controlActionsRow">
-              <button class="action-btn primary" id="openMaterialBtn" type="button">Материал</button>
-              <button class="action-btn" id="openSlidesBtn" type="button" disabled>Слайд</button>
-              <button class="action-btn" id="generateTestBtn" type="button" disabled>Тест жасау</button>
-              <button class="action-btn" id="openQrBtn" type="button" disabled>Тест (QR)</button>
-              <button class="action-btn" id="openResultsBtn" type="button" disabled>Нәтижелер</button>
+              <button class="action-btn subject-nav-btn is-active" id="openMaterialBtn" type="button">
+                <span class="action-btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7.5 3.5Z"></path>
+                    <path d="M14 3.5V8h4"></path>
+                    <path d="M8.5 12.5h7"></path>
+                    <path d="M8.5 16h5"></path>
+                  </svg>
+                </span>
+                <span class="action-btn-label">Материал</span>
+              </button>
+              <button class="action-btn subject-nav-btn" id="openSlidesBtn" type="button" disabled>
+                <span class="action-btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="5" width="16" height="12" rx="2"></rect>
+                    <path d="M9 19h6"></path>
+                    <path d="M12 17v2"></path>
+                    <path d="M8 9.5h8"></path>
+                    <path d="M8 12.5h5"></path>
+                  </svg>
+                </span>
+                <span class="action-btn-label">Слайд</span>
+              </button>
+              <button class="action-btn subject-nav-btn" id="generateTestBtn" type="button" disabled>
+                <span class="action-btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5A1.5 1.5 0 0 1 7.5 3.5Z"></path>
+                    <path d="M14 3.5V8h4"></path>
+                    <path d="M9 13.5h5"></path>
+                    <path d="M9 16.5h3"></path>
+                    <path d="m8.5 10.5 1 1 2-2"></path>
+                  </svg>
+                </span>
+                <span class="action-btn-label">Тест</span>
+              </button>
+              <button class="action-btn subject-nav-btn" id="openQrBtn" type="button" disabled>
+                <span class="action-btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h5v5H4z"></path>
+                    <path d="M15 4h5v5h-5z"></path>
+                    <path d="M4 15h5v5H4z"></path>
+                    <path d="M16 16h1"></path>
+                    <path d="M15 12h2v2h-2z"></path>
+                    <path d="M19 12v3"></path>
+                    <path d="M12 15h3"></path>
+                    <path d="M18 18v2"></path>
+                    <path d="M15 19h2"></path>
+                  </svg>
+                </span>
+                <span class="action-btn-label">Тест (QR)</span>
+              </button>
+              <button class="action-btn subject-nav-btn" id="openResultsBtn" type="button" disabled>
+                <span class="action-btn-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 19.5h14"></path>
+                    <path d="M8 17V10"></path>
+                    <path d="M12 17V6.5"></path>
+                    <path d="M16 17v-4.5"></path>
+                  </svg>
+                </span>
+                <span class="action-btn-label">Нәтижелер</span>
+              </button>
             </div>
           </div>
 
@@ -239,34 +297,76 @@
                 <div class="test-qr-board">
                   <div class="test-qr-card">
                     <div class="test-info-row">
-                      <div class="test-ready-inline hidden" id="testInfoCard">
-                        <div class="test-ready-topline">
-                          <span class="test-ready-state hidden" id="testInfoState"></span>
-                          <span class="test-ready-meta" id="testInfoText"></span>
+                      <div class="test-loading-card hidden" id="testLoadingCard">
+                        <div class="test-loading-copy">
+                          <div class="slides-loader test-loader" aria-hidden="true"></div>
+                          <div class="test-loading-text">
+                            <h3 id="testLoadingTitle">ИИ тест жасау басталды</h3>
+                            <p id="testLoadingText">Параметрлер бойынша сұрақтар дайындалып жатыр</p>
+                          </div>
                         </div>
-                        <p class="test-ready-note hidden" id="testInfoHint"></p>
                       </div>
 
-                      <div class="test-info-actions">
-                        <button class="small-btn hidden" id="previewTestBtn" type="button">Тестті қарау</button>
-                        <button class="small-btn primary hidden" id="launchTestBtn" type="button">Тестті бастау</button>
+                      <div class="test-ready-inline hidden" id="testInfoCard">
+                        <div class="test-ready-copy">
+                          <div class="test-ready-topline">
+                            <span class="test-ready-state hidden" id="testInfoState"></span>
+                            <span class="test-ready-timer hidden" id="testInfoTimer"></span>
+                          </div>
+                          <p class="test-ready-meta" id="testInfoText"></p>
+                          <p class="test-ready-hint hidden" id="testInfoHint"></p>
+                        </div>
+
+                        <div class="test-ready-actions">
+                          <button class="small-btn hidden" id="previewTestBtn" type="button">Тестті қарау</button>
+                          <button class="small-btn primary hidden" id="launchTestBtn" type="button">Тестті бастау</button>
+                        </div>
                       </div>
                     </div>
 
                     <div class="test-settings-panel" id="testSettingsPanel">
-                      <div class="test-settings-grid">
-                        <label class="test-settings-field" for="testQuestionCountInput">
-                          <span id="testQuestionCountLabel">Сұрақ саны</span>
-                          <input id="testQuestionCountInput" type="number" min="3" max="25" value="5" />
-                        </label>
+                      <div class="test-settings-shell">
+                        <div class="test-settings-head">
+                          <span class="test-settings-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M7 3.5h7l4 4V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19V5a1.5 1.5 0 0 1 1-1.5Z"></path>
+                              <path d="M14 3.5V8h4"></path>
+                              <path d="M9 13.5h5"></path>
+                              <path d="M9 16.5h3"></path>
+                              <path d="m8.5 10.5 1 1 2-2"></path>
+                            </svg>
+                          </span>
 
-                        <label class="test-settings-field" for="testDurationInput">
-                          <span id="testDurationLabel">Уақыт (минут)</span>
-                          <input id="testDurationInput" type="number" min="5" max="180" value="20" />
-                        </label>
+                          <div class="test-settings-copy">
+                            <p class="test-settings-title" id="testSettingsTitle">Тест параметрлері</p>
+                            <p class="test-settings-hint hidden" id="testSettingsHint"></p>
+                          </div>
+                        </div>
 
-                        <div class="test-settings-cta">
-                          <button class="small-btn primary" id="buildTestBtn" type="button">Тест жасау</button>
+                        <div class="test-settings-body">
+                          <div class="test-settings-grid">
+                            <label class="test-settings-field" for="testQuestionCountInput">
+                              <span class="test-settings-field-label" id="testQuestionCountLabel">Сұрақ саны</span>
+                              <span class="test-settings-field-note" id="testQuestionCountHint">Неше сұрақ жасалады</span>
+                              <div class="test-settings-input-shell">
+                                <input id="testQuestionCountInput" type="number" min="3" max="25" step="1" inputmode="numeric" autocomplete="off" value="5" />
+                                <span class="test-settings-unit" id="testQuestionCountUnit">сұрақ</span>
+                              </div>
+                            </label>
+
+                            <label class="test-settings-field" for="testDurationInput">
+                              <span class="test-settings-field-label" id="testDurationLabel">Жауап қабылдау уақыты</span>
+                              <span class="test-settings-field-note" id="testDurationHint">Уақыт біткенде тест жабылады</span>
+                              <div class="test-settings-input-shell">
+                                <input id="testDurationInput" type="number" min="5" max="180" step="1" inputmode="numeric" autocomplete="off" value="20" />
+                                <span class="test-settings-unit" id="testDurationUnit">мин</span>
+                              </div>
+                            </label>
+
+                            <div class="test-settings-cta">
+                              <button class="small-btn primary" id="buildTestBtn" type="button">Тестті дайындау</button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -280,6 +380,7 @@
 
                       <div class="test-qr-caption hidden" id="testQrCaption">
                         <div class="test-qr-caption-title" id="testQrCaptionTitle">QR кодты студенттерге көрсетіңіз</div>
+                        <div class="test-qr-caption-timer hidden" id="testQrCaptionTimer"></div>
                         <p class="test-qr-caption-text" id="testQrCaptionText">Студенттер телефонмен сканерлеп, Google Form-ға өтеді.</p>
                       </div>
                     </div>
@@ -422,7 +523,7 @@
 
           <div class="profile-head-copy">
             <h4 id="profileModalNameText">Каламан Ерболат Тлеуханұлы</h4>
-            <p id="profileModalRoleText">ст.преподаватель</p>
+            <p id="profileModalRoleText">оқытушы</p>
           </div>
         </div>
 
@@ -523,6 +624,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260411-09"></script>
+  <script src="./js/app.js?v=20260415-56"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ class Discipline(models.Model):
         choices=[
             ("kaz", "Kazakh"),
             ("rus", "Russian"),
+            ("eng", "English"),
         ],
         default="kaz"
     )

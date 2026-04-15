@@ -1,12 +1,12 @@
-const LOCAL_API_BASE = "http://127.0.0.1:8000/api";
+﻿const LOCAL_API_BASE = "http://127.0.0.1:8000/api";
 const runtimeApiBase = window.__APP_CONFIG__?.apiBase?.trim();
 const isLocalStaticPreview = ["127.0.0.1:5500", "localhost:5500"].includes(window.location.host);
 const API_BASE = runtimeApiBase || (isLocalStaticPreview ? LOCAL_API_BASE : `${window.location.origin}/api`);
 
 const DEFAULT_PROFILE_STATE = {
-  fullName: "Каламан Ерболат Тлеуханұлы",
-  roleLabel: "Лектор: ст.преподаватель",
-  roleShort: "ст.преподаватель",
+  fullName: "Қаламан Ерболат Тлеуханұлы",
+  roleLabel: "Оқытушы",
+  roleShort: "оқытушы",
   username: "kalaman_erbolat",
   email: "kalaman@university.kz",
   bio: "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
@@ -20,16 +20,34 @@ let coursesData = [];
 let selectedRole = "kaz";
 let selectedCourseNumber = null;
 
+const SUPPORTED_ROLES = Object.freeze(["kaz", "rus", "eng"]);
+const ROLE_MENU_LABELS = Object.freeze({
+  kaz: "Оқытушы",
+  rus: "Лектор",
+  eng: "Lektor",
+});
+const ROLE_LOCALES = Object.freeze({
+  kaz: "kk-KZ",
+  rus: "ru-RU",
+  eng: "en-US",
+});
+const ROLE_HTML_LANG = Object.freeze({
+  kaz: "kk",
+  rus: "ru",
+  eng: "en",
+});
+
 const DEFAULT_PROFILE_BIOS = {
   kaz: "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
-  rus: "Преподаватель по дисциплинам информационной безопасности и программирования."
+  rus: "Преподаватель по дисциплинам информационной безопасности и программирования.",
+  eng: "Lecturer in information security and programming disciplines."
 };
 
 const UI_TEXT = {
   kaz: {
     roleTeacher: "Оқытушы",
     roleLecturer: "Лектор",
-    roleShort: "аға оқытушы",
+    roleShort: "оқытушы",
     roleLabel: "Оқытушы",
     profileBioDefault: DEFAULT_PROFILE_BIOS.kaz,
     back: "← Артқа",
@@ -44,7 +62,7 @@ const UI_TEXT = {
     materialType: "Материал түрі",
     topic: "Тақырып",
     material: "Материал",
-    generateTest: "Тест жасау",
+    generateTest: "Тест",
     testQr: "Тест (QR)",
     results: "Нәтижелер",
     fullscreen: "Толық экран",
@@ -59,7 +77,7 @@ const UI_TEXT = {
     disciplineModalTitle: "Жаңа пән",
     disciplinePreviewTitle: "Карточка үлгісі",
     disciplineTitleLabel: "Пән атауы",
-    disciplineTitlePlaceholder: "Мысалы, Желілік қауіпсіздік",
+    disciplineTitlePlaceholder: "Пән атауын өзгертіңіз",
     disciplinePreviewUntitled: "Жаңа пән",
     disciplineCreate: "Қосу",
     disciplineCreating: "Қосылып жатыр...",
@@ -76,7 +94,6 @@ const UI_TEXT = {
     cancel: "Бас тарту",
     disciplineDeleting: "Жойылып жатыр...",
     disciplineDeleteError: "Пәнді жою кезінде қате шықты.",
-    disciplineTitlePlaceholder: "Пән атауын өзгертіңіз",
     disciplineRenameEmpty: "Пән атауы бос болмауы керек.",
     disciplineRenameError: "Пән атауын жаңарту кезінде қате шықты.",
     materialsEmpty: "Материалды ашыңыз",
@@ -131,7 +148,7 @@ const UI_TEXT = {
     authGooglePending: "Google-ға өту...",
     authModalNote: "Google аккаунты бар болса кіресіз, жаңа болса тіркелу автоматты жүреді.",
     authRequiredHome: "Файлдар мен пәндерді көру үшін алдымен Google арқылы кіріңіз.",
-    authRequiredDisciplines: "Пәндер мен материалдар кіруден кейін ашылады.",
+    authRequiredDisciplines: "Пәндер мен материалдар кіргеннен кейін ашылады.",
     authRequiredAction: "Алдымен жүйеге Google арқылы кіріңіз.",
     uploadMaterial: "Материал қосу",
     connectDrive: "Google Drive қосу",
@@ -155,10 +172,11 @@ const UI_TEXT = {
     logoutPlaceholder: "Шығу функциясы.",
     courseLabel: ({ number }) => `${number} курс`
   },
+
   rus: {
     roleTeacher: "Оқытушы",
     roleLecturer: "Лектор",
-    roleShort: "ст. преподаватель",
+    roleShort: "преподаватель",
     roleLabel: "Лектор",
     profileBioDefault: DEFAULT_PROFILE_BIOS.rus,
     back: "← Назад",
@@ -173,7 +191,7 @@ const UI_TEXT = {
     materialType: "Тип материала",
     topic: "Тема",
     material: "Материал",
-    generateTest: "Создать тест",
+    generateTest: "Тест",
     testQr: "Тест (QR)",
     results: "Результаты",
     fullscreen: "Полный экран",
@@ -188,7 +206,7 @@ const UI_TEXT = {
     disciplineModalTitle: "Новая дисциплина",
     disciplinePreviewTitle: "Предпросмотр карточки",
     disciplineTitleLabel: "Название дисциплины",
-    disciplineTitlePlaceholder: "Например, Сетевые технологии",
+    disciplineTitlePlaceholder: "Измените название дисциплины",
     disciplinePreviewUntitled: "Новая дисциплина",
     disciplineCreate: "Добавить",
     disciplineCreating: "Добавляется...",
@@ -205,7 +223,6 @@ const UI_TEXT = {
     cancel: "Отмена",
     disciplineDeleting: "Удаляется...",
     disciplineDeleteError: "Не удалось удалить дисциплину.",
-    disciplineTitlePlaceholder: "Измените название дисциплины",
     disciplineRenameEmpty: "Название дисциплины не должно быть пустым.",
     disciplineRenameError: "Не удалось обновить название дисциплины.",
     materialsEmpty: "Откройте материал",
@@ -320,10 +337,10 @@ Object.assign(UI_TEXT.rus, {
 
 Object.assign(UI_TEXT.kaz, {
   homeLogo: "Негізгі бетке өту",
-  voiceAssistantLabel: "ИИ ассистент",
+  voiceAssistantLabel: "Ayla",
   voiceHelpLabel: "Жылдам көмек",
-  voiceHelpTitle: "Дауыстық көмекші",
-  voiceHelpIntro: "Жүйені дауыс арқылы басқаруға болады. Қысқа әрі нақты айтсаңыз, көмекші сұрағыңызды тезірек түсінеді.\n\nМысалы:",
+  voiceHelpTitle: "Ayla",
+  voiceHelpIntro: "Ayla жүйеде тез бағдар беріп, қажетті бөлімдерді ашып береді. Қысқа әрі нақты айтсаңыз, жауаптары да табиғирақ шығады.\n\nМысалы:",
   voiceHelpSteps: [
     "Қай бөлім керек екенін айтыңыз: материал, тест немесе нәтиже.",
     "Бір сұрауда бір ғана әрекет айтқаныңыз дұрыс.",
@@ -333,15 +350,15 @@ Object.assign(UI_TEXT.kaz, {
   voiceSendLabel: "Жіберу",
   voiceInputEmpty: "Алдымен сұрағыңызды жазыңыз немесе айтыңыз.",
   voiceLiveCaptured: ({ text }) => `Тыңдалды: ${text}`,
-  voiceAcknowledged: "Түсіндім, орындаймын.",
+  voiceAcknowledged: "Жарайды, қарап шығамын.",
 });
 
 Object.assign(UI_TEXT.rus, {
   homeLogo: "Перейти на главную страницу",
-  voiceAssistantLabel: "ИИ ассистент",
+  voiceAssistantLabel: "Ayla",
   voiceHelpLabel: "Быстрая помощь",
-  voiceHelpTitle: "Голосовой помощник",
-  voiceHelpIntro: "Системой можно управлять голосом. Если говорить коротко и конкретно, помощник быстрее поймет запрос.\n\nНапример:",
+  voiceHelpTitle: "Ayla",
+  voiceHelpIntro: "Ayla помогает быстро ориентироваться в системе и открывать нужные разделы. Чем точнее запрос, тем естественнее и точнее ответ.\n\nНапример:",
   voiceHelpSteps: [
     "Скажите, какой раздел нужен: материал, тест или результат.",
     "Лучше указывать только одно действие в одном запросе.",
@@ -351,15 +368,173 @@ Object.assign(UI_TEXT.rus, {
   voiceSendLabel: "Отправить",
   voiceInputEmpty: "Сначала введите запрос или продиктуйте его.",
   voiceLiveCaptured: ({ text }) => `Распознано: ${text}`,
-  voiceAcknowledged: "Понял, выполняю.",
+  voiceAcknowledged: "Хорошо, сейчас посмотрю.",
 });
 
+UI_TEXT.eng = {
+  ...UI_TEXT.rus,
+  roleTeacher: "Оқытушы",
+  roleLecturer: "Лектор",
+  roleShort: "lecturer",
+  roleLabel: "Lektor",
+  profileBioDefault: DEFAULT_PROFILE_BIOS.eng,
+  back: "← Back",
+  edit: "Edit",
+  save: "Save",
+  editProfile: "Edit profile",
+  logout: "Log out",
+  subjectField: "Subject",
+  subjectPlaceholder: "Choose a subject",
+  subjectNotFound: "Subject not found",
+  subjectSelectFirst: "Choose a subject first.",
+  materialType: "Material type",
+  topic: "Topic",
+  material: "Material",
+  generateTest: "Test",
+  testQr: "Test (QR)",
+  results: "Results",
+  fullscreen: "Fullscreen",
+  openTest: "Open test",
+  showQr: "Open QR",
+  topicPlaceholder: "Choose a topic",
+  topicNotFound: "Topic not found",
+  coursesLoadError: "Could not load courses.",
+  coursesNotFound: "No courses found.",
+  disciplinesNotFound: "No subjects found for this course.",
+  addDiscipline: "Add subject",
+  disciplineModalTitle: "New subject",
+  disciplinePreviewTitle: "Card preview",
+  disciplineTitleLabel: "Subject name",
+  disciplineTitlePlaceholder: "Change the subject name",
+  disciplinePreviewUntitled: "New subject",
+  disciplineCreate: "Add",
+  disciplineCreating: "Adding...",
+  disciplineTitleRequired: "Enter the subject name.",
+  disciplineCreateError: "Could not add the subject.",
+  addInlineDiscipline: "Add subject",
+  disciplineMenu: "Subject actions",
+  disciplineDelete: "Delete",
+  deleteMaterialAction: "Delete material",
+  deletingMaterialAction: "Deleting material...",
+  deleteDisciplineAction: "Delete subject",
+  deleteDisciplineConfirm: ({ title }) => `Delete the subject "${title}" completely?`,
+  confirmDelete: "Confirm delete",
+  cancel: "Cancel",
+  disciplineDeleting: "Deleting...",
+  disciplineDeleteError: "Could not delete the subject.",
+  disciplineRenameEmpty: "Subject name cannot be empty.",
+  disciplineRenameError: "Could not update the subject name.",
+  materialsEmpty: "Open a material",
+  materialSelectPrompt: "Choose a material.",
+  materialDescriptionMissing: "Material description is missing",
+  selectMaterialFirst: "Choose a material first.",
+  testLectureOnly: "Tests are available only for lecture materials.",
+  testReady: ({ count }) => `Test ready · ${count} questions`,
+  formNotReady: "The test form link is not ready yet.",
+  qrNotReady: "The test form link for QR is not ready yet.",
+  qrJoin: "Join the test",
+  generatingAiTest: "AI is generating the test...",
+  aiTestError: "An error occurred while generating the AI test.",
+  aiTestLectureOnly: "Test generation is available only for lecture materials.",
+  testModalView: "View test",
+  testModalEdit: "Edit test",
+  questionLabel: ({ number }) => `Question ${number}`,
+  resultsLoading: "Loading test results...",
+  noTestSession: "There is no test session for this material yet.",
+  noStudentResponses: "There are no student responses yet.",
+  resultsEmptyTitle: "No results yet",
+  resultsEmptyText: "Students have not taken this test yet.",
+  resultsFound: ({ count }) => `Found: ${count} responses`,
+  resultsLoadError: "An error occurred while loading results.",
+  resultsSheetUnavailable: "The results sheet link is not ready yet.",
+  resultsSyncError: "An error occurred while updating results.",
+  resultsOpenedHere: "Results opened here.",
+  resultsScoringMissing: "This test does not have a saved answer key, so scores and percentages cannot be calculated.",
+  resultsScoreUnavailable: "Not calculated",
+  resultsRegenerateHint: "Regenerate the test to see exact scores.",
+  openResultsSheet: "Open in Google Sheets",
+  downloadResults: "Download results",
+  nameMissing: "Name is missing",
+  answerMissing: "No answer",
+  submittedAt: "Submitted at",
+  allStudentResponses: "All student responses",
+  tableNumber: "#",
+  tableName: "Full name",
+  tableScore: "Score",
+  tableTime: "Time",
+  profileModalTitle: "Edit profile",
+  qrModalTitle: "Join by QR",
+  participantTitle: "Participant",
+  username: "Username",
+  email: "Email",
+  bio: "Bio",
+  sheetFrameTitle: "Test results",
+  authLogin: "Sign in",
+  authModalTitle: "Sign in",
+  authModalText: "Sign in with Google to upload materials and save your profile.",
+  authGoogle: "Continue with Google",
+  authGooglePending: "Opening Google...",
+  authModalNote: "If you already have an account, you will sign in. New accounts are created automatically.",
+  authRequiredHome: "Sign in with Google first to view files and subjects.",
+  authRequiredDisciplines: "Subjects and materials open after sign-in.",
+  authRequiredAction: "Sign in with Google first.",
+  uploadMaterial: "Upload material",
+  connectDrive: "Connect Google Drive",
+  driveConnected: ({ email }) => `Google Drive connected: ${email}`,
+  driveNotConnected: "Google Drive is not connected yet.",
+  driveNotConfigured: "Google Drive OAuth is not configured yet.",
+  driveConnectError: "Could not connect Google Drive.",
+  logoutError: "Could not log out.",
+  materialUploading: "Uploading material...",
+  materialUploadDone: ({ title }) => `"${title}" material uploaded.`,
+  materialUploadError: "Could not upload material.",
+  voiceReady: "Ready",
+  voiceListening: "Listening...",
+  voiceUnderstood: ({ text }) => `Understood: ${text}`,
+  voiceTranscribing: "Converting voice to text...",
+  voiceRequestError: "An error occurred while contacting the voice assistant.",
+  voiceSorry: "Sorry, I could not process the request right now.",
+  micDenied: "Microphone access was denied.",
+  voiceUnavailable: "Voice feature is unavailable",
+  errorLabel: ({ error }) => `Error: ${error}`,
+  logoutPlaceholder: "Logout function.",
+  courseLabel: ({ number }) => `${number} course`,
+  slides: "Slides",
+  slidesGenerating: "Creating slides...",
+  slidesReady: ({ title }) => `Presentation ready: ${title}`,
+  slidesLectureOnly: "Slides are available only for lecture materials.",
+  slidesSelectPrompt: "Choose a lecture material to create slides.",
+  slidesEmptyTitle: "AI presentation will appear here",
+  slidesEmptyText: "Press the slides button and the system will build a presentation from the lecture material.",
+  slidesLoadingTitle: "Building presentation",
+  slidesLoadingText: "AI is extracting key ideas and turning them into slides.",
+  slidesOpen: "Open slides",
+  downloadSlides: "Download",
+  slidesError: "An error occurred while creating slides.",
+  slidesDownloadUnavailable: "The presentation download link is not ready yet.",
+  homeLogo: "Go to home page",
+  voiceAssistantLabel: "Ayla",
+  voiceHelpLabel: "Quick help",
+  voiceHelpTitle: "Ayla",
+  voiceHelpIntro: "Ayla helps you quickly navigate the system and open the right sections. The more specific your request is, the more accurate the response will be.\n\nFor example:",
+  voiceHelpSteps: [
+    "Say which section you need: material, test, or results.",
+    "It is better to request only one action at a time.",
+    "A clear request gives a more accurate response."
+  ],
+  voiceInputPlaceholder: "",
+  voiceSendLabel: "Send",
+  voiceInputEmpty: "Enter or dictate your request first.",
+  voiceLiveCaptured: ({ text }) => `Captured: ${text}`,
+  voiceAcknowledged: "Okay, I will check it now.",
+};
+
 const typeOrder = [
-  { key: "lecture", label: "Дәріс" },
-  { key: "practice", label: "Практика" },
-  { key: "lab", label: "Зертхана" },
-  { key: "siw", label: "СӨЖ" },
-  { key: "syllabus", label: "Силлабус" }
+  { key: "lecture", label: "Р”У™СЂС–СЃ" },
+  { key: "practice", label: "РџСЂР°РєС‚РёРєР°" },
+  { key: "lab", label: "Р—РµСЂС‚С…Р°РЅР°" },
+  { key: "siw", label: "РЎУЁР–" },
+  { key: "syllabus", label: "РЎРёР»Р»Р°Р±СѓСЃ" }
 ];
 
 const APP_STATE_KEY = "lektor-teacher-state-v1";
@@ -473,26 +648,34 @@ const openSlidesFullscreenBtn = document.getElementById("openSlidesFullscreenBtn
 const downloadSlidesBtn = document.getElementById("downloadSlidesBtn");
 
 const testInfoRow = testPane?.querySelector(".test-info-row");
+const testLoadingCard = document.getElementById("testLoadingCard");
+const testLoadingTitle = document.getElementById("testLoadingTitle");
+const testLoadingText = document.getElementById("testLoadingText");
 const testInfoCard = document.getElementById("testInfoCard");
 const testInfoState = document.getElementById("testInfoState");
 const testInfoText = document.getElementById("testInfoText");
+const testInfoTimer = document.getElementById("testInfoTimer");
 const testInfoHint = document.getElementById("testInfoHint");
 const qrImageInline = document.getElementById("qrImageInline");
-const openTestDirectBtn = document.getElementById("openTestDirectBtn");
-const showQrBtn = document.getElementById("showQrBtn");
 const buildTestBtn = document.getElementById("buildTestBtn");
 const previewTestBtn = document.getElementById("previewTestBtn");
 const launchTestBtn = document.getElementById("launchTestBtn");
 const testSettingsPanel = document.getElementById("testSettingsPanel");
 const testQuestionCountInput = document.getElementById("testQuestionCountInput");
 const testDurationInput = document.getElementById("testDurationInput");
+const testQuestionCountLabel = document.getElementById("testQuestionCountLabel");
+const testQuestionCountHint = document.getElementById("testQuestionCountHint");
+const testQuestionCountUnit = document.getElementById("testQuestionCountUnit");
 const testSettingsTitle = document.getElementById("testSettingsTitle");
 const testSettingsHint = document.getElementById("testSettingsHint");
+const testDurationLabel = document.getElementById("testDurationLabel");
+const testDurationHint = document.getElementById("testDurationHint");
+const testDurationUnit = document.getElementById("testDurationUnit");
 const testQrBoard = testPane?.querySelector(".test-qr-board");
 const testQrCard = testPane?.querySelector(".test-qr-card");
-const testQrActions = testPane?.querySelector(".test-qr-actions");
 const testQrCaption = document.getElementById("testQrCaption");
 const testQrCaptionTitle = document.getElementById("testQrCaptionTitle");
+const testQrCaptionTimer = document.getElementById("testQrCaptionTimer");
 const testQrCaptionText = document.getElementById("testQrCaptionText");
 
 const resultsInfoText = document.getElementById("resultsInfoText") || { textContent: "" };
@@ -582,6 +765,8 @@ const publicTestQuestionList = document.getElementById("publicTestQuestionList")
 const publicTestSubmitBtn = document.getElementById("publicTestSubmitBtn");
 const publicTestResultCard = document.getElementById("publicTestResultCard");
 
+const TEST_SAVE_FEEDBACK_WINDOW_MS = 2200;
+
 let recognition = null;
 let isListening = false;
 let selectedSubject = null;
@@ -612,10 +797,22 @@ let publicTestAttempt = null;
 let publicTestCountdownTimer = null;
 let publicTestAnswers = [];
 let teacherTestStatusTimer = null;
+let visibleTeacherTestSessionId = null;
+let teacherTestCardCleanupTimer = null;
+let isTeacherTestCardDisintegrating = false;
+let testGenerationAbortController = null;
+let activeTestGenerationMaterialId = null;
+let activeTestGenerationStartedAt = 0;
+let activeTestGenerationPreviousSessionId = null;
+let testGenerationWatchdogTimer = null;
+let testGenerationNotice = "";
 
 let generatedQuestions = [];
 let currentTestSession = null;
 let isEditingTest = false;
+let isSavingTestChanges = false;
+let testModalSavedAt = 0;
+let testModalSaveFlashTimer = 0;
 let driveConnection = {
   configured: false,
   connected: false,
@@ -640,6 +837,9 @@ let voiceHasDetectedSpeech = false;
 let voiceRecognitionSilenceTimerId = 0;
 let voiceRecognitionLastTranscript = "";
 let voiceRecognitionHasSpeech = false;
+let assistantSpeechAudio = null;
+let assistantSpeechAbortController = null;
+let assistantSpeechObjectUrl = "";
 
 const VOICE_ACTIVITY_THRESHOLD = 0.035;
 const VOICE_SILENCE_STOP_MS = 2200;
@@ -649,6 +849,16 @@ function t(key, params = {}) {
   const fallback = UI_TEXT.kaz[key];
   const value = dictionary[key] ?? fallback ?? key;
   return typeof value === "function" ? value(params) : value;
+}
+
+function roleText(kazText, rusText, engText = rusText) {
+  if (selectedRole === "kaz") return kazText;
+  if (selectedRole === "eng") return engText;
+  return rusText;
+}
+
+function getRoleLocale() {
+  return ROLE_LOCALES[selectedRole] || ROLE_LOCALES.kaz;
 }
 
 function formatCourseLabel(number) {
@@ -722,7 +932,7 @@ function renderVoiceHelp() {
 }
 
 function getSpeechLanguage() {
-  return selectedRole === "kaz" ? "kk-KZ" : "ru-RU";
+  return getRoleLocale();
 }
 
 function applyRoleProfileState() {
@@ -736,7 +946,7 @@ function applyRoleProfileState() {
 }
 
 function applyStaticTranslations() {
-  document.documentElement.lang = selectedRole === "kaz" ? "kk" : "ru";
+  document.documentElement.lang = ROLE_HTML_LANG[selectedRole] || ROLE_HTML_LANG.kaz;
 
   const subjectLabel = document.querySelector('label[for="subjectSelect"]');
   const materialTypeLabel = document.querySelector('label[for="materialTypeSelect"]');
@@ -754,7 +964,7 @@ function applyStaticTranslations() {
   updateRoleMenuActive();
 
   roleMenuItems.forEach(btn => {
-    btn.textContent = btn.dataset.roleValue === "kaz" ? t("roleTeacher") : t("roleLecturer");
+    btn.textContent = ROLE_MENU_LABELS[btn.dataset.roleValue] || t("roleLecturer");
   });
 
   if (courseBackBtn) courseBackBtn.textContent = t("back");
@@ -764,18 +974,16 @@ function applyStaticTranslations() {
   if (subjectLabel) subjectLabel.textContent = t("subjectField");
   if (materialTypeLabel) materialTypeLabel.textContent = t("materialType");
   if (topicLabel) topicLabel.textContent = t("topic");
-  if (openMaterialBtn) openMaterialBtn.textContent = t("material");
-  if (openSlidesBtn) openSlidesBtn.textContent = isSlidesGenerating ? t("slidesGenerating") : t("slides");
-  if (generateTestBtn) generateTestBtn.textContent = t("generateTest");
-  if (openQrBtn) openQrBtn.textContent = t("testQr");
-  if (openResultsBtn) openResultsBtn.textContent = t("results");
+  setActionButtonLabel(openMaterialBtn, t("material"));
+  setActionButtonLabel(openSlidesBtn, isSlidesGenerating ? t("slidesGenerating") : t("slides"));
+  setActionButtonLabel(generateTestBtn, t("generateTest"));
+  setActionButtonLabel(openQrBtn, t("testQr"));
+  setActionButtonLabel(openResultsBtn, t("results"));
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
   if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
   if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
   if (openResultsSheetBtn) openResultsSheetBtn.textContent = t("openResultsSheet");
   if (downloadResultsBtn) downloadResultsBtn.textContent = t("downloadResults");
-  if (openTestDirectBtn) openTestDirectBtn.textContent = t("openTest");
-  if (showQrBtn) showQrBtn.textContent = t("showQr");
   if (qrCodeLabel) qrCodeLabel.textContent = t("qrJoin");
   if (editProfileBtn) editProfileBtn.textContent = t("editProfile");
   if (logoutBtn) logoutBtn.textContent = t("logout");
@@ -804,18 +1012,24 @@ function applyStaticTranslations() {
     saveDisciplineBtn.textContent = saveDisciplineBtn.disabled ? t("disciplineCreating") : t("disciplineCreate");
   }
   if (editTestBtn) editTestBtn.textContent = t("edit");
-  if (saveTestBtn) saveTestBtn.textContent = t("save");
-  if (previewTestBtn) previewTestBtn.textContent = selectedRole === "kaz" ? "Тестті қарау" : "Посмотреть тест";
+  if (saveTestBtn) saveTestBtn.textContent = getSaveTestButtonText();
+  if (previewTestBtn) previewTestBtn.textContent = t("testModalView");
   if (testModalTitle) testModalTitle.textContent = isEditingTest ? t("testModalEdit") : t("testModalView");
   if (resultsSheetFrame) resultsSheetFrame.title = t("sheetFrameTitle");
-  if (buildTestBtn) buildTestBtn.textContent = selectedRole === "kaz" ? "Тестті құрастыру" : "Собрать тест";
-  if (testSettingsTitle) testSettingsTitle.textContent = selectedRole === "kaz" ? "Тест баптауы" : "Настройки теста";
-  if (testQuestionCountInput) testQuestionCountInput.placeholder = selectedRole === "kaz" ? "Сұрақ саны" : "Количество вопросов";
-  if (testDurationInput) testDurationInput.placeholder = selectedRole === "kaz" ? "Уақыт" : "Время";
-  if (publicTestNameLabel) publicTestNameLabel.textContent = selectedRole === "kaz" ? "Аты-жөніңіз" : "Имя и фамилия";
-  if (publicTestStartBtn) publicTestStartBtn.textContent = selectedRole === "kaz" ? "Тестті бастау" : "Начать тест";
-  if (publicTestSubmitBtn) publicTestSubmitBtn.textContent = selectedRole === "kaz" ? "Тапсыру" : "Отправить";
-  if (publicTestStudentNameInput) publicTestStudentNameInput.placeholder = selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз" : "Введите имя и фамилию";
+  if (buildTestBtn) buildTestBtn.textContent = roleText("Тестті дайындау", "Подготовить тест", "Prepare test");
+  if (testSettingsTitle) testSettingsTitle.textContent = roleText("Тест параметрлері", "Параметры теста", "Test settings");
+  if (testQuestionCountLabel) testQuestionCountLabel.textContent = roleText("Сұрақ саны", "Количество вопросов", "Number of questions");
+  if (testQuestionCountHint) testQuestionCountHint.textContent = roleText("Неше сұрақ жасалады", "Сколько вопросов подготовить", "How many questions to prepare");
+  if (testQuestionCountUnit) testQuestionCountUnit.textContent = roleText("сұрақ", "вопр.", "questions");
+  if (testDurationLabel) testDurationLabel.textContent = roleText("Жауап қабылдау уақыты", "Время приема ответов", "Answer time");
+  if (testDurationHint) testDurationHint.textContent = roleText("Уақыт біткенде тест жабылады", "После него тест закроется", "The test closes when time is over");
+  if (testDurationUnit) testDurationUnit.textContent = roleText("мин", "мин", "min");
+  if (testQuestionCountInput) testQuestionCountInput.placeholder = "5";
+  if (testDurationInput) testDurationInput.placeholder = "20";
+  if (publicTestNameLabel) publicTestNameLabel.textContent = roleText("Аты-жөніңіз", "Имя и фамилия", "Full name");
+  if (publicTestStartBtn) publicTestStartBtn.textContent = roleText("Тестті бастау", "Начать тест", "Start test");
+  if (publicTestSubmitBtn) publicTestSubmitBtn.textContent = roleText("Тапсыру", "Отправить", "Submit");
+  if (publicTestStudentNameInput) publicTestStudentNameInput.placeholder = roleText("Аты-жөніңізді енгізіңіз", "Введите имя и фамилию", "Enter your full name");
   if (profileBtn) profileBtn.setAttribute("aria-label", t("editProfile"));
   if (authOpenBtn) authOpenBtn.setAttribute("aria-label", t("authLogin"));
   if (authGoogleBtn) authGoogleBtn.setAttribute("aria-label", t("authGoogle"));
@@ -835,29 +1049,29 @@ function normalizeMaterialType(type) {
   const normalized = String(type || "").toLowerCase().trim();
 
   const map = {
-    lecture: "lecture",
-    lesson: "lecture",
-    lection: "lecture",
-    дәріс: "lecture",
+    "lecture": "lecture",
+    "lesson": "lecture",
+    "lection": "lecture",
+    "РґУ™СЂС–СЃ": "lecture",
 
-    practice: "practice",
-    practical: "practice",
-    практикалық: "practice",
-    практика: "practice",
+    "practice": "practice",
+    "practical": "practice",
+    "РїСЂР°РєС‚РёРєР°Р»С‹Т›": "practice",
+    "РїСЂР°РєС‚РёРєР°": "practice",
 
-    lab: "lab",
-    laboratory: "lab",
-    зертхана: "lab",
-    зертханалық: "lab",
+    "lab": "lab",
+    "laboratory": "lab",
+    "Р·РµСЂС‚С…Р°РЅР°": "lab",
+    "Р·РµСЂС‚С…Р°РЅР°Р»С‹Т›": "lab",
 
-    sowj: "siw",
-    siw: "siw",
-    сөж: "siw",
-    срс: "siw",
-    self: "siw",
+    "sowj": "siw",
+    "siw": "siw",
+    "СЃУ©Р¶": "siw",
+    "СЃСЂСЃ": "siw",
+    "self": "siw",
 
-    syllabus: "syllabus",
-    силлабус: "syllabus"
+    "syllabus": "syllabus",
+    "СЃРёР»Р»Р°Р±СѓСЃ": "syllabus"
   };
 
   return map[normalized] || normalized || "lecture";
@@ -916,6 +1130,93 @@ async function fetchJSON(url, options = {}) {
   return payload;
 }
 
+async function fetchAudioBlob(url, options = {}) {
+  const requestOptions = { ...options };
+  const method = String(requestOptions.method || "GET").toUpperCase();
+
+  if (url.startsWith(API_BASE) && !requestOptions.credentials) {
+    requestOptions.credentials = "include";
+  }
+
+  if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method)) {
+    const csrfToken = getCookie("csrftoken");
+    requestOptions.headers = {
+      ...(requestOptions.headers || {}),
+      ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+    };
+  }
+
+  const response = await fetch(url, requestOptions);
+  if (!response.ok) {
+    const responseType = response.headers.get("content-type") || "";
+    const payload = responseType.includes("application/json")
+      ? await response.json()
+      : await response.text();
+    const detail =
+      payload?.detail ||
+      payload?.error ||
+      `Request failed: ${response.status}`;
+    const error = new Error(detail);
+    error.payload = payload;
+    error.status = response.status;
+    throw error;
+  }
+
+  return {
+    blob: await response.blob(),
+    contentType: response.headers.get("content-type") || "audio/mpeg",
+    provider: response.headers.get("X-TTS-Provider") || "",
+  };
+}
+
+function getAiServiceErrorMessage(error, fallbackMessage) {
+  const code = String(error?.payload?.code || "").trim().toLowerCase();
+  const retryAfter = Number(error?.payload?.retry_after_seconds || 0);
+  const hasRetryAfter = Number.isFinite(retryAfter) && retryAfter > 0;
+  const waitSeconds = hasRetryAfter ? retryAfter : 30;
+  if (code === "gemini_quota_exceeded") {
+    return roleText(
+      "Gemini квотасы уақытша таусылып тұр. 2-3 минуттан кейін қайта көріңіз, қайталанса API лимитін тексеру керек.",
+      "Квота Gemini временно исчерпана. Попробуйте снова через 2-3 минуты; если ошибка повторится, проверьте лимиты API.",
+      "Gemini quota is temporarily exhausted. Try again in 2-3 minutes; if it repeats, check the API limits.",
+    );
+  }
+
+  if (code === "gemini_rate_limited") {
+    return roleText(
+      `Gemini сұраныс лимитіне жетті. Шамамен ${waitSeconds} секундтан кейін қайта көріңіз.`,
+      `Достигнут лимит запросов Gemini. Попробуйте снова примерно через ${waitSeconds} секунд.`,
+      `Gemini request limit was reached. Try again in about ${waitSeconds} seconds.`,
+    );
+  }
+
+  if (code === "gemini_service_busy") {
+    return roleText(
+      `Gemini сервисі уақытша бос емес. Шамамен ${waitSeconds} секундтан кейін қайта көріңіз.`,
+      `Сервис Gemini временно перегружен. Попробуйте снова примерно через ${waitSeconds} секунд.`,
+      `Gemini is temporarily busy. Try again in about ${waitSeconds} seconds.`,
+    );
+  }
+
+  if (code === "gemini_timeout") {
+    return roleText(
+      `Gemini жауабы кешігіп тұр. Шамамен ${waitSeconds} секундтан кейін қайта көріңіз.`,
+      `Ответ Gemini не успел прийти вовремя. Попробуйте снова примерно через ${waitSeconds} секунд.`,
+      `Gemini response took too long. Try again in about ${waitSeconds} seconds.`,
+    );
+  }
+
+  if (code === "gemini_auth_error" || code === "gemini_config_error" || code === "gemini_model_error") {
+    return roleText(
+      "Gemini баптауы дұрыс емес. Backend-тағы API key мен model параметрлерін тексеру керек.",
+      "Настройка Gemini некорректна. Проверьте API key и параметры модели на backend.",
+      "Gemini configuration is incorrect. Check the backend API key and model settings.",
+    );
+  }
+
+  return error?.message || fallbackMessage;
+}
+
 function getCookie(name) {
   const cookies = document.cookie ? document.cookie.split("; ") : [];
   for (const cookie of cookies) {
@@ -928,23 +1229,180 @@ function getCookie(name) {
 }
 
 function clampTestConfig(questionCount, durationMinutes) {
+  const parsedQuestionCount = Number.parseInt(String(questionCount ?? "").trim(), 10);
+  const parsedDurationMinutes = Number.parseInt(String(durationMinutes ?? "").trim(), 10);
+
   return {
-    questionCount: Math.max(3, Math.min(Number(questionCount) || 5, 25)),
-    durationMinutes: Math.max(5, Math.min(Number(durationMinutes) || 20, 180)),
+    questionCount: Math.max(3, Math.min(Number.isFinite(parsedQuestionCount) ? parsedQuestionCount : 5, 25)),
+    durationMinutes: Math.max(5, Math.min(Number.isFinite(parsedDurationMinutes) ? parsedDurationMinutes : 20, 180)),
   };
 }
 
+function getClampedDurationMinutes(durationMinutes, fallback = testConfig.durationMinutes) {
+  const rawValue = String(durationMinutes ?? "").trim();
+  if (!rawValue) {
+    return clampTestConfig(testConfig.questionCount, fallback).durationMinutes;
+  }
+
+  return clampTestConfig(testConfig.questionCount, rawValue).durationMinutes;
+}
+
+function buildDurationEditorMarkup({
+  inputId,
+  value,
+}) {
+  return `
+    <div class="test-duration-editor">
+      <div class="test-settings-input-shell test-modal-duration-shell">
+        <input
+          id="${inputId}"
+          class="edit-input test-modal-summary-input"
+          type="number"
+          min="5"
+          max="180"
+          step="1"
+          inputmode="numeric"
+          autocomplete="off"
+          value="${value}"
+        />
+        <span class="test-settings-unit">${roleText("мин", "мин", "min")}</span>
+      </div>
+    </div>
+  `;
+}
+
+function updateTestModalCloseTimePreview(durationMinutes = testConfig.durationMinutes) {
+  const closeValue = document.getElementById("testModalCloseTimeValue");
+  if (!closeValue) return;
+
+  closeValue.textContent = getProjectedTeacherCloseClock(durationMinutes, currentTestSession);
+}
+
+function bindTestModalDurationEditor(initialDuration) {
+  const modalDurationInput = document.getElementById("testModalDurationInput");
+
+  if (!modalDurationInput) return;
+
+  const syncEditorState = (value, { commitInput = false } = {}) => {
+    const rawValue = String(value ?? "").trim();
+    const parsedDuration = Number.parseInt(rawValue, 10);
+    const safeDuration = Number.isFinite(parsedDuration)
+      ? Math.max(5, Math.min(parsedDuration, 180))
+      : getClampedDurationMinutes(initialDuration, initialDuration);
+
+    if (commitInput || !rawValue) {
+      modalDurationInput.value = String(safeDuration);
+    }
+
+    updateTestModalCloseTimePreview(safeDuration);
+    return safeDuration;
+  };
+
+  modalDurationInput.addEventListener("input", () => {
+    syncEditorState(modalDurationInput.value, { commitInput: false });
+  });
+
+  modalDurationInput.addEventListener("change", () => {
+    syncEditorState(modalDurationInput.value, { commitInput: true });
+  });
+
+  modalDurationInput.addEventListener("blur", () => {
+    syncEditorState(modalDurationInput.value, { commitInput: true });
+  });
+
+  syncEditorState(initialDuration, { commitInput: true });
+}
+
+function hasRecentTestSaveFeedback() {
+  return Date.now() - testModalSavedAt < TEST_SAVE_FEEDBACK_WINDOW_MS;
+}
+
+function getSaveTestButtonText() {
+  if (isSavingTestChanges) {
+    return roleText("Сақталып жатыр...", "Сохраняется...", "Saving...");
+  }
+
+  return t("save");
+}
+
+function getTestRegenerationFailedMessage(error) {
+  const details = getAiServiceErrorMessage(error, t("aiTestError"));
+  return roleText(
+    `Жаңа тест жасалмады. Ескі тест өзгеріссіз қалды. Себебі: ${details}`,
+    `Новый тест не был создан. Старый тест остался без изменений. Причина: ${details}`,
+    `A new test was not created. The old test was kept unchanged. Reason: ${details}`,
+  );
+}
+
+function syncTestModalActionButtons() {
+  if (!editTestBtn || !saveTestBtn) return;
+
+  editTestBtn.classList.toggle("hidden", isEditingTest);
+  editTestBtn.disabled = isSavingTestChanges;
+  saveTestBtn.classList.toggle("hidden", !isEditingTest);
+  saveTestBtn.disabled = !isEditingTest || isSavingTestChanges;
+  saveTestBtn.classList.toggle("is-saving", isSavingTestChanges);
+  saveTestBtn.textContent = getSaveTestButtonText();
+}
+
+function flashTestModalSaveFeedback() {
+  if (!testModalSummary || !hasRecentTestSaveFeedback()) return;
+
+  if (testModalSaveFlashTimer) {
+    clearTimeout(testModalSaveFlashTimer);
+  }
+
+  testModalSummary.classList.remove("is-save-flash");
+  void testModalSummary.offsetWidth;
+  testModalSummary.classList.add("is-save-flash");
+
+  testModalSaveFlashTimer = window.setTimeout(() => {
+    testModalSummary?.classList.remove("is-save-flash");
+  }, 950);
+}
+
+function getDraftTestConfig() {
+  return clampTestConfig(testQuestionCountInput?.value, testDurationInput?.value);
+}
+
 function getCurrentQuestionCount() {
-  return clampTestConfig(testQuestionCountInput?.value, testConfig.durationMinutes).questionCount;
+  return getDraftTestConfig().questionCount;
 }
 
 function getCurrentDurationMinutes() {
-  return clampTestConfig(testConfig.questionCount, testDurationInput?.value).durationMinutes;
+  return getDraftTestConfig().durationMinutes;
+}
+
+function applyAssistantTestConfig(assistantData = {}) {
+  const nextConfig = clampTestConfig(
+    assistantData.question_count ?? testConfig.questionCount,
+    assistantData.duration_minutes ?? testConfig.durationMinutes,
+  );
+  testConfig = nextConfig;
+  syncTestConfigInputs();
+  saveStoredTestConfig();
+  return nextConfig;
 }
 
 function syncTestConfigInputs() {
   if (testQuestionCountInput) testQuestionCountInput.value = String(testConfig.questionCount);
   if (testDurationInput) testDurationInput.value = String(testConfig.durationMinutes);
+}
+
+function commitTestConfigFromInputs(options = {}) {
+  const { syncInputs = true, persist = true } = options;
+
+  testConfig = getDraftTestConfig();
+
+  if (syncInputs) {
+    syncTestConfigInputs();
+  }
+
+  if (persist) {
+    saveStoredTestConfig();
+  }
+
+  return testConfig;
 }
 
 function saveStoredTestConfig() {
@@ -1007,47 +1465,40 @@ function getSessionRemainingSeconds(session = currentTestSession) {
   return Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
 }
 
-function getTeacherTestInfoState(session = currentTestSession) {
-  const questionCount = generatedQuestions.length || Number(session?.question_count) || testConfig.questionCount;
-  const durationMinutes = Number(session?.duration_minutes) || testConfig.durationMinutes;
-  const sessionStatus = String(session?.session_status || "").toLowerCase();
-  const remainingSeconds = getSessionRemainingSeconds(session);
-
-  if (sessionStatus === "live" && remainingSeconds > 0) {
-    return {
-      message: selectedRole === "kaz"
-        ? `Тест ашық · Жабылуына ${formatCountdown(remainingSeconds)} қалды`
-        : `Тест открыт · До закрытия ${formatCountdown(remainingSeconds)}`,
-      state: "live",
-    };
-  }
-
-  if (sessionStatus === "expired") {
-    return {
-      message: selectedRole === "kaz"
-        ? `Тест жабылды · ${questionCount} сұрақ · ${durationMinutes} мин`
-        : `Тест закрыт · ${questionCount} вопросов · ${durationMinutes} мин`,
-      state: "done",
-    };
-  }
-
-  return {
-    message: selectedRole === "kaz"
-      ? `Тест дайын · ${questionCount} сұрақ · ${durationMinutes} мин · QR әлі іске қосылмаған`
-      : `Тест готов · ${questionCount} вопросов · ${durationMinutes} мин · QR еще не запущен`,
-    state: "ready",
-  };
-}
-
 function buildPublicTestGateUrl(accessToken) {
   if (!accessToken) return "";
   return `${API_BASE}/results/public-test/${accessToken}/open/`;
 }
 
-function setOpenTestDirectDisabled(disabled = true) {
-  if (openTestDirectBtn) {
-    openTestDirectBtn.disabled = disabled;
+function setActionButtonLabel(button, label) {
+  if (!button) return;
+
+  const labelNode = button.querySelector(".action-btn-label");
+  if (labelNode) {
+    labelNode.textContent = label || "";
+  } else {
+    button.textContent = label || "";
   }
+
+  button.setAttribute("aria-label", label || "");
+}
+
+function syncSubjectActionButtons() {
+  const qrMode = Boolean(testQrBoard?.classList.contains("is-qr-mode"));
+  const activeAction = activeSubjectPanel === "test"
+    ? (qrMode ? "qr" : "test")
+    : activeSubjectPanel;
+
+  [
+    [openMaterialBtn, "materials"],
+    [openSlidesBtn, "slides"],
+    [generateTestBtn, "test"],
+    [openQrBtn, "qr"],
+    [openResultsBtn, "results"],
+  ].forEach(([button, key]) => {
+    if (!button) return;
+    button.classList.toggle("is-active", activeAction === key);
+  });
 }
 
 function formatTeacherClock(value) {
@@ -1056,66 +1507,231 @@ function formatTeacherClock(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
 
-  return parsed.toLocaleTimeString(selectedRole === "kaz" ? "kk-KZ" : "ru-RU", {
+  return parsed.toLocaleTimeString(getRoleLocale(), {
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
+function getNormalizedTestSessionStatus(session = currentTestSession) {
+  return String(session?.session_status || "").trim().toLowerCase();
+}
+
+function shouldShowTeacherTestCard(session = currentTestSession) {
+  if (isTestGenerating || !session || !generatedQuestions.length) return false;
+
+  const sessionStatus = getNormalizedTestSessionStatus(session);
+  if (!sessionStatus) return false;
+  if (sessionStatus === "expired") return isTeacherTestCardDisintegrating;
+  if (sessionStatus === "live") return true;
+
+  return Boolean(session?.id) && Number(visibleTeacherTestSessionId) === Number(session.id);
+}
+
+function clearTeacherTestCardCleanupTimer() {
+  if (!teacherTestCardCleanupTimer) return;
+  clearTimeout(teacherTestCardCleanupTimer);
+  teacherTestCardCleanupTimer = null;
+}
+
+function stopTestGenerationWatchdog() {
+  if (!testGenerationWatchdogTimer) {
+    return;
+  }
+
+  clearInterval(testGenerationWatchdogTimer);
+  testGenerationWatchdogTimer = null;
+}
+
+function cancelActiveTestGeneration(options = {}) {
+  const { keepUiState = false } = options;
+
+  if (testGenerationAbortController) {
+    testGenerationAbortController.abort();
+    testGenerationAbortController = null;
+  }
+
+  activeTestGenerationMaterialId = null;
+  activeTestGenerationStartedAt = 0;
+  activeTestGenerationPreviousSessionId = null;
+  stopTestGenerationWatchdog();
+
+  if (!keepUiState) {
+    isTestGenerating = false;
+    if (generateTestBtn) {
+      generateTestBtn.disabled = false;
+    }
+  }
+}
+
+function startTestGenerationWatchdog(materialId) {
+  stopTestGenerationWatchdog();
+
+  if (!materialId) {
+    return;
+  }
+
+  testGenerationWatchdogTimer = window.setInterval(async () => {
+    if (!isTestGenerating || Number(activeTestGenerationMaterialId || 0) !== Number(materialId)) {
+      stopTestGenerationWatchdog();
+      return;
+    }
+
+    try {
+      const sessions = await loadTestSessionsForMaterial(materialId);
+      const latestSession = sessions.find((session) => {
+        if (!session?.id || Number(session.id) === Number(activeTestGenerationPreviousSessionId)) {
+          return false;
+        }
+
+        const createdAt = new Date(session.created_at || 0).getTime();
+        return Number.isNaN(createdAt) || createdAt >= activeTestGenerationStartedAt;
+      }) || null;
+      const latestStatus = getNormalizedTestSessionStatus(latestSession);
+
+      if (!latestSession || !["ready", "live"].includes(latestStatus)) {
+        return;
+      }
+
+      hydrateCurrentTestSession(latestSession);
+      visibleTeacherTestSessionId = latestSession.id || null;
+      isTestGenerating = false;
+      stopTestGenerationWatchdog();
+
+      if (Number(getSelectedMaterial()?.id || 0) === Number(materialId)) {
+        renderTestSettingsPanel();
+        renderTestBlock(Boolean(testQrBoard?.classList.contains("is-qr-mode")));
+      }
+      updateActionButtonsState();
+    } catch (error) {
+      console.warn("Test generation watchdog error:", error);
+    }
+  }, 3000);
+}
+
+function finishTeacherTestCardRemoval() {
+  clearTeacherTestCardCleanupTimer();
+  isTeacherTestCardDisintegrating = false;
+  visibleTeacherTestSessionId = null;
+  generatedQuestions = [];
+
+  if (testInfoCard) {
+    testInfoCard.classList.remove("is-disintegrating");
+  }
+
+  renderTestBlock(false);
+  updateActionButtonsState();
+}
+
+function startTeacherTestCardRemoval() {
+  clearTeacherTestCardCleanupTimer();
+  isTeacherTestCardDisintegrating = true;
+  syncTeacherTestPanelInfo(currentTestSession);
+
+  if (testInfoCard) {
+    testInfoCard.classList.add("is-disintegrating");
+  }
+
+  teacherTestCardCleanupTimer = window.setTimeout(() => {
+    finishTeacherTestCardRemoval();
+  }, 900);
+}
+
+function updateTestInfoRowVisibility() {
+  if (!testInfoRow) return;
+
+  const hasReadyCard = Boolean(testInfoCard && !testInfoCard.classList.contains("hidden"));
+  const hasLoadingCard = Boolean(testLoadingCard && !testLoadingCard.classList.contains("hidden"));
+  testInfoRow.classList.toggle("hidden", !hasReadyCard && !hasLoadingCard);
+}
+
 function getTeacherTestInfoState(session = currentTestSession) {
   const questionCount = generatedQuestions.length || Number(session?.question_count) || testConfig.questionCount;
   const durationMinutes = Number(session?.duration_minutes) || testConfig.durationMinutes;
-  const sessionStatus = String(session?.session_status || "").toLowerCase();
+  const sessionStatus = getNormalizedTestSessionStatus(session);
   const remainingSeconds = getSessionRemainingSeconds(session);
-  const meta = selectedRole === "kaz"
-    ? `${questionCount} сұрақ · ${durationMinutes} мин`
-    : `${questionCount} вопросов · ${durationMinutes} мин`;
+  const meta = roleText(
+    `Тест ${questionCount} сұрақтан`,
+    `Тест из ${questionCount} вопросов`,
+    `Test with ${questionCount} questions`,
+  );
+  const durationMeta = roleText(
+    `${durationMinutes} минут уақыт`,
+    `${durationMinutes} минут`,
+    `${durationMinutes} minutes`,
+  );
   const closeClock = formatTeacherClock(session?.public_expires_at);
+  const readyTimerLabel = `${String(Math.max(0, durationMinutes)).padStart(2, "0")}:00`;
 
   if (sessionStatus === "live" && remainingSeconds > 0) {
     return {
       state: "live",
-      label: selectedRole === "kaz" ? "Тест жүріп жатыр" : "Тест запущен",
+      label: roleText("Тест жүріп жатыр", "Тест запущен", "Test is running"),
+      cardLabel: "TEST",
       meta,
-      hint: selectedRole === "kaz"
-        ? `${formatCountdown(remainingSeconds)} қалды${closeClock ? ` · ${closeClock}-де жабылады` : ""}`
-        : `${formatCountdown(remainingSeconds)} до закрытия${closeClock ? ` · закроется в ${closeClock}` : ""}`,
-      actionLabel: selectedRole === "kaz" ? "QR-ды ашу" : "Открыть QR",
-      qrTitle: selectedRole === "kaz" ? "QR кодты аудиторияға көрсетіңіз" : "Покажите QR аудитории",
-      qrHint: selectedRole === "kaz"
-        ? "Студенттер телефонмен сканерлеп, Google Form-ға бірден өтеді. Уақыт аяқталғанда форма автоматты түрде жабылады."
-        : "Студенты сканируют код телефоном и сразу переходят в Google Form.",
+      hint: roleText(
+        [durationMeta, closeClock ? `${closeClock}-де жабылады` : ""].filter(Boolean).join("\n"),
+        [durationMeta, closeClock ? `Закроется в ${closeClock}` : ""].filter(Boolean).join("\n"),
+        [durationMeta, closeClock ? `Closes at ${closeClock}` : ""].filter(Boolean).join("\n"),
+      ),
+      timerLabel: formatCountdown(remainingSeconds),
+      actionLabel: roleText("QR бөлімі", "QR-раздел", "QR section"),
+      qrTitle: roleText("QR-ды сканерлеп, тестке өтіңіз", "Сканируйте QR и перейдите к тесту", "Scan the QR code to open the test"),
+      qrTimer: roleText(
+        `Аяқталуына ${formatCountdown(remainingSeconds)} қалды`,
+        `До окончания ${formatCountdown(remainingSeconds)}`,
+        `${formatCountdown(remainingSeconds)} left`,
+      ),
+      qrHint: roleText(
+        "Жауаптарды жіберер алдында бәрін бір рет тексеріп алыңыз.",
+        "Перед отправкой ответов быстро проверьте их еще раз.",
+        "Check your answers before submitting.",
+      ),
     };
   }
 
   if (sessionStatus === "expired") {
     return {
       state: "done",
-      label: selectedRole === "kaz" ? "Тест жабылды" : "Тест закрыт",
+      label: roleText("Тест жабылды", "Тест закрыт", "Test closed"),
+      cardLabel: "TEST",
       meta,
-      hint: selectedRole === "kaz"
-        ? "Қажет болса жаңа уақытпен қайта бастауға болады."
-        : "При необходимости можно запустить тест заново с новым временем.",
-      actionLabel: selectedRole === "kaz" ? "Қайта бастау" : "Запустить снова",
-      qrTitle: selectedRole === "kaz" ? "QR терезесі жабық" : "QR-окно закрыто",
-      qrHint: selectedRole === "kaz"
-        ? "Қайта бастау батырмасы студенттер үшін жаңа уақыт терезесін ашады."
-        : "Повторный запуск откроет для студентов новое временное окно.",
+      hint: roleText(
+        [durationMeta, closeClock ? `${closeClock}-де жабылды` : "Тест аяқталды"].filter(Boolean).join("\n"),
+        [durationMeta, closeClock ? `Закрыт в ${closeClock}` : "Тест завершен"].filter(Boolean).join("\n"),
+        [durationMeta, closeClock ? `Closed at ${closeClock}` : "Test completed"].filter(Boolean).join("\n"),
+      ),
+      timerLabel: "00:00",
+      actionLabel: "",
+      qrTitle: roleText("Тест аяқталды", "Тест завершен", "Test completed"),
+      qrTimer: "",
+      qrHint: roleText(
+        "Тест уақыты аяқталды. Енді нәтижелерді көруге болады.",
+        "Время теста завершено. Теперь можно открыть результаты.",
+        "The test time is over. You can now open the results.",
+      ),
     };
   }
 
   return {
     state: "ready",
-    label: selectedRole === "kaz" ? "Тест дайын" : "Тест готов",
+    label: roleText("Тест дайын", "Тест готов", "Test ready"),
+    cardLabel: "TEST",
     meta,
-    hint: selectedRole === "kaz"
-      ? "Таймер тек «Тестті бастау» басылғаннан кейін жүреді."
-      : "Таймер начнется только после нажатия кнопки запуска теста.",
-    actionLabel: selectedRole === "kaz" ? "Тестті бастау" : "Запустить тест",
-    qrTitle: selectedRole === "kaz" ? "QR код тест басталғаннан кейін шығады" : "QR появится после запуска теста",
-    qrHint: selectedRole === "kaz"
-      ? "Тест басталған соң студенттер телефонмен сканерлеп, Google Form-ға өтеді."
-      : "После запуска студенты сканируют код и переходят к форме.",
+    hint: roleText(
+      [durationMeta, closeClock ? `${closeClock}-де жабылады` : ""].filter(Boolean).join("\n"),
+      [durationMeta, closeClock ? `Закроется в ${closeClock}` : ""].filter(Boolean).join("\n"),
+      [durationMeta, closeClock ? `Closes at ${closeClock}` : ""].filter(Boolean).join("\n"),
+    ),
+    timerLabel: readyTimerLabel,
+    actionLabel: roleText("Тестті іске қосу", "Запустить тест", "Start test"),
+    qrTitle: roleText("QR код тест басталғаннан кейін шығады", "QR появится после запуска теста", "The QR code appears after the test starts"),
+    qrTimer: "",
+    qrHint: roleText(
+      "Тест басталған соң студенттер телефонмен сканерлеп, Google Form-ға өтеді.",
+      "После запуска студенты сканируют код и переходят к Google Form.",
+      "After launch, students scan the code and open the Google Form.",
+    ),
   };
 }
 
@@ -1237,6 +1853,8 @@ function renderLoginRequiredState() {
 function resetProtectedAppData() {
   stopTeacherTestStatusTimer();
   stopPublicTestTimer();
+  clearTeacherTestCardCleanupTimer();
+  isTeacherTestCardDisintegrating = false;
   subjects = [];
   isDisciplineAccessLocked = false;
   selectedCourseNumber = null;
@@ -1248,6 +1866,7 @@ function resetProtectedAppData() {
   deletingDisciplineId = null;
   disciplineDeleteError = "";
   currentTestSession = null;
+  visibleTeacherTestSessionId = null;
   generatedQuestions = [];
   slidesErrorMessage = "";
   isMaterialManagerOpen = false;
@@ -1383,6 +2002,8 @@ function serializeGeneratedQuestion(question) {
 function hydrateCurrentTestSession(sessionData) {
   if (!sessionData) {
     currentTestSession = null;
+    visibleTeacherTestSessionId = null;
+    isTeacherTestCardDisintegrating = false;
     generatedQuestions = [];
     return;
   }
@@ -1412,6 +2033,30 @@ function hydrateCurrentTestSession(sessionData) {
   );
   saveStoredTestConfig();
   syncTestConfigInputs();
+}
+
+function buildOptimisticTestSessionSnapshot(session = currentTestSession, overrides = {}) {
+  if (!session) {
+    return null;
+  }
+
+  const nextSession = {
+    ...session,
+    ...overrides,
+  };
+
+  if (nextSession.public_started_at) {
+    const startedAtMs = new Date(nextSession.public_started_at).getTime();
+    if (!Number.isNaN(startedAtMs)) {
+      const durationMs = Number(nextSession.duration_minutes || 0) * 60 * 1000;
+      const nextExpiresAt = new Date(startedAtMs + durationMs).toISOString();
+      nextSession.public_expires_at = nextExpiresAt;
+      nextSession.remaining_seconds = getSessionRemainingSeconds(nextSession);
+      nextSession.session_status = nextSession.remaining_seconds > 0 ? "live" : "expired";
+    }
+  }
+
+  return nextSession;
 }
 
 async function loadDriveStatus() {
@@ -1591,9 +2236,11 @@ async function deleteSelectedMaterial() {
   isMaterialDeleting = true;
   renderDriveStatus();
 
-  const confirmMessage = selectedRole === "kaz"
-    ? `"${material.title}" материалы және оған қатысты тесттері жойылады. Жалғастыру керек пе?`
-    : `Материал "${material.title}" и связанные с ним тесты будут удалены. Продолжить?`;
+  const confirmMessage = roleText(
+    `"${material.title}" матеріалдар жүктелген құралдар. Жалғастыру үшін керек пе?`,
+    `Материал "${material.title}" және оның байланыстырылған тесттер жойылады. Жалғастыру?`,
+    `Material "${material.title}" and its linked tests will be deleted. Continue?`,
+  );
 
   try {
     if (!window.confirm(confirmMessage)) {
@@ -1663,6 +2310,14 @@ async function loadLatestTestSessionForSelectedMaterial() {
 
   const sessions = await loadTestSessionsForMaterial(material.id);
   hydrateCurrentTestSession(sessions[0] || null);
+  const sessionStatus = getNormalizedTestSessionStatus(currentTestSession);
+  visibleTeacherTestSessionId = ["ready", "live"].includes(sessionStatus) ? currentTestSession?.id || null : null;
+  isTeacherTestCardDisintegrating = false;
+
+  if (sessionStatus === "expired") {
+    generatedQuestions = [];
+  }
+
   return currentTestSession;
 }
 
@@ -1746,39 +2401,42 @@ function updateRoleMenuActive() {
 
 function getTypeLabel(type) {
   const labels = {
-    lecture: selectedRole === "kaz" ? "Дәріс" : "Лекция",
-    practice: selectedRole === "kaz" ? "Практика" : "Практика",
-    lab: selectedRole === "kaz" ? "Зертхана" : "Лаборатория",
-    siw: selectedRole === "kaz" ? "СӨЖ" : "СРС",
-    syllabus: selectedRole === "kaz" ? "Силлабус" : "Силлабус"
+    lecture: roleText("Дәріс", "Лекция", "Lecture"),
+    practice: roleText("Практика", "Практика", "Practice"),
+    lab: roleText("Зертхана", "Лаборатория", "Lab"),
+    siw: roleText("СӨЖ", "СРС", "SIW"),
+    syllabus: roleText("Силлабус", "Силлабус", "Syllabus")
   };
 
   return labels[type] || t("material");
 }
 
 function getDeleteActionLabel() {
-  return selectedRole === "kaz" ? "Жою" : "Удалить";
+  return roleText("Жою", "Удалить", "Delete");
 }
 
 function getDeletingActionLabel() {
-  return selectedRole === "kaz" ? "Р–РѕР№С‹Р»СѓРґР°..." : "РЈРґР°Р»РµРЅРёРµ...";
+  return roleText("Жойылып жатыр...", "Удаление...", "Deleting...");
 }
 
 function getUploadActionLabel() {
-  return selectedRole === "kaz" ? "Жүктеу" : "Загрузка";
+  return roleText("Жүктеу", "Загрузка", "Upload");
 }
 
 function getUploadSingleActionLabel() {
-  return selectedRole === "kaz" ? "Файл" : "Файл";
+  return roleText("Файл", "Файл", "File");
 }
 
 function getUploadFolderActionLabel() {
-  return selectedRole === "kaz" ? "Папка жүктеу" : "Загрузить папку";
+  return roleText("Папка жүктеу", "Загрузить папку", "Upload folder");
 }
 
 function getMaterialManagerToggleLabel() {
   if (selectedRole === "kaz") {
     return isMaterialManagerOpen ? "Жүктеуді жабу" : "Материал жүктеу";
+  }
+  if (selectedRole === "eng") {
+    return isMaterialManagerOpen ? "Hide upload" : "Upload material";
   }
 
   return isMaterialManagerOpen ? "Скрыть загрузку" : "Загрузка материала";
@@ -1940,14 +2598,15 @@ function openAuthModal() {
 
 function updateBrandRoleLabel() {
   if (!brandRoleTitle) return;
-  brandRoleTitle.textContent = selectedRole === "kaz" ? t("roleTeacher") : t("roleLecturer");
+  brandRoleTitle.textContent = ROLE_MENU_LABELS[selectedRole] || t("roleLabel");
 }
 
 function renderDisciplinePreviewCard() {
   if (!disciplinePreviewCard) return;
 
   const previewTitle = disciplineTitleInput?.value.trim() || t("disciplinePreviewUntitled");
-  const previewTheme = getDisciplineTheme((selectedCourseNumber || 0) + subjects.length + (selectedRole === "rus" ? 2 : 0));
+  const roleThemeOffset = selectedRole === "rus" ? 2 : selectedRole === "eng" ? 4 : 0;
+  const previewTheme = getDisciplineTheme((selectedCourseNumber || 0) + subjects.length + roleThemeOffset);
 
   disciplinePreviewCard.className = "discipline-preview-card";
   disciplinePreviewCard.innerHTML = `
@@ -2195,7 +2854,7 @@ async function restoreTeacherAppState() {
     return;
   }
 
-  if (savedState.selectedRole && ["kaz", "rus"].includes(savedState.selectedRole)) {
+  if (savedState.selectedRole && SUPPORTED_ROLES.includes(savedState.selectedRole)) {
     selectedRole = savedState.selectedRole;
     applyStaticTranslations();
     renderProfile();
@@ -2258,6 +2917,7 @@ async function openCourseDisciplines(courseNumber, preferredSubjectId = null) {
 }
 
 function showCourseStage() {
+  cancelActiveTestGeneration();
   selectedCourseNumber = null;
   isDisciplineAccessLocked = false;
   openedDisciplineMenuId = null;
@@ -2299,6 +2959,7 @@ function switchSubjectPanel(panelName) {
     resultsPane.classList.remove("hidden");
   }
 
+  syncSubjectActionButtons();
   saveTeacherAppState();
 }
 
@@ -2529,6 +3190,7 @@ async function loadMaterialsForSubject(subjectId) {
 }
 
 async function openSubject(subject) {
+  cancelActiveTestGeneration();
   selectedSubject = { ...subject };
   slidesErrorMessage = "";
   isEditingSubjectTitle = false;
@@ -2574,6 +3236,7 @@ async function openSubject(subject) {
 }
 
 function showHome() {
+  cancelActiveTestGeneration();
   cancelSubjectTitleEdit();
   subjectView.classList.add("hidden");
   homeView.classList.remove("hidden");
@@ -2663,8 +3326,14 @@ function buildAssistantContext() {
       : null,
     available_subjects: getAssistantSubjectSnapshots(),
     available_materials: getAssistantMaterialSnapshots(),
+    active_material_type: activeType || "",
+    test_config: {
+      question_count: testConfig.questionCount,
+      duration_minutes: testConfig.durationMinutes,
+    },
     has_generated_test: generatedQuestions.length > 0,
     has_results: Boolean(currentTestSession),
+    has_results_sheet: Boolean(currentTestSession?.results_sheet_url),
   };
 }
 
@@ -2719,7 +3388,15 @@ async function syncAssistantMaterialSelection({
   subjectId = null,
   materialId = null,
   materialType = "",
-} = {}) {
+} = {}, options = {}) {
+  const {
+    loadTestSession = true,
+    renderSlides = true,
+    renderTest = true,
+    renderResults = false,
+    saveState = true,
+  } = options;
+
   await ensureAssistantSubjectContext({ courseNumber, subjectId });
 
   if (!selectedSubject) {
@@ -2747,14 +3424,36 @@ async function syncAssistantMaterialSelection({
   populateMaterialTypeSelect();
   populateTopicSelect();
   renderDriveStatus();
-  await loadLatestTestSessionForSelectedMaterial();
+  if (loadTestSession) {
+    await loadLatestTestSessionForSelectedMaterial();
+  }
   clearMaterialPreview();
-  renderSlidesPreview();
-  renderTestBlock();
-  await renderResultsBlock();
-  saveTeacherAppState();
+  if (renderSlides) {
+    renderSlidesPreview();
+  }
+  if (renderTest) {
+    renderTestBlock();
+  }
+  if (renderResults) {
+    await renderResultsBlock();
+  }
+  if (saveState) {
+    saveTeacherAppState();
+  }
 
   return getSelectedMaterial();
+}
+
+async function applyAssistantWorkspaceSelection(assistantData = {}, options = {}) {
+  const selectionPayload = {
+    courseNumber: assistantData.course_number,
+    subjectId: assistantData.subject_id,
+    materialId: assistantData.material_id,
+    materialType: assistantData.material_type,
+  };
+
+  applyAssistantTestConfig(assistantData);
+  return syncAssistantMaterialSelection(selectionPayload, options);
 }
 
 function populateSubjectSelect() {
@@ -2852,7 +3551,7 @@ function populateMaterialTypeSelect() {
   `).join("");
 
   if (!existingTypes.length) {
-    materialTypeSelect.innerHTML = `<option value="lecture">Дәріс</option>`;
+    materialTypeSelect.innerHTML = `<option value="lecture">Р”У™СЂС–СЃ</option>`;
     activeType = "lecture";
   }
 }
@@ -2994,56 +3693,16 @@ async function openPreviewFullscreen() {
 }
 
 function resetTestState() {
+  cancelActiveTestGeneration({ keepUiState: true });
+  clearTeacherTestCardCleanupTimer();
   generatedQuestions = [];
   currentTestSession = null;
+  visibleTeacherTestSessionId = null;
+  isTeacherTestCardDisintegrating = false;
   isEditingTest = false;
   isTestGenerating = false;
+  testGenerationNotice = "";
   updateActionButtonsState();
-}
-
-function renderTestSettingsPanel() {
-  const material = getSelectedMaterial();
-  const isLecture = material?.type === "lecture";
-  const hasTest = Boolean(currentTestSession && generatedQuestions.length);
-
-  syncTestConfigInputs();
-
-  if (buildTestBtn) {
-    buildTestBtn.disabled = !isLecture || isTestGenerating;
-    buildTestBtn.textContent = isTestGenerating
-      ? (selectedRole === "kaz" ? "Құрастырылып жатыр..." : "Создается...")
-      : (selectedRole === "kaz" ? "Тестті құрастыру" : "Собрать тест");
-  }
-
-  if (testQuestionCountInput) {
-    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
-  }
-
-  if (testDurationInput) {
-    testDurationInput.disabled = !isLecture || isTestGenerating;
-  }
-
-  if (testInfoText) {
-    testInfoText.classList.toggle("is-error", !isLecture);
-  }
-
-  if (testSettingsHint) {
-    if (!isLecture) {
-      testSettingsHint.textContent = t("testLectureOnly");
-      return;
-    }
-
-    if (hasTest) {
-      testSettingsHint.textContent = selectedRole === "kaz"
-        ? `Тест дайын: ${generatedQuestions.length} сұрақ, ${testConfig.durationMinutes} минут.`
-        : `Тест готов: ${generatedQuestions.length} вопросов, ${testConfig.durationMinutes} минут.`;
-      return;
-    }
-
-    testSettingsHint.textContent = selectedRole === "kaz"
-      ? "Сұрақ санын және тест уақытын белгілеп, содан кейін тестті құрастырыңыз."
-      : "Укажите количество вопросов и длительность теста, затем соберите тест.";
-  }
 }
 
 function setSlidesStatus(message = "", state = "neutral") {
@@ -3079,7 +3738,6 @@ function renderSlidesPreview() {
   }
 
   const material = getSelectedMaterial();
-  const isLecture = material?.type === "lecture";
   const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
 
   if (openSlidesFullscreenBtn) {
@@ -3094,13 +3752,6 @@ function renderSlidesPreview() {
     slidesErrorMessage = "";
     setSlidesStatus("");
     slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesSelectPrompt"));
-    return;
-  }
-
-  if (!isLecture) {
-    slidesErrorMessage = "";
-    setSlidesStatus(t("slidesLectureOnly"), "error");
-    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesLectureOnly"));
     return;
   }
 
@@ -3185,16 +3836,19 @@ function downloadCurrentSlides() {
 
 function updateActionButtonsState() {
   const material = getSelectedMaterial();
-  const isLecture = material?.type === "lecture";
-  const hasGeneratedTest = generatedQuestions.length > 0;
+  const hasMaterial = Boolean(material);
+  const hasGeneratedTest = shouldShowTeacherTestCard(currentTestSession);
   const hasSessionLink = !!currentTestSession?.access_token || !!currentTestSession?.form_url;
   const hasResults = !!currentTestSession;
+  const sessionStatus = getNormalizedTestSessionStatus(currentTestSession);
+  const canOpenQr = sessionStatus === "live" && hasGeneratedTest && hasSessionLink && !isTestGenerating;
 
-  openSlidesBtn.disabled = !isLecture || isSlidesGenerating;
-  openSlidesBtn.textContent = isSlidesGenerating ? t("slidesGenerating") : t("slides");
-  generateTestBtn.disabled = !isLecture || isTestGenerating;
-  openQrBtn.disabled = !hasGeneratedTest || !hasSessionLink;
+  openSlidesBtn.disabled = !hasMaterial || isSlidesGenerating;
+  setActionButtonLabel(openSlidesBtn, isSlidesGenerating ? t("slidesGenerating") : t("slides"));
+  generateTestBtn.disabled = !hasMaterial || isTestGenerating;
+  openQrBtn.disabled = !canOpenQr;
   openResultsBtn.disabled = !hasResults;
+  syncSubjectActionButtons();
   renderTestSettingsPanel();
 }
 
@@ -3233,21 +3887,13 @@ function buildGoogleSheetDownloadUrl(url, format = "xlsx") {
 }
 
 function buildResultsSummaryDoc(title, responses = [], options = {}) {
-  const labels = selectedRole === "kaz"
-    ? {
-        participants: "Тапсырғандар",
-        average: "Орташа пайыз",
-        best: "Үздік балл",
-        percent: "Пайыз",
-        noData: "Нәтиже табылмады",
-      }
-    : {
-        participants: "Участников",
-        average: "Средний процент",
-        best: "Лучший балл",
-        percent: "Процент",
-        noData: "Результаты не найдены",
-      };
+  const labels = {
+    participants: roleText("Тапсырғандар", "Участников", "Participants"),
+    average: roleText("Орташа пайыз", "Средний процент", "Average percentage"),
+    best: roleText("Үздік балл", "Лучший балл", "Best score"),
+    percent: roleText("Пайыз", "Процент", "Percent"),
+    noData: roleText("Нәтиже табылмады", "Результаты не найдены", "No results found"),
+  };
 
   const normalizedResponses = Array.isArray(responses) ? responses : [];
   const scoringReady = options.scoringReady !== false;
@@ -3273,10 +3919,10 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
 
   const rowsHtml = normalizedResponses.map((response, index) => {
     const submittedAt = response.submitted_at
-      ? new Date(response.submitted_at).toLocaleString(selectedRole === "kaz" ? "kk-KZ" : "ru-RU")
+      ? new Date(response.submitted_at).toLocaleString(getRoleLocale())
       : "-";
     const scoreLabel = scoringReady ? escapeHtml(response.score_label || "-") : escapeHtml(t("resultsScoreUnavailable"));
-    const percentLabel = scoringReady ? `${Number(response.percentage) || 0}%` : "—";
+    const percentLabel = scoringReady ? `${Number(response.percentage) || 0}%` : "вЂ”";
 
     return `
       <tr>
@@ -3308,7 +3954,7 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
             </div>
             <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
               <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.average}</div>
-              <div style="font-size:28px;font-weight:800;color:#0f172a;">${scoringReady ? `${averagePercent}%` : "—"}</div>
+              <div style="font-size:28px;font-weight:800;color:#0f172a;">${scoringReady ? `${averagePercent}%` : "вЂ”"}</div>
             </div>
             <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
               <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.best}</div>
@@ -3366,12 +4012,22 @@ function makeQuestion(index, topicTitle) {
 }
 
 async function saveEditedQuestions() {
+  if (isSavingTestChanges) {
+    return;
+  }
+
+  isSavingTestChanges = true;
+  syncTestModalActionButtons();
+
+  const wasQrMode = Boolean(testQrBoard?.classList.contains("is-qr-mode"));
+  const previousSessionSnapshot = currentTestSession ? JSON.parse(JSON.stringify(currentTestSession)) : null;
+
   document.querySelectorAll(".edit-textarea").forEach(area => {
     const qIndex = Number(area.dataset.questionIndex);
     generatedQuestions[qIndex].question = area.value.trim() || generatedQuestions[qIndex].question;
   });
 
-  document.querySelectorAll(".edit-input").forEach(input => {
+  document.querySelectorAll(".edit-input[data-question-index][data-option-index]").forEach(input => {
     const qIndex = Number(input.dataset.questionIndex);
     const oIndex = Number(input.dataset.optionIndex);
     generatedQuestions[qIndex].options[oIndex] = input.value.trim() || generatedQuestions[qIndex].options[oIndex];
@@ -3389,6 +4045,24 @@ async function saveEditedQuestions() {
     saveStoredTestConfig();
   }
 
+  const serializedQuestions = generatedQuestions.map((q) => serializeGeneratedQuestion(q));
+
+  if (currentTestSession?.id) {
+    const optimisticSession = buildOptimisticTestSessionSnapshot(currentTestSession, {
+      questions_json: serializedQuestions,
+      question_count: generatedQuestions.length,
+      duration_minutes: testConfig.durationMinutes,
+    });
+
+    hydrateCurrentTestSession(optimisticSession);
+    if (["ready", "live"].includes(getNormalizedTestSessionStatus(currentTestSession))) {
+      visibleTeacherTestSessionId = currentTestSession?.id || null;
+    }
+  }
+
+  renderTestSettingsPanel();
+  renderTestBlock(wasQrMode);
+
   if (currentTestSession?.id) {
     try {
       const updated = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/`, {
@@ -3397,80 +4071,38 @@ async function saveEditedQuestions() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
+          questions_json: serializedQuestions,
           question_count: generatedQuestions.length,
           duration_minutes: testConfig.durationMinutes,
         }),
       });
 
       hydrateCurrentTestSession(updated);
+      if (["ready", "live"].includes(getNormalizedTestSessionStatus(currentTestSession))) {
+        visibleTeacherTestSessionId = currentTestSession?.id || null;
+      }
     } catch (error) {
       console.error("Test session save error:", error);
+      if (previousSessionSnapshot) {
+        hydrateCurrentTestSession(previousSessionSnapshot);
+        visibleTeacherTestSessionId = ["ready", "live"].includes(getNormalizedTestSessionStatus(currentTestSession))
+          ? currentTestSession?.id || null
+          : null;
+      }
+      renderTestSettingsPanel();
+      renderTestBlock(wasQrMode);
+      setTestPanelInfo(error?.message || t("resultsSyncError"), "error");
+      isSavingTestChanges = false;
+      renderQuestionModal(true);
+      return;
     }
   }
 
   renderTestSettingsPanel();
-  renderTestBlock(false);
+  renderTestBlock(wasQrMode);
+  testModalSavedAt = Date.now();
+  isSavingTestChanges = false;
   renderQuestionModal(false);
-}
-
-function renderTestBlock(showQrInline = false) {
-  const material = getSelectedMaterial();
-  renderTestSettingsPanel();
-
-  if (!material) {
-    testInfoText.textContent = "";
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    showQrBtn.disabled = true;
-    updateActionButtonsState();
-    return;
-  }
-
-  const isLecture = material.type === "lecture";
-
-  if (!isLecture) {
-    testInfoText.textContent = t("testLectureOnly");
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    showQrBtn.disabled = true;
-    updateActionButtonsState();
-    return;
-  }
-
-  if (!generatedQuestions.length) {
-    testInfoText.textContent = "";
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    showQrBtn.disabled = true;
-    updateActionButtonsState();
-    return;
-  }
-
-  const publicUrl = getCurrentTestLaunchUrl();
-  testInfoText.textContent = selectedRole === "kaz"
-    ? `Тест дайын · ${generatedQuestions.length} сұрақ · ${testConfig.durationMinutes} мин`
-    : `Тест готов · ${generatedQuestions.length} вопросов · ${testConfig.durationMinutes} мин`;
-
-  if (!publicUrl) {
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    showQrBtn.disabled = true;
-    updateActionButtonsState();
-    return;
-  }
-
-  if (showQrInline) {
-    qrImageInline.src = buildInlineQrUrl(publicUrl);
-    qrImageInline.style.display = "block";
-  } else {
-    qrImageInline.style.display = "none";
-  }
-
-  setOpenTestDirectDisabled(false);
-  showQrBtn.disabled = false;
-
-  updateActionButtonsState();
 }
 
 async function renderResultsBlock() {
@@ -3659,7 +4291,7 @@ async function downloadResultsSheet() {
 
 async function launchCurrentTestSession() {
   if (!currentTestSession?.id) {
-    throw new Error(selectedRole === "kaz" ? "Тест сессиясы табылмады." : "Тестовая сессия не найдена.");
+    throw new Error(roleText("Тест сессиясы табылмады.", "Тестовая сессия не найдена.", "Test session was not found."));
   }
 
   const payload = await fetchJSON(`${API_BASE}/results/test-sessions/${currentTestSession.id}/launch-public/`, {
@@ -3670,6 +4302,7 @@ async function launchCurrentTestSession() {
     ...currentTestSession,
     ...payload,
   });
+  visibleTeacherTestSessionId = currentTestSession?.id || null;
   saveTeacherAppState();
   return currentTestSession;
 }
@@ -3685,136 +4318,8 @@ async function closeCurrentTestSessionWindow() {
     ...currentTestSession,
     ...payload,
   });
+  visibleTeacherTestSessionId = null;
   saveTeacherAppState();
-}
-
-async function openTestDirect() {
-  if (!generatedQuestions.length) return;
-
-  try {
-    await launchCurrentTestSession();
-  } catch (error) {
-    alert(error?.message || t("formNotReady"));
-    return;
-  }
-
-  const formUrl = getCurrentTestLaunchUrl();
-
-  if (!formUrl) {
-    alert(t("formNotReady"));
-    return;
-  }
-
-  renderTestBlock(false);
-  window.open(formUrl, "_blank");
-}
-
-async function showQr() {
-  if (!generatedQuestions.length) return;
-
-  try {
-    await launchCurrentTestSession();
-  } catch (error) {
-    alert(error?.message || t("qrNotReady"));
-    return;
-  }
-
-  const formUrl = getCurrentTestLaunchUrl();
-
-  if (!formUrl) {
-    alert(t("qrNotReady"));
-    return;
-  }
-
-  switchSubjectPanel("test");
-  renderTestBlock(true);
-}
-
-async function createAiQuestions() {
-  const currentMaterial = getSelectedMaterial();
-
-  if (!currentMaterial) {
-    alert(t("selectMaterialFirst"));
-    return;
-  }
-
-  if (currentMaterial.type !== "lecture") {
-    alert(t("aiTestLectureOnly"));
-    return;
-  }
-
-  isTestGenerating = true;
-  generateTestBtn.disabled = true;
-  testInfoText.textContent = t("generatingAiTest");
-  renderTestSettingsPanel();
-
-  try {
-    const nextQuestionCount = getCurrentQuestionCount();
-    const nextDurationMinutes = getCurrentDurationMinutes();
-    testConfig = clampTestConfig(nextQuestionCount, nextDurationMinutes);
-    saveStoredTestConfig();
-
-    const response = await fetch(`${API_BASE}/materials/${currentMaterial.id}/generate-test/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        language: selectedRole,
-        question_count: testConfig.questionCount,
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`AI test request failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    generatedQuestions = data.test.map((item, index) => ({
-      id: index + 1,
-      question: item.question,
-      options: Array.isArray(item.options) ? item.options : [],
-      answer: resolveQuestionAnswerIndex(item),
-      answerRaw: item.answer || "",
-    }));
-
-    const sessionResponse = await fetch(`${API_BASE}/results/test-sessions/create-from-ai/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        material_id: currentMaterial.id,
-        question_count: testConfig.questionCount,
-        duration_minutes: testConfig.durationMinutes,
-        questions: generatedQuestions.map((q) => serializeGeneratedQuestion(q))
-      })
-    });
-
-    if (!sessionResponse.ok) {
-      throw new Error(`Test session create failed: ${sessionResponse.status}`);
-    }
-
-    const sessionData = await sessionResponse.json();
-    hydrateCurrentTestSession({
-      ...sessionData,
-      material: currentMaterial.id,
-      questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
-    });
-
-    renderTestBlock(false);
-    switchSubjectPanel("test");
-    saveTeacherAppState();
-  } catch (error) {
-    console.error("AI TEST ERROR:", error);
-    testInfoText.textContent = t("aiTestError");
-    alert(t("aiTestError"));
-  } finally {
-    isTestGenerating = false;
-    generateTestBtn.disabled = false;
-    updateActionButtonsState();
-  }
 }
 
 function formatCountdown(seconds) {
@@ -3884,228 +4389,12 @@ function renderPublicResultCard(resultAttempt = publicTestAttempt) {
   if (!publicTestResultCard || !resultAttempt) return;
 
   publicTestResultCard.innerHTML = `
-    <h3 style="font-size:24px;line-height:1.2;font-weight:800;color:#fff;">${selectedRole === "kaz" ? "Тест аяқталды" : "Тест завершен"}</h3>
+    <h3 style="font-size:24px;line-height:1.2;font-weight:800;color:#fff;">${roleText("Тест аяқталды", "Тест завершен", "Test completed")}</h3>
     <p style="font-size:15px;line-height:1.6;color:rgba(226,232,240,0.82);">
-      ${selectedRole === "kaz" ? "Нәтижеңіз" : "Ваш результат"}: <strong>${escapeHtml(resultAttempt.score_label || "-")}</strong>
+      ${roleText("Нәтижеңіз", "Ваш результат", "Your result")}: <strong>${escapeHtml(resultAttempt.score_label || "-")}</strong>
     </p>
   `;
   publicTestResultCard.classList.remove("hidden");
-}
-
-function startPublicTestTimer() {
-  stopPublicTestTimer();
-
-  if (!publicTestAttempt || publicTestAttempt.status !== "started") {
-    publicTestTimer.textContent = "--:--";
-    return;
-  }
-
-  const updateTimer = () => {
-    const remaining = Number(publicTestAttempt.remaining_seconds || 0);
-    publicTestTimer.textContent = formatCountdown(remaining);
-
-    if (remaining <= 0) {
-      stopPublicTestTimer();
-      setPublicTestStatus(selectedRole === "kaz" ? "Тест уақыты аяқталды." : "Время теста истекло.", "error");
-      publicTestSubmitBtn.disabled = true;
-      publicTestQuestionsWrap.classList.add("hidden");
-      publicTestResultCard.classList.remove("hidden");
-      publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Уақыт аяқталды." : "Время вышло."}</p>`;
-      clearStoredPublicAttempt(publicTestSessionToken);
-      return;
-    }
-
-    publicTestAttempt.remaining_seconds = remaining - 1;
-  };
-
-  updateTimer();
-  publicTestCountdownTimer = setInterval(updateTimer, 1000);
-}
-
-function renderPublicTestState() {
-  if (!publicTestView) return;
-
-  const session = publicTestSession;
-  const attempt = publicTestAttempt;
-
-  publicTestTitle.textContent = session?.title || (selectedRole === "kaz" ? "Тест" : "Тест");
-  publicTestCourse.textContent = session?.discipline_title || (selectedRole === "kaz" ? "Тест сессиясы" : "Тестовая сессия");
-  publicTestMeta.textContent = session
-    ? `${session.material_title} · ${session.question_count} ${selectedRole === "kaz" ? "сұрақ" : "вопросов"} · ${session.duration_minutes} ${selectedRole === "kaz" ? "мин" : "мин"}`
-    : "";
-
-  publicTestResultCard.classList.add("hidden");
-  publicTestQuestionsWrap.classList.add("hidden");
-  publicTestStartCard.classList.remove("hidden");
-  publicTestSubmitBtn.disabled = false;
-
-  if (!attempt) {
-    publicTestTimer.textContent = session ? formatCountdown(session.duration_minutes * 60) : "--:--";
-    setPublicTestStatus(
-      selectedRole === "kaz"
-        ? "Тестті бастау үшін аты-жөніңізді енгізіңіз."
-        : "Введите имя и фамилию, чтобы начать тест.",
-      "neutral",
-    );
-    return;
-  }
-
-  if (attempt.status === "submitted") {
-    publicTestStartCard.classList.add("hidden");
-    renderPublicResultCard(attempt);
-    setPublicTestStatus(
-      selectedRole === "kaz"
-        ? "Бұл тест осы студент үшін бұрын тапсырылған."
-        : "Этот тест уже был отправлен этим студентом.",
-      "success",
-    );
-    publicTestTimer.textContent = "00:00";
-    persistPublicAttemptState();
-    return;
-  }
-
-  if (attempt.status === "expired") {
-    publicTestStartCard.classList.add("hidden");
-    publicTestResultCard.classList.remove("hidden");
-    publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Бұл әрекет уақыты аяқталған." : "Время этой попытки истекло."}</p>`;
-    setPublicTestStatus(
-      selectedRole === "kaz"
-        ? "Уақыт аяқталған соң бұл тестті қайта бастауға болмайды."
-        : "После истечения времени повторно начать тест нельзя.",
-      "error",
-    );
-    publicTestTimer.textContent = "00:00";
-    clearStoredPublicAttempt(publicTestSessionToken);
-    return;
-  }
-
-  publicTestStartCard.classList.add("hidden");
-  publicTestQuestionsWrap.classList.remove("hidden");
-  publicTestStudentNameInput.value = attempt.student_name || "";
-  setPublicTestStatus(
-    selectedRole === "kaz"
-      ? "Тест жүріп жатыр. Уақыт аяқталғанша тапсырып үлгеріңіз."
-      : "Тест запущен. Успейте отправить до окончания времени.",
-    "info",
-  );
-  renderPublicTestQuestions();
-  startPublicTestTimer();
-}
-
-async function loadPublicTestSession() {
-  if (!publicTestSessionToken) return;
-
-  const storedAttempt = readStoredPublicAttempt(publicTestSessionToken);
-  if (storedAttempt?.attemptToken) {
-    publicTestAttemptToken = storedAttempt.attemptToken;
-    publicTestAnswers = Array.isArray(storedAttempt.answers) ? storedAttempt.answers : [];
-  }
-
-  const query = publicTestAttemptToken ? `?attempt_token=${publicTestAttemptToken}` : "";
-  const sessionPayload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/${query}`);
-  publicTestSession = sessionPayload;
-  publicTestAttempt = sessionPayload.attempt || null;
-
-  if (publicTestSession?.language && ["kaz", "rus"].includes(publicTestSession.language)) {
-    selectedRole = publicTestSession.language;
-    applyStaticTranslations();
-  }
-
-  if (!publicTestAttempt && storedAttempt?.studentName) {
-    publicTestStudentNameInput.value = storedAttempt.studentName;
-  }
-
-  if (publicTestAttempt?.attempt_token) {
-    publicTestAttemptToken = publicTestAttempt.attempt_token;
-  }
-
-  renderPublicTestState();
-}
-
-async function startPublicTest() {
-  if (!publicTestSessionToken) return;
-
-  const studentName = publicTestStudentNameInput.value.trim();
-  if (!studentName) {
-    setPublicTestStatus(
-      selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз." : "Введите имя и фамилию.",
-      "error",
-    );
-    publicTestStudentNameInput.focus();
-    return;
-  }
-
-  publicTestStartBtn.disabled = true;
-  setPublicTestStatus(selectedRole === "kaz" ? "Тест ашылып жатыр..." : "Тест открывается...", "info");
-
-  try {
-    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/start/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        student_name: studentName,
-        attempt_token: publicTestAttemptToken || undefined,
-      }),
-    });
-
-    publicTestSession = payload.session;
-    publicTestAttempt = payload.attempt;
-    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
-    publicTestAnswers = new Array(publicTestSession?.questions?.length || 0).fill(null);
-    persistPublicAttemptState();
-    renderPublicTestState();
-  } catch (error) {
-    console.error("Public test start error:", error);
-    const payload = error.payload || {};
-    if (payload.attempt) {
-      publicTestSession = payload.session || publicTestSession;
-      publicTestAttempt = payload.attempt;
-      publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
-      publicTestAnswers = Array.isArray(publicTestAttempt?.answers)
-        ? publicTestAttempt.answers.map(item => item.selected_option_index ?? null)
-        : publicTestAnswers;
-      persistPublicAttemptState();
-      renderPublicTestState();
-      return;
-    }
-
-    setPublicTestStatus(error.message || (selectedRole === "kaz" ? "Тестті бастау мүмкін болмады." : "Не удалось начать тест."), "error");
-  } finally {
-    publicTestStartBtn.disabled = false;
-  }
-}
-
-async function submitPublicTest() {
-  if (!publicTestSessionToken || !publicTestAttemptToken) return;
-
-  publicTestSubmitBtn.disabled = true;
-  setPublicTestStatus(selectedRole === "kaz" ? "Жауаптар жіберіліп жатыр..." : "Ответы отправляются...", "info");
-
-  try {
-    const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/submit/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        attempt_token: publicTestAttemptToken,
-        answers: publicTestAnswers,
-      }),
-    });
-
-    publicTestSession = payload.session;
-    publicTestAttempt = payload.attempt;
-    publicTestAttemptToken = publicTestAttempt?.attempt_token || "";
-    persistPublicAttemptState();
-    renderPublicTestState();
-  } catch (error) {
-    console.error("Public test submit error:", error);
-    setPublicTestStatus(error.message || (selectedRole === "kaz" ? "Тестті тапсыру мүмкін болмады." : "Не удалось отправить тест."), "error");
-  } finally {
-    publicTestSubmitBtn.disabled = false;
-  }
 }
 
 async function initPublicTestMode() {
@@ -4118,7 +4407,7 @@ async function initPublicTestMode() {
     await loadPublicTestSession();
   } catch (error) {
     console.error("Public test init error:", error);
-    setPublicTestStatus(selectedRole === "kaz" ? "Тест сессиясын ашу мүмкін болмады." : "Не удалось открыть тестовую сессию.", "error");
+    setPublicTestStatus(roleText("Тест сессиясын ашу мүмкін болмады.", "Не удалось открыть тестовую сессию.", "Could not open the test session."), "error");
   }
 
   return true;
@@ -4126,16 +4415,16 @@ async function initPublicTestMode() {
 
 function getProjectedTeacherCloseClock(durationMinutes, session = currentTestSession) {
   if (!session?.public_started_at) {
-    return selectedRole === "kaz" ? "Тест басталған соң көрінеді" : "Появится после запуска теста";
+    return roleText("Тест басталған соң көрінеді", "Появится после запуска теста", "Shown after the test starts");
   }
 
   const startedAtMs = new Date(session.public_started_at).getTime();
   if (Number.isNaN(startedAtMs)) {
-    return selectedRole === "kaz" ? "Уақыт есептелмеді" : "Время не определено";
+    return roleText("Уақыт есептелмеді", "Время не определено", "Time is not available");
   }
 
   const projected = new Date(startedAtMs + Number(durationMinutes || 0) * 60 * 1000);
-  return formatTeacherClock(projected.toISOString()) || (selectedRole === "kaz" ? "Уақыт есептелмеді" : "Время не определено");
+  return formatTeacherClock(projected.toISOString()) || roleText("Уақыт есептелмеді", "Время не определено", "Time is not available");
 }
 
 function renderTestModalSummary(editMode = false) {
@@ -4144,20 +4433,23 @@ function renderTestModalSummary(editMode = false) {
   const info = getTeacherTestInfoState(currentTestSession);
   const durationValue = Number(currentTestSession?.duration_minutes) || testConfig.durationMinutes;
   const closeClock = getProjectedTeacherCloseClock(durationValue, currentTestSession);
-  const statusLabel = info.label || (selectedRole === "kaz" ? "Тест дайын" : "Тест готов");
-  const questionCountLabel = selectedRole === "kaz" ? "Сұрақ саны" : "Количество вопросов";
-  const durationLabel = selectedRole === "kaz" ? "Белсенді уақыт" : "Активное время";
-  const closeLabel = selectedRole === "kaz" ? "Жабылу уақыты" : "Время закрытия";
-  const statusTitle = selectedRole === "kaz" ? "Тест параметрлері" : "Параметры теста";
+  const statusLabel = info.label || roleText("Тест дайын", "Тест готов", "Test ready");
+  const questionCountLabel = roleText("Сұрақ саны", "Количество вопросов", "Number of questions");
+  const durationLabel = roleText("Белсенді уақыт", "Активное время", "Active time");
+  const closeLabel = roleText("Жабылу уақыты", "Время закрытия", "Closing time");
+  const statusTitle = roleText("Тест параметрлері", "Параметры теста", "Test settings");
   const closeHint = editMode && String(currentTestSession?.session_status || "").toLowerCase() === "live"
-    ? `<div class="test-modal-summary-note">${selectedRole === "kaz" ? "Уақытты сақтағаннан кейін жабылу мезгілі автоматты түрде жаңарады." : "После сохранения время закрытия обновится автоматически."}</div>`
+    ? `<div class="test-modal-summary-note">${roleText("Уақытты сақтағаннан кейін жабылу мезгілі автоматты түрде жаңарады.", "После сохранения время закрытия обновится автоматически.", "After saving, the closing time updates automatically.")}</div>`
+    : "";
+  const saveSuccessNote = !editMode && hasRecentTestSaveFeedback()
+    ? `<div class="test-modal-summary-note is-success">${roleText("Өзгерістер сақталды.", "Изменения сохранены.", "Changes saved.")}</div>`
     : "";
 
   testModalSummary.innerHTML = `
     <div class="test-modal-summary-title">${statusTitle}</div>
     <div class="test-modal-summary-grid">
       <div class="test-modal-summary-field">
-        <span>${selectedRole === "kaz" ? "Күйі" : "Статус"}</span>
+        <span>${roleText("Күйі", "Статус", "Status")}</span>
         <strong>${escapeHtml(statusLabel)}</strong>
       </div>
       <div class="test-modal-summary-field">
@@ -4168,8 +4460,11 @@ function renderTestModalSummary(editMode = false) {
         <span>${durationLabel}</span>
         ${
           editMode
-            ? `<input id="testModalDurationInput" class="edit-input test-modal-summary-input" type="number" min="5" max="180" value="${durationValue}" />`
-            : `<strong>${durationValue} ${selectedRole === "kaz" ? "мин" : "мин"}</strong>`
+            ? buildDurationEditorMarkup({
+                inputId: "testModalDurationInput",
+                value: durationValue,
+              })
+            : `<strong>${durationValue} ${roleText("мин", "мин", "min")}</strong>`
         }
       </div>
       <div class="test-modal-summary-field">
@@ -4178,29 +4473,18 @@ function renderTestModalSummary(editMode = false) {
       </div>
     </div>
     ${closeHint}
+    ${saveSuccessNote}
   `;
 
   if (editMode) {
-    const modalDurationInput = document.getElementById("testModalDurationInput");
-    if (modalDurationInput) {
-      modalDurationInput.addEventListener("input", () => {
-        const nextConfig = clampTestConfig(generatedQuestions.length || testConfig.questionCount, modalDurationInput.value);
-        const closeValue = document.getElementById("testModalCloseTimeValue");
-
-        modalDurationInput.value = String(nextConfig.durationMinutes);
-        if (closeValue) {
-          closeValue.textContent = getProjectedTeacherCloseClock(nextConfig.durationMinutes, currentTestSession);
-        }
-      });
-    }
+    bindTestModalDurationEditor(durationValue);
   }
 }
 
 function renderQuestionModal(editMode = false) {
   isEditingTest = editMode;
   testModalTitle.textContent = editMode ? t("testModalEdit") : t("testModalView");
-  editTestBtn.classList.toggle("hidden", editMode);
-  saveTestBtn.classList.toggle("hidden", !editMode);
+  syncTestModalActionButtons();
 
   renderTestModalSummary(editMode);
   testQuestionsContainer.innerHTML = "";
@@ -4232,9 +4516,9 @@ function renderQuestionModal(editMode = false) {
             <div style="
               min-height:44px;
               border-radius:12px;
-              border:1px solid ${q.answer === oIndex ? "rgba(0,93,176,0.22)" : "rgba(0,93,176,0.14)"};
-              background:${q.answer === oIndex ? "rgba(0,93,176,0.12)" : "#f5f8fc"};
-              color:${q.answer === oIndex ? "#0f5d9b" : "#17314b"};
+              border:1px solid ${q.answer === oIndex ? "rgba(110,169,79,0.24)" : "rgba(0,93,176,0.14)"};
+              background:${q.answer === oIndex ? "rgba(235,247,226,0.92)" : "#f5f8fc"};
+              color:${q.answer === oIndex ? "#2f6a29" : "#17314b"};
               display:flex;
               align-items:center;
               gap:10px;
@@ -4244,9 +4528,10 @@ function renderQuestionModal(editMode = false) {
             ">
               <div style="
                 width:26px;height:26px;border-radius:50%;
-                background:${q.answer === oIndex ? "rgba(0,93,176,0.18)" : "rgba(0,93,176,0.10)"};
+                background:${q.answer === oIndex ? "rgba(110,169,79,0.16)" : "rgba(0,93,176,0.10)"};
                 display:flex;align-items:center;justify-content:center;
                 font-size:11px;font-weight:800;flex-shrink:0;
+                color:${q.answer === oIndex ? "#39742f" : "#4d6784"};
               ">${String.fromCharCode(65 + oIndex)}</div>
               <div>${escapeHtml(option)}</div>
             </div>
@@ -4257,6 +4542,12 @@ function renderQuestionModal(editMode = false) {
 
     testQuestionsContainer.appendChild(card);
   });
+
+  if (!editMode && hasRecentTestSaveFeedback()) {
+    requestAnimationFrame(() => {
+      flashTestModalSaveFeedback();
+    });
+  }
 }
 
 function normalizeVoiceText(text) {
@@ -4272,7 +4563,7 @@ function normalizeVoiceText(text) {
 function detectAssistantReplyLanguage(text) {
   const rawText = String(text || "").toLowerCase();
   const normalized = normalizeVoiceText(text);
-  const kazakhCharMatch = /[әіңғүұқөһі]/i.test(rawText);
+  const kazakhCharMatch = /[әіңғүұқөһ]/i.test(rawText);
   const kazakhHints = [
     "сәлем",
     "көмек",
@@ -4319,13 +4610,277 @@ function selectLocalizedAssistantReply(language, kazakhText, russianText) {
   return language === "rus" ? russianText : kazakhText;
 }
 
-function buildLocalAssistantFallback(transcript) {
-  const normalized = normalizeVoiceText(transcript);
-  if (!normalized) {
+const LOCAL_ASSISTANT_OPEN_WORDS = ["аш", "көрсет", "открой", "покажи", "перейди", "open", "show"];
+const LOCAL_ASSISTANT_HELP_PHRASES = ["көмек", "команда", "командалар", "не істей аласың", "что ты умеешь", "help"];
+const LOCAL_ASSISTANT_HOME_PHRASES = ["басты бет", "главная", "главную", "үйге", "домой", "home"];
+const LOCAL_ASSISTANT_BACK_PHRASES = ["артқа", "қайтар", "назад", "go back"];
+const LOCAL_ASSISTANT_MATERIALS_PHRASES = ["материал", "материалдар", "материалды", "материалы", "конспект"];
+const LOCAL_ASSISTANT_TEST_PANEL_PHRASES = ["тестті аш", "тест аш", "тест бөлімі", "открой тест", "перейди в тест", "test"];
+const LOCAL_ASSISTANT_RESULTS_PHRASES = ["нәтиже", "нәтижелер", "результат", "результаты", "балл", "оценка", "results"];
+const LOCAL_ASSISTANT_RESULTS_SHEET_PHRASES = ["google sheets", "гугл шит", "гугл таблиц", "sheets", "sheet", "таблица", "таблицу"];
+const LOCAL_ASSISTANT_SLIDES_PHRASES = ["слайд", "слайдтар", "слайды", "презентация", "slides"];
+const LOCAL_ASSISTANT_GENERATE_TEST_PHRASES = ["тест жаса", "тест дайында", "тест құрастыр", "создай тест", "сгенерируй тест", "generate test"];
+const LOCAL_ASSISTANT_GENERATE_SLIDES_PHRASES = ["слайд жаса", "слайд дайында", "презентация жаса", "создай слайды", "создай презентацию", "generate slides"];
+const LOCAL_ASSISTANT_OPEN_QR_PHRASES = ["qr", "qr код", "кьюар", "куар"];
+const LOCAL_ASSISTANT_START_TEST_PHRASES = ["тестті баста", "тест баста", "начни тест", "запусти тест", "start test"];
+const LOCAL_ASSISTANT_STOP_TOKENS = new Set([
+  "аш",
+  "көрсет",
+  "открой",
+  "покажи",
+  "перейди",
+  "материал",
+  "материалдар",
+  "материалы",
+  "тест",
+  "слайд",
+  "слайды",
+  "презентация",
+  "пән",
+  "дисциплина",
+  "course",
+  "курс",
+  "курса",
+]);
+const LOCAL_ASSISTANT_MATERIAL_TYPE_ALIASES = [
+  ["дәріс", "lecture"],
+  ["лекция", "lecture"],
+  ["lecture", "lecture"],
+  ["lesson", "lecture"],
+  ["практика", "practice"],
+  ["практиканы", "practice"],
+  ["practice", "practice"],
+  ["practical", "practice"],
+  ["зертхана", "lab"],
+  ["зертхананы", "lab"],
+  ["лаборатория", "lab"],
+  ["lab", "lab"],
+  ["сөж", "siw"],
+  ["срс", "siw"],
+  ["siw", "siw"],
+  ["sowj", "siw"],
+  ["силлабус", "syllabus"],
+  ["syllabus", "syllabus"],
+];
+const LOCAL_ASSISTANT_COURSE_PATTERNS = [
+  /(\d{1,2})\s*(?:курс|курсты|курсқа|курса|course)\b/u,
+];
+const LOCAL_ASSISTANT_QUESTION_COUNT_PATTERNS = [
+  /(\d{1,2})\s*(?:сұрақ|сурак|сұрақтан|сурактан|вопрос(?:а|ов)?|question)\b/u,
+  /(?:сұрақ|сурак|вопрос(?:а|ов)?|question)\s*(\d{1,2})\b/u,
+];
+const LOCAL_ASSISTANT_DURATION_PATTERNS = [
+  /(\d{1,3})\s*(?:минут|мин|minute|min)\b/u,
+  /(?:минут|мин|minute|min)\s*(\d{1,3})\b/u,
+];
+
+function containsAnyLocalAssistantPhrase(text, phrases) {
+  return phrases.some(item => text.includes(item));
+}
+
+function extractLocalAssistantCourseNumber(text) {
+  for (const pattern of LOCAL_ASSISTANT_COURSE_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) {
+      const value = Number.parseInt(match[1], 10);
+      if (Number.isFinite(value)) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractLocalAssistantMaterialType(text) {
+  for (const [alias, materialType] of LOCAL_ASSISTANT_MATERIAL_TYPE_ALIASES) {
+    if (text.includes(alias)) {
+      return materialType;
+    }
+  }
+
+  return "";
+}
+
+function extractLocalAssistantQuestionCount(text) {
+  for (const pattern of LOCAL_ASSISTANT_QUESTION_COUNT_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) {
+      const value = Number.parseInt(match[1], 10);
+      if (Number.isFinite(value)) {
+        return clampTestConfig(value, testConfig.durationMinutes).questionCount;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractLocalAssistantDurationMinutes(text) {
+  for (const pattern of LOCAL_ASSISTANT_DURATION_PATTERNS) {
+    const match = text.match(pattern);
+    if (match) {
+      const value = Number.parseInt(match[1], 10);
+      if (Number.isFinite(value)) {
+        return clampTestConfig(testConfig.questionCount, value).durationMinutes;
+      }
+    }
+  }
+
+  return null;
+}
+
+function tokenizeLocalAssistantTitle(value) {
+  return normalizeVoiceText(value)
+    .split(" ")
+    .filter(token => token.length > 2 && !LOCAL_ASSISTANT_STOP_TOKENS.has(token));
+}
+
+function scoreLocalAssistantEntityMatch(text, item) {
+  const normalizedTitle = normalizeVoiceText(item?.title || "");
+  if (!normalizedTitle) {
+    return 0;
+  }
+
+  if (text.includes(normalizedTitle)) {
+    return 1;
+  }
+
+  const titleTokens = tokenizeLocalAssistantTitle(normalizedTitle);
+  if (!titleTokens.length) {
+    return 0;
+  }
+
+  const matchedTokens = titleTokens.filter(token => text.includes(token)).length;
+  const tokenRatio = matchedTokens / titleTokens.length;
+  if (tokenRatio >= 0.66) {
+    return 0.75 + (tokenRatio * 0.2);
+  }
+
+  return 0;
+}
+
+function findBestLocalAssistantEntityMatch(text, items = []) {
+  let bestItem = null;
+  let bestScore = 0;
+
+  items.forEach(item => {
+    const score = scoreLocalAssistantEntityMatch(text, item);
+    if (score > bestScore) {
+      bestItem = item;
+      bestScore = score;
+    }
+  });
+
+  if (bestScore < 0.75) {
     return null;
   }
 
-  const language = detectAssistantReplyLanguage(transcript);
+  return bestItem;
+}
+
+function pickFirstLocalAssistantMaterialByType(context, materialType = "") {
+  if (!materialType) {
+    return null;
+  }
+
+  const availableMaterials = Array.isArray(context?.available_materials) ? context.available_materials : [];
+  const selectedMaterial = context?.selected_material && context.selected_material.id ? context.selected_material : null;
+
+  const firstMatch = availableMaterials.find(item => item.type === materialType);
+  if (firstMatch) {
+    return firstMatch;
+  }
+
+  if (selectedMaterial?.type === materialType) {
+    return selectedMaterial;
+  }
+
+  return null;
+}
+
+function buildLocalAssistantActionReply(action, language, payload = {}) {
+  const isRussian = language === "rus";
+  const subjectTitle = String(payload.subject_title || payload.subject?.title || "").trim();
+  const materialTitle = String(payload.material_title || payload.material?.title || "").trim();
+  const courseNumber = Number(payload.course_number ?? payload.subject?.course_number ?? payload.material?.course_number ?? 0) || 0;
+  const questionCount = Number(payload.question_count) || 0;
+  const durationMinutes = Number(payload.duration_minutes) || 0;
+
+  if (action === "open_course" && courseNumber) {
+    return isRussian ? `Хорошо, открою ${courseNumber} курс.` : `Жарайды, ${courseNumber}-курсты ашамын.`;
+  }
+
+  if (action === "open_subject" && subjectTitle) {
+    return isRussian ? `Хорошо, открою дисциплину ${subjectTitle}.` : `Жарайды, ${subjectTitle} пәнін ашамын.`;
+  }
+
+  if (action === "select_material" && materialTitle) {
+    return isRussian ? `Хорошо, открою материал ${materialTitle}.` : `Жарайды, ${materialTitle} материалын ашамын.`;
+  }
+
+  if (action === "generate_test") {
+    if (isRussian) {
+      if (questionCount && durationMinutes) {
+        return `Хорошо, подготовлю тест на ${questionCount} вопросов и ${durationMinutes} минут.`;
+      }
+      if (questionCount) {
+        return `Хорошо, подготовлю тест на ${questionCount} вопросов.`;
+      }
+      return "Хорошо, начну подготовку теста.";
+    }
+
+    if (questionCount && durationMinutes) {
+      return `Жарайды, ${questionCount} сұрақтық, ${durationMinutes} минуттық тест дайындауды бастаймын.`;
+    }
+    if (questionCount) {
+      return `Жарайды, ${questionCount} сұрақтық тест дайындауды бастаймын.`;
+    }
+    return "Жарайды, тест дайындауды бастаймын.";
+  }
+
+  const replyMap = {
+    show_help: isRussian ? "Хорошо, открою панель помощи." : "Жарайды, көмек панелін ашамын.",
+    go_home: isRussian ? "Хорошо, перейду на главную страницу." : "Жарайды, басты бетке өтемін.",
+    go_back: isRussian ? "Хорошо, верну на предыдущий экран." : "Жарайды, алдыңғы бетке қайтарамын.",
+    open_materials: isRussian ? "Хорошо, открою раздел материалов." : "Жарайды, материалдар бөлімін ашамын.",
+    open_test: isRussian ? "Хорошо, открою раздел теста." : "Жарайды, тест бөлімін ашамын.",
+    open_results: isRussian ? "Хорошо, открою результаты." : "Жарайды, нәтижелерді ашамын.",
+    open_results_sheet: isRussian ? "Хорошо, открою результаты в Google Sheets." : "Жарайды, нәтижелерді Google Sheets-та ашамын.",
+    open_slides: isRussian ? "Хорошо, открою раздел слайдов." : "Жарайды, слайд бөлімін ашамын.",
+    generate_slides: isRussian ? "Хорошо, начну подготовку слайдов." : "Жарайды, слайд дайындауды бастаймын.",
+    open_qr: isRussian ? "Хорошо, открою QR-код теста." : "Жарайды, тесттің QR кодын ашамын.",
+    start_test: isRussian ? "Хорошо, запущу тест." : "Жарайды, тестті іске қосамын.",
+  };
+
+  return replyMap[action] || "";
+}
+
+function buildLocalAssistantResponse(action, language, payload = {}) {
+  const subject = payload.subject || null;
+  const material = payload.material || null;
+
+  return {
+    action,
+    reply: payload.reply || buildLocalAssistantActionReply(action, language, payload),
+    course_number: Number(
+      payload.course_number ??
+      subject?.course_number ??
+      material?.course_number ??
+      0
+    ) || null,
+    subject_id: Number(payload.subject_id ?? subject?.id ?? material?.subject_id ?? 0) || null,
+    subject_title: String(payload.subject_title || subject?.title || "").trim(),
+    material_id: Number(payload.material_id ?? material?.id ?? 0) || null,
+    material_title: String(payload.material_title || material?.title || "").trim(),
+    material_type: String(payload.material_type || material?.type || "").trim(),
+    question_count: payload.question_count ?? null,
+    duration_minutes: payload.duration_minutes ?? null,
+    local: true,
+  };
+}
+
+function buildLocalAssistantSmalltalkReply(normalized, language) {
   const hasSystemAction = ["аш", "открой", "покажи", "жаса", "создай", "generate", "баста", "start"].some(item => normalized.includes(item));
   const isGreeting = ["сәлем", "салам", "салем", "қайырлы күн", "привет", "hello", "hi"].some(item => normalized.includes(item));
   const isThanks = ["рақмет", "рахмет", "спасибо", "thanks", "thank you"].some(item => normalized.includes(item));
@@ -4395,6 +4950,243 @@ function buildLocalAssistantFallback(transcript) {
       "Слайдтарды ашу үшін «слайдтарды аш» деңіз. Ал жаңасын жасау үшін «слайд жасап бер» деп айтыңыз.",
       "Чтобы открыть слайды, скажите «открой слайды». Чтобы создать новые, скажите «создай слайды».",
     );
+  }
+
+  return "";
+}
+
+function looksLikeLocalAssistantHelpRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_HELP_PHRASES);
+}
+
+function looksLikeLocalAssistantHomeRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_HOME_PHRASES);
+}
+
+function looksLikeLocalAssistantBackRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_BACK_PHRASES);
+}
+
+function looksLikeLocalAssistantGenerateTestRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_GENERATE_TEST_PHRASES);
+}
+
+function looksLikeLocalAssistantGenerateSlidesRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_GENERATE_SLIDES_PHRASES);
+}
+
+function looksLikeLocalAssistantOpenQrRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_OPEN_QR_PHRASES);
+}
+
+function looksLikeLocalAssistantStartTestRequest(text, context) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_START_TEST_PHRASES) || (
+    text === "баста" && (context.active_panel === "test" || context.has_generated_test)
+  );
+}
+
+function looksLikeLocalAssistantResultsRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_RESULTS_PHRASES);
+}
+
+function looksLikeLocalAssistantResultsSheetRequest(text) {
+  return looksLikeLocalAssistantResultsRequest(text)
+    && containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_RESULTS_SHEET_PHRASES);
+}
+
+function looksLikeLocalAssistantSlidesRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_SLIDES_PHRASES);
+}
+
+function looksLikeLocalAssistantMaterialsRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_MATERIALS_PHRASES)
+    || (
+      Boolean(extractLocalAssistantMaterialType(text))
+      && containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_OPEN_WORDS)
+    );
+}
+
+function looksLikeLocalAssistantOpenTestPanelRequest(text, context) {
+  if (looksLikeLocalAssistantGenerateTestRequest(text) || looksLikeLocalAssistantStartTestRequest(text, context)) {
+    return false;
+  }
+
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_TEST_PANEL_PHRASES);
+}
+
+function resolveLocalAssistantCommand(transcript) {
+  const normalized = normalizeVoiceText(transcript);
+  if (!normalized) {
+    return null;
+  }
+
+  const language = detectAssistantReplyLanguage(transcript);
+  const context = buildAssistantContext();
+  const matchedSubject = findBestLocalAssistantEntityMatch(normalized, context.available_subjects || []);
+  const matchedMaterial = findBestLocalAssistantEntityMatch(normalized, context.available_materials || []);
+  const selectedSubjectSnapshot = context.selected_subject?.id ? context.selected_subject : null;
+  const selectedMaterialSnapshot = context.selected_material?.id ? context.selected_material : null;
+  const courseNumber = extractLocalAssistantCourseNumber(normalized);
+  const materialType = extractLocalAssistantMaterialType(normalized);
+  const questionCount = extractLocalAssistantQuestionCount(normalized);
+  const durationMinutes = extractLocalAssistantDurationMinutes(normalized);
+  const targetMaterialFromType = pickFirstLocalAssistantMaterialByType(context, materialType || "");
+  const smalltalkReply = buildLocalAssistantSmalltalkReply(normalized, language);
+
+  if (smalltalkReply) {
+    return {
+      reply: smalltalkReply,
+      local: true,
+    };
+  }
+
+  if (looksLikeLocalAssistantHelpRequest(normalized)) {
+    return buildLocalAssistantResponse("show_help", language);
+  }
+
+  if (looksLikeLocalAssistantHomeRequest(normalized)) {
+    return buildLocalAssistantResponse("go_home", language);
+  }
+
+  if (looksLikeLocalAssistantBackRequest(normalized)) {
+    return buildLocalAssistantResponse("go_back", language);
+  }
+
+  if (looksLikeLocalAssistantGenerateSlidesRequest(normalized)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    if (targetMaterial) {
+      return buildLocalAssistantResponse("generate_slides", language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+      });
+    }
+  }
+
+  if (looksLikeLocalAssistantGenerateTestRequest(normalized) && !looksLikeLocalAssistantStartTestRequest(normalized, context)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    if (targetMaterial) {
+      return buildLocalAssistantResponse("generate_test", language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+        question_count: questionCount,
+        duration_minutes: durationMinutes,
+      });
+    }
+  }
+
+  if (looksLikeLocalAssistantOpenQrRequest(normalized)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    if (targetMaterial) {
+      return buildLocalAssistantResponse("open_qr", language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+        question_count: questionCount,
+        duration_minutes: durationMinutes,
+      });
+    }
+  }
+
+  if (looksLikeLocalAssistantStartTestRequest(normalized, context)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    if (targetMaterial) {
+      return buildLocalAssistantResponse("start_test", language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+        question_count: questionCount,
+        duration_minutes: durationMinutes,
+      });
+    }
+  }
+
+  if (looksLikeLocalAssistantResultsRequest(normalized)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    const actionName = looksLikeLocalAssistantResultsSheetRequest(normalized) ? "open_results_sheet" : "open_results";
+
+    if (targetMaterial) {
+      return buildLocalAssistantResponse(actionName, language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+      });
+    }
+
+    if (matchedSubject || selectedSubjectSnapshot || courseNumber) {
+      return buildLocalAssistantResponse(actionName, language, {
+        subject: matchedSubject || selectedSubjectSnapshot,
+        course_number: courseNumber || selectedSubjectSnapshot?.course_number || null,
+        material_type: materialType,
+      });
+    }
+  }
+
+  if (looksLikeLocalAssistantSlidesRequest(normalized)) {
+    const targetMaterial = matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot;
+    if (targetMaterial) {
+      return buildLocalAssistantResponse("open_slides", language, {
+        material: targetMaterial,
+        subject: matchedSubject || selectedSubjectSnapshot,
+        material_type: materialType || targetMaterial.type || "",
+      });
+    }
+
+    if (matchedSubject || selectedSubjectSnapshot || courseNumber) {
+      return buildLocalAssistantResponse("open_slides", language, {
+        subject: matchedSubject || selectedSubjectSnapshot,
+        course_number: courseNumber || selectedSubjectSnapshot?.course_number || null,
+        material_type: materialType,
+      });
+    }
+  }
+
+  if (matchedMaterial) {
+    return buildLocalAssistantResponse("select_material", language, {
+      material: matchedMaterial,
+      subject: matchedSubject || selectedSubjectSnapshot,
+      material_type: matchedMaterial.type || materialType || "",
+    });
+  }
+
+  if (matchedSubject) {
+    return buildLocalAssistantResponse(
+      looksLikeLocalAssistantMaterialsRequest(normalized) ? "open_materials" : "open_subject",
+      language,
+      {
+        subject: matchedSubject,
+        course_number: courseNumber || matchedSubject.course_number || null,
+        material_type: materialType,
+      },
+    );
+  }
+
+  if (courseNumber) {
+    return buildLocalAssistantResponse("open_course", language, {
+      course_number: courseNumber,
+      material_type: materialType,
+    });
+  }
+
+  if (looksLikeLocalAssistantMaterialsRequest(normalized) || (materialType && containsAnyLocalAssistantPhrase(normalized, LOCAL_ASSISTANT_OPEN_WORDS))) {
+    return buildLocalAssistantResponse("open_materials", language, {
+      subject: selectedSubjectSnapshot,
+      material: targetMaterialFromType || selectedMaterialSnapshot,
+      course_number: selectedSubjectSnapshot?.course_number || null,
+      material_type: materialType || targetMaterialFromType?.type || selectedMaterialSnapshot?.type || "",
+    });
+  }
+
+  if (looksLikeLocalAssistantOpenTestPanelRequest(normalized, context)) {
+    return buildLocalAssistantResponse("open_test", language, {
+      subject: selectedSubjectSnapshot,
+      material: matchedMaterial || targetMaterialFromType || selectedMaterialSnapshot,
+      course_number: selectedSubjectSnapshot?.course_number || null,
+      material_type: materialType || matchedMaterial?.type || targetMaterialFromType?.type || selectedMaterialSnapshot?.type || "",
+      question_count: questionCount,
+      duration_minutes: durationMinutes,
+    });
   }
 
   return null;
@@ -4598,6 +5390,8 @@ async function handleAssistantAction(assistantData) {
     materialType: assistantData.material_type,
   };
 
+  applyAssistantTestConfig(assistantData);
+
   if (assistantData.action === "show_help") {
     setVoicePanelOpen(true);
     setVoiceHelpOpen(true);
@@ -4617,64 +5411,112 @@ async function handleAssistantAction(assistantData) {
   }
 
   if (assistantData.action === "open_subject") {
-    await ensureAssistantSubjectContext(selectionPayload);
+    await applyAssistantWorkspaceSelection(assistantData, {
+      loadTestSession: false,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("materials");
     renderMaterialPreview();
     return;
   }
 
-  if ([
-    "select_material",
-    "open_materials",
-    "open_test",
-    "open_results",
-    "open_slides",
-    "generate_test",
-    "generate_slides",
-    "open_qr",
-    "start_test",
-  ].includes(assistantData.action)) {
-    await syncAssistantMaterialSelection(selectionPayload);
-  }
-
   if (assistantData.action === "select_material") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: false,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("materials");
     renderMaterialPreview();
     return;
   }
 
   if (assistantData.action === "open_materials") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: false,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("materials");
     renderMaterialPreview();
     return;
   }
 
   if (assistantData.action === "open_test") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("test");
     renderTestBlock(false);
     return;
   }
 
   if (assistantData.action === "open_results") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("results");
     await renderResultsBlock();
     return;
   }
 
+  if (assistantData.action === "open_results_sheet") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
+    switchSubjectPanel("results");
+    await openResultsSheetDirect();
+    return;
+  }
+
   if (assistantData.action === "open_slides") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: false,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("slides");
     renderSlidesPreview();
     return;
   }
 
   if (assistantData.action === "generate_slides") {
+    await applyAssistantWorkspaceSelection(assistantData, {
+      loadTestSession: false,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     await generateSlidesForSelectedMaterial();
     return;
   }
 
   if (assistantData.action === "generate_test") {
     switchSubjectPanel("test");
-    await createAiQuestions();
+    await applyAssistantWorkspaceSelection(assistantData, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
+    await createAiQuestions({
+      questionCount: assistantData.question_count,
+      durationMinutes: assistantData.duration_minutes,
+    });
     return;
   }
 
@@ -4683,23 +5525,41 @@ async function handleAssistantAction(assistantData) {
   }
 
   if (assistantData.action === "open_qr") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("test");
     if (!generatedQuestions.length) {
-      await createAiQuestions();
+      await createAiQuestions({
+        questionCount: assistantData.question_count,
+        durationMinutes: assistantData.duration_minutes,
+      });
     }
     if (generatedQuestions.length) {
-      showQr();
+      await showQr();
     }
     return;
   }
 
   if (assistantData.action === "start_test") {
+    await syncAssistantMaterialSelection(selectionPayload, {
+      loadTestSession: true,
+      renderSlides: false,
+      renderTest: false,
+      renderResults: false,
+    });
     switchSubjectPanel("test");
     if (!generatedQuestions.length) {
-      await createAiQuestions();
+      await createAiQuestions({
+        questionCount: assistantData.question_count,
+        durationMinutes: assistantData.duration_minutes,
+      });
     }
     if (generatedQuestions.length) {
-      openTestDirect();
+      await openTestDirect();
     }
     return;
   }
@@ -4727,7 +5587,7 @@ function setVoiceState(state, text) {
 function sanitizeSpeechText(text) {
   return String(text || "")
     .replace(/["«»]/g, "")
-    .replace(/\bQR\b/gi, selectedRole === "kaz" ? "кью ар код" : "ку эр код")
+    .replace(/\bQR\b/gi, roleText("кью ар код", "ку эр код", "queue ar code"))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -4743,35 +5603,58 @@ function buildAssistantSpeechReply(assistantData, fallbackText = "") {
   const courseNumber = Number(assistantData.course_number) || 0;
 
   const speechMap = {
-    show_help: "Түсіндім, көмекті ашып беремін.",
-    go_home: "Түсіндім, басты бетке өтемін.",
-    go_back: "Түсіндім, артқа қайтарамын.",
-    open_materials: "Түсіндім, материалдарды ашып беремін.",
-    open_test: "Түсіндім, тест бөлімін ашып беремін.",
-    open_results: "Түсіндім, нәтижелерді ашып беремін.",
-    open_slides: "Түсіндім, слайдтарды ашып беремін.",
-    open_qr: "Түсіндім, кью ар кодты ашып беремін.",
-    start_test: "Түсіндім, тестті бастаймын.",
-    generate_test: "Түсіндім, тест жасап беремін.",
-    generate_slides: "Түсіндім, слайд жасап беремін.",
+    show_help: "Жарайды, көмек бөлімін ашамын.",
+    go_home: "Жарайды, басты бетке өтемін.",
+    go_back: "Жарайды, алдыңғы бетке қайтарамын.",
+    open_materials: "Жарайды, материалдар бөлімін ашамын.",
+    open_test: "Жарайды, тест бөлімін ашамын.",
+    open_results: "Жарайды, нәтижелерді ашамын.",
+    open_results_sheet: "Жарайды, нәтижелерді Google Sheets-та ашамын.",
+    open_slides: "Жарайды, слайд бөлімін ашамын.",
+    open_qr: "Жарайды, QR кодын ашамын.",
+    start_test: "Жарайды, тестті іске қосамын.",
+    generate_test: "Жарайды, тест дайындауды бастаймын.",
+    generate_slides: "Жарайды, слайд дайындауды бастаймын.",
   };
 
   if (assistantData.action === "open_course" && courseNumber) {
-    return `Түсіндім, ${courseNumber}-курсты ашып беремін.`;
+    return `Жарайды, ${courseNumber}-курсты ашамын.`;
   }
 
   if (assistantData.action === "open_subject" && subjectTitle) {
-    return `Түсіндім, ${subjectTitle} пәнін ашып беремін.`;
+    return `Жарайды, ${subjectTitle} пәнін ашамын.`;
   }
 
   if (assistantData.action === "select_material" && materialTitle) {
-    return `Түсіндім, ${materialTitle} материалын ашып беремін.`;
+    return `Жарайды, ${materialTitle} материалын ашамын.`;
   }
 
   return speechMap[assistantData.action] || fallback;
 }
 
-function speakAssistantReply(text) {
+function stopAssistantSpeechPlayback() {
+  if (assistantSpeechAbortController) {
+    assistantSpeechAbortController.abort();
+    assistantSpeechAbortController = null;
+  }
+
+  if (assistantSpeechAudio) {
+    assistantSpeechAudio.pause();
+    assistantSpeechAudio.src = "";
+    assistantSpeechAudio = null;
+  }
+
+  if (assistantSpeechObjectUrl) {
+    URL.revokeObjectURL(assistantSpeechObjectUrl);
+    assistantSpeechObjectUrl = "";
+  }
+
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+function speakAssistantReplyWithBrowser(text) {
   if (!text || !("speechSynthesis" in window)) {
     return;
   }
@@ -4787,7 +5670,13 @@ function speakAssistantReply(text) {
     preferredVoice =
       voices.find(v => v.lang === "kk-KZ") ||
       voices.find(v => v.lang?.startsWith("kk")) ||
-      voices.find(v => /kazakh|қазақ/i.test(v.name || "")) ||
+      voices.find(v => /kazakh|Т›Р°Р·Р°Т›/i.test(v.name || "")) ||
+      null;
+  } else if (selectedRole === "eng") {
+    preferredVoice =
+      voices.find(v => v.lang === "en-US") ||
+      voices.find(v => v.lang?.startsWith("en")) ||
+      voices[0] ||
       null;
   } else {
     preferredVoice =
@@ -4812,6 +5701,62 @@ function speakAssistantReply(text) {
   utterance.volume = 1;
 
   synth.speak(utterance);
+}
+
+async function speakAssistantReply(text) {
+  const cleanText = sanitizeSpeechText(text);
+  if (!cleanText) {
+    return;
+  }
+
+  stopAssistantSpeechPlayback();
+
+  const abortController = new AbortController();
+  assistantSpeechAbortController = abortController;
+
+  try {
+    const audioResponse = await requestAssistantSpeechAudio(cleanText, abortController.signal);
+    if (assistantSpeechAbortController !== abortController) {
+      return;
+    }
+
+    assistantSpeechObjectUrl = URL.createObjectURL(audioResponse.blob);
+    const audio = new Audio(assistantSpeechObjectUrl);
+    assistantSpeechAudio = audio;
+
+    const cleanup = () => {
+      if (assistantSpeechAudio === audio) {
+        assistantSpeechAudio = null;
+      }
+      if (assistantSpeechAbortController === abortController) {
+        assistantSpeechAbortController = null;
+      }
+      if (assistantSpeechObjectUrl) {
+        URL.revokeObjectURL(assistantSpeechObjectUrl);
+        assistantSpeechObjectUrl = "";
+      }
+    };
+
+    audio.addEventListener("ended", cleanup, { once: true });
+    audio.addEventListener("error", cleanup, { once: true });
+
+    await audio.play();
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return;
+    }
+
+    console.warn("Assistant speech playback fallback:", error);
+    if (assistantSpeechAbortController === abortController) {
+      assistantSpeechAbortController = null;
+    }
+    if (assistantSpeechObjectUrl) {
+      URL.revokeObjectURL(assistantSpeechObjectUrl);
+      assistantSpeechObjectUrl = "";
+    }
+    assistantSpeechAudio = null;
+    speakAssistantReplyWithBrowser(cleanText);
+  }
 }
 
 function stopVoiceCapture() {
@@ -4916,6 +5861,7 @@ async function toggleListening(event) {
 
   setVoicePanelOpen(true);
   setVoiceHelpOpen(false);
+  stopAssistantSpeechPlayback();
 
   if (stopVoiceCapture()) {
     return;
@@ -4955,10 +5901,33 @@ async function handleAssistantCommand(transcript, options = {}) {
     return;
   }
 
-  const localReply = buildLocalAssistantFallback(cleanTranscript);
-  if (localReply) {
-    setVoiceState("idle", localReply);
-    speakAssistantReply(localReply);
+  stopAssistantSpeechPlayback();
+
+  const localAssistantData = resolveLocalAssistantCommand(cleanTranscript);
+  if (localAssistantData) {
+    try {
+      const spokenReply = buildAssistantSpeechReply(localAssistantData, localAssistantData.reply || "");
+      const visibleReply = localAssistantData.reply || spokenReply;
+
+      if (visibleReply) {
+        setVoiceState("idle", visibleReply);
+      }
+
+      if (spokenReply) {
+        speakAssistantReply(spokenReply);
+      }
+
+      if (localAssistantData.action) {
+        await handleAssistantAction(localAssistantData);
+      }
+    } catch (error) {
+      console.error("Local assistant command error:", error);
+      const detailedReply = String(error?.message || "").trim();
+      const visibleReply = detailedReply || t("voiceRequestError");
+      const spokenReply = detailedReply || t("voiceSorry");
+      setVoiceState("idle", visibleReply);
+      speakAssistantReply(spokenReply);
+    }
     return;
   }
 
@@ -5155,7 +6124,7 @@ if (roleTitleBtn) {
 
 roleMenuItems.forEach(btn => {
   btn.addEventListener("click", async () => {
-    selectedRole = btn.dataset.roleValue;
+    selectedRole = SUPPORTED_ROLES.includes(btn.dataset.roleValue) ? btn.dataset.roleValue : "kaz";
     roleMenu.classList.add("hidden");
     await refreshInterfaceLanguage({ roleChanged: true });
   });
@@ -5257,6 +6226,7 @@ if (subjectSelect) {
 
 if (materialTypeSelect) {
   materialTypeSelect.addEventListener("change", async () => {
+    cancelActiveTestGeneration();
     activeType = materialTypeSelect.value;
     selectedMaterialId = null;
     slidesErrorMessage = "";
@@ -5355,6 +6325,7 @@ if (saveDisciplineBtn) {
 
 if (topicSelect) {
   topicSelect.addEventListener("change", async () => {
+    cancelActiveTestGeneration();
     selectedMaterialId = Number(topicSelect.value);
     slidesErrorMessage = "";
     renderDriveStatus();
@@ -5384,7 +6355,7 @@ if (openSlidesBtn) {
     renderSlidesPreview();
 
     const material = getSelectedMaterial();
-    if (!material || material.type !== "lecture" || isSlidesGenerating) {
+    if (!material || isSlidesGenerating) {
       return;
     }
 
@@ -5403,13 +6374,6 @@ async function generateSlidesForSelectedMaterial() {
 
   if (!currentMaterial) {
     setSlidesStatus(t("slidesSelectPrompt"), "error");
-    renderSlidesPreview();
-    return;
-  }
-
-  if (currentMaterial.type !== "lecture") {
-    slidesErrorMessage = "";
-    setSlidesStatus(t("slidesLectureOnly"), "error");
     renderSlidesPreview();
     return;
   }
@@ -5436,7 +6400,7 @@ async function generateSlidesForSelectedMaterial() {
     saveTeacherAppState();
   } catch (error) {
     console.error("AI SLIDES ERROR:", error);
-    slidesErrorMessage = error?.message || t("slidesError");
+    slidesErrorMessage = getAiServiceErrorMessage(error, t("slidesError"));
   } finally {
     isSlidesGenerating = false;
     updateActionButtonsState();
@@ -5451,15 +6415,12 @@ function setTestPanelInfo(message = "", state = "neutral") {
   const stateLabel = String(options.stateLabel || "").trim();
   const metaText = String(options.metaText || message || "").trim();
   const hintText = String(options.hintText || "").trim();
+  const timerText = String(options.timerText || "").trim();
   const actionLabel = String(options.actionLabel || "").trim();
-  const hasContent = Boolean(stateLabel || metaText || hintText);
+  const hasContent = Boolean(stateLabel || metaText || hintText || timerText);
 
   testInfoCard.classList.toggle("hidden", !hasContent);
   testInfoCard.dataset.state = state || "neutral";
-
-  if (testInfoRow) {
-    testInfoRow.classList.toggle("hidden", !hasContent && !actionLabel && previewTestBtn?.classList.contains("hidden"));
-  }
 
   if (testInfoState) {
     testInfoState.textContent = stateLabel;
@@ -5467,6 +6428,11 @@ function setTestPanelInfo(message = "", state = "neutral") {
   }
 
   testInfoText.textContent = metaText;
+
+  if (testInfoTimer) {
+    testInfoTimer.textContent = timerText;
+    testInfoTimer.classList.toggle("hidden", !timerText);
+  }
 
   if (testInfoHint) {
     testInfoHint.textContent = hintText;
@@ -5479,16 +6445,42 @@ function setTestPanelInfo(message = "", state = "neutral") {
     launchTestBtn.disabled = Boolean(options.actionDisabled);
     launchTestBtn.classList.toggle("hidden", !actionLabel);
   }
+
+  updateTestInfoRowVisibility();
 }
 
-function setTestQrCaption(title = "", text = "", visible = false) {
+function setTestLoadingState(visible = false) {
+  if (!testLoadingCard) return;
+
+  if (testLoadingTitle) {
+    testLoadingTitle.textContent = roleText("ИИ тест жасау басталды", "AI-тест формируется", "AI test is being prepared");
+  }
+
+  if (testLoadingText) {
+    testLoadingText.textContent = roleText(
+      "Параметрлер бойынша сұрақтар дайындалып жатыр",
+      "Вопросы готовятся по выбранным параметрам",
+      "Questions are being prepared with the selected settings",
+    );
+  }
+
+  testLoadingCard.classList.toggle("hidden", !visible);
+  updateTestInfoRowVisibility();
+}
+
+function setTestQrCaption(title = "", text = "", visible = false, timerText = "") {
   if (!testQrCaption) return;
 
-  const hasContent = Boolean(visible && (title || text));
+  const hasContent = Boolean(visible && (title || text || timerText));
   testQrCaption.classList.toggle("hidden", !hasContent);
 
   if (testQrCaptionTitle) {
     testQrCaptionTitle.textContent = title || "";
+  }
+
+  if (testQrCaptionTimer) {
+    testQrCaptionTimer.textContent = timerText || "";
+    testQrCaptionTimer.classList.toggle("hidden", !timerText);
   }
 
   if (testQrCaptionText) {
@@ -5504,25 +6496,45 @@ function stopTeacherTestStatusTimer() {
 }
 
 function syncTeacherTestPanelInfo(session = currentTestSession) {
-  if (!generatedQuestions.length) {
+  if (!shouldShowTeacherTestCard(session)) {
     stopTeacherTestStatusTimer();
     setTestPanelInfo("");
+    setTestQrCaption("", "", false, "");
     return;
   }
 
   const info = getTeacherTestInfoState(session);
   setTestPanelInfo("", info.state, {
-    stateLabel: info.label,
+    stateLabel: info.cardLabel || info.label,
     metaText: info.meta,
     hintText: info.hint,
+    timerText: info.timerLabel,
     actionLabel: info.actionLabel,
+  });
+
+  if (testQrBoard?.classList.contains("is-qr-mode")) {
+    setTestQrCaption(info.qrTitle, info.qrHint, true, info.qrTimer);
+  }
+}
+
+async function requestAssistantSpeechAudio(text, signal) {
+  return fetchAudioBlob(`${API_BASE}/assistant/speak/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      text,
+      language: selectedRole,
+    }),
+    signal,
   });
 }
 
 function startTeacherTestStatusTimer(session = currentTestSession) {
   stopTeacherTestStatusTimer();
 
-  if (!session || String(session.session_status || "").toLowerCase() !== "live") {
+  if (!session || getNormalizedTestSessionStatus(session) !== "live") {
     return;
   }
 
@@ -5540,6 +6552,7 @@ function startTeacherTestStatusTimer(session = currentTestSession) {
       currentTestSession.session_status = "expired";
       syncTeacherTestPanelInfo(currentTestSession);
       stopTeacherTestStatusTimer();
+      startTeacherTestCardRemoval();
       closeCurrentTestSessionWindow().catch((error) => {
         console.error("Test close sync error:", error);
       });
@@ -5566,113 +6579,22 @@ function setTestPaneMode(mode = "settings") {
   if (testSettingsPanel) {
     testSettingsPanel.classList.toggle("hidden", qrMode);
   }
-
-  if (testQrActions) {
-    testQrActions.classList.toggle("hidden", !qrMode);
-  }
 }
 
-renderTestSettingsPanel = function renderTestSettingsPanelOverride() {
-  const material = getSelectedMaterial();
-  const isLecture = material?.type === "lecture";
-
-  syncTestConfigInputs();
-
-  if (buildTestBtn) {
-    buildTestBtn.disabled = !isLecture || isTestGenerating;
-    buildTestBtn.textContent = isTestGenerating
-      ? (selectedRole === "kaz" ? "Жасалып жатыр..." : "Создается...")
-      : (selectedRole === "kaz" ? "Тест жасау" : "Создать тест");
-  }
-
-  if (testQuestionCountInput) {
-    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
-  }
-
-  if (testDurationInput) {
-    testDurationInput.disabled = !isLecture || isTestGenerating;
-  }
-
-  if (testSettingsTitle) {
-    testSettingsTitle.textContent = "";
-  }
-
-  if (testSettingsHint) {
-    testSettingsHint.textContent = "";
-  }
-};
-
-renderTestBlock = function renderTestBlockOverride(showQrInline = false) {
-  const material = getSelectedMaterial();
-  const qrMode = showQrInline === true;
-  renderTestSettingsPanel();
-  setTestPaneMode(qrMode ? "qr" : "settings");
-
-  if (!material) {
-    setTestPanelInfo("");
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
-    setTestPaneMode("settings");
-    updateActionButtonsState();
-    return;
-  }
-
-  if (material.type !== "lecture") {
-    setTestPanelInfo(t("testLectureOnly"), "error");
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
-    setTestPaneMode("settings");
-    updateActionButtonsState();
-    return;
-  }
-
-  if (!generatedQuestions.length) {
-    setTestPanelInfo("");
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
-    setTestPaneMode("settings");
-    updateActionButtonsState();
-    return;
-  }
-
-  const publicUrl = getCurrentTestLaunchUrl();
-
-  if (!qrMode) {
-    setTestPanelInfo(
-      selectedRole === "kaz"
-        ? `Тест дайын · ${generatedQuestions.length} сұрақ · ${testConfig.durationMinutes} мин`
-        : `Тест готов · ${generatedQuestions.length} вопросов · ${testConfig.durationMinutes} мин`
-    );
-  } else {
-    setTestPanelInfo("");
-  }
-
-  if (!publicUrl) {
-    qrImageInline.style.display = "none";
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
-    updateActionButtonsState();
-    return;
-  }
-
-  if (qrMode) {
-    qrImageInline.src = buildInlineQrUrl(publicUrl);
-    qrImageInline.style.display = "block";
-  } else {
-    qrImageInline.style.display = "none";
-  }
-
-  setOpenTestDirectDisabled(!qrMode);
-  if (showQrBtn) showQrBtn.disabled = false;
-  setTestPaneMode(qrMode ? "qr" : "settings");
-  updateActionButtonsState();
-};
-
-createAiQuestions = async function createAiQuestionsOverride() {
+async function createAiQuestions(options = {}) {
+  const { questionCount = null, durationMinutes = null } = options;
   const currentMaterial = getSelectedMaterial();
+  const currentMaterialId = Number(currentMaterial?.id || 0) || null;
+  const previousSessionSnapshot = currentTestSession ? JSON.parse(JSON.stringify(currentTestSession)) : null;
+
+  if (questionCount != null || durationMinutes != null) {
+    testConfig = clampTestConfig(
+      questionCount ?? testConfig.questionCount,
+      durationMinutes ?? testConfig.durationMinutes,
+    );
+    syncTestConfigInputs();
+    saveStoredTestConfig();
+  }
 
   switchSubjectPanel("test");
   setTestPaneMode("settings");
@@ -5683,22 +6605,27 @@ createAiQuestions = async function createAiQuestionsOverride() {
     return;
   }
 
-  if (currentMaterial.type !== "lecture") {
-    setTestPanelInfo(t("aiTestLectureOnly"), "error");
-    renderTestSettingsPanel();
-    return;
-  }
-
   isTestGenerating = true;
+  cancelActiveTestGeneration({ keepUiState: true });
+  const abortController = new AbortController();
+  testGenerationAbortController = abortController;
+  activeTestGenerationMaterialId = currentMaterialId;
+  activeTestGenerationStartedAt = Date.now() - 5000;
+  activeTestGenerationPreviousSessionId = previousSessionSnapshot?.id || null;
+  startTestGenerationWatchdog(currentMaterialId);
+  clearTeacherTestCardCleanupTimer();
+  isTeacherTestCardDisintegrating = false;
+  visibleTeacherTestSessionId = null;
+  currentTestSession = null;
+  generatedQuestions = [];
+  testGenerationNotice = "";
   generateTestBtn.disabled = true;
-  setTestPanelInfo(t("generatingAiTest"));
+  setTestPanelInfo("");
   renderTestSettingsPanel();
+  renderTestBlock(false);
 
   try {
-    const nextQuestionCount = getCurrentQuestionCount();
-    const nextDurationMinutes = getCurrentDurationMinutes();
-    testConfig = clampTestConfig(nextQuestionCount, nextDurationMinutes);
-    saveStoredTestConfig();
+    commitTestConfigFromInputs({ syncInputs: true, persist: true });
 
     const data = await fetchJSON(`${API_BASE}/materials/${currentMaterial.id}/generate-test/`, {
       method: "POST",
@@ -5708,7 +6635,8 @@ createAiQuestions = async function createAiQuestionsOverride() {
       body: JSON.stringify({
         language: selectedRole,
         question_count: testConfig.questionCount,
-      })
+      }),
+      signal: abortController.signal,
     });
 
     generatedQuestions = data.test.map((item, index) => ({
@@ -5729,85 +6657,152 @@ createAiQuestions = async function createAiQuestionsOverride() {
         question_count: testConfig.questionCount,
         duration_minutes: testConfig.durationMinutes,
         questions: generatedQuestions.map((q) => serializeGeneratedQuestion(q))
-      })
+      }),
+      signal: abortController.signal,
     });
+
+    if (abortController.signal.aborted) {
+      return;
+    }
+
     hydrateCurrentTestSession({
       ...sessionData,
       material: currentMaterial.id,
       questions_json: generatedQuestions.map((q) => serializeGeneratedQuestion(q)),
     });
+    visibleTeacherTestSessionId = currentTestSession?.id || null;
+    testGenerationNotice = "";
 
-    renderTestBlock(false);
-    saveTeacherAppState();
+    if (Number(getSelectedMaterial()?.id || 0) === currentMaterialId) {
+      renderTestBlock(false);
+      saveTeacherAppState();
+    }
   } catch (error) {
-    console.error("AI TEST ERROR:", error);
-    setTestPanelInfo(error?.message || t("aiTestError"), "error");
-  } finally {
-    isTestGenerating = false;
-    generateTestBtn.disabled = false;
-    updateActionButtonsState();
-  }
-};
+    if (error?.name === "AbortError") {
+      return;
+    }
 
-renderTestSettingsPanel = function renderTestSettingsPanelEnhanced() {
+    console.error("AI TEST ERROR:", error);
+    setTestLoadingState(false);
+    if (previousSessionSnapshot && Number(getSelectedMaterial()?.id || 0) === currentMaterialId) {
+      hydrateCurrentTestSession(previousSessionSnapshot);
+      const fallbackStatus = getNormalizedTestSessionStatus(currentTestSession);
+      visibleTeacherTestSessionId = ["ready", "live"].includes(fallbackStatus) ? currentTestSession?.id || null : null;
+      testGenerationNotice = getTestRegenerationFailedMessage(error);
+      renderTestBlock(false);
+    } else if (Number(getSelectedMaterial()?.id || 0) === currentMaterialId) {
+      testGenerationNotice = getAiServiceErrorMessage(error, t("aiTestError"));
+      setTestPanelInfo(testGenerationNotice, "error");
+    }
+  } finally {
+    const isCurrentGeneration = testGenerationAbortController === abortController;
+
+    if (isCurrentGeneration) {
+      testGenerationAbortController = null;
+      activeTestGenerationMaterialId = null;
+      activeTestGenerationStartedAt = 0;
+      activeTestGenerationPreviousSessionId = null;
+      stopTestGenerationWatchdog();
+
+      isTestGenerating = false;
+      if (generateTestBtn) {
+        generateTestBtn.disabled = false;
+      }
+      if (Number(getSelectedMaterial()?.id || 0) === currentMaterialId) {
+        renderTestSettingsPanel();
+        renderTestBlock(Boolean(testQrBoard?.classList.contains("is-qr-mode")));
+      }
+      updateActionButtonsState();
+    }
+  }
+}
+
+function renderTestSettingsPanel() {
   const material = getSelectedMaterial();
-  const isLecture = material?.type === "lecture";
-  const hasGeneratedTest = generatedQuestions.length > 0;
+  const canPrepareTest = Boolean(material);
+  const hasGeneratedTest = shouldShowTeacherTestCard(currentTestSession);
 
   syncTestConfigInputs();
 
   if (buildTestBtn) {
-    buildTestBtn.disabled = !isLecture || isTestGenerating;
+    buildTestBtn.disabled = !canPrepareTest || isTestGenerating;
     buildTestBtn.textContent = isTestGenerating
-      ? (selectedRole === "kaz" ? "Жасалып жатыр..." : "Создается...")
-      : (selectedRole === "kaz" ? "Тест жасау" : "Создать тест");
+      ? roleText("Дайындалып жатыр...", "Подготовка...", "Preparing...")
+      : hasGeneratedTest
+        ? roleText("Қайта дайындау", "Подготовить заново", "Prepare again")
+        : roleText("Тестті дайындау", "Подготовить тест", "Prepare test");
   }
 
   if (previewTestBtn) {
-    previewTestBtn.disabled = !isLecture || !hasGeneratedTest || isTestGenerating;
-    previewTestBtn.classList.toggle("hidden", !isLecture || !hasGeneratedTest);
+    previewTestBtn.disabled = !canPrepareTest || !hasGeneratedTest || isTestGenerating;
+    previewTestBtn.classList.toggle("hidden", !canPrepareTest || !hasGeneratedTest);
   }
 
   if (testQuestionCountInput) {
-    testQuestionCountInput.disabled = !isLecture || isTestGenerating;
+    testQuestionCountInput.disabled = !canPrepareTest || isTestGenerating;
   }
 
   if (testDurationInput) {
-    testDurationInput.disabled = !isLecture || isTestGenerating;
+    testDurationInput.disabled = !canPrepareTest || isTestGenerating;
   }
 
   if (testSettingsTitle) {
-    testSettingsTitle.textContent = "";
+    testSettingsTitle.textContent = !canPrepareTest
+      ? roleText("Материал таңдалмады", "Материал не выбран", "No material selected")
+      : roleText("Тест параметрлері", "Параметры теста", "Test settings");
+  }
+
+  if (testQuestionCountLabel) {
+    testQuestionCountLabel.textContent = roleText("Сұрақ саны", "Количество вопросов", "Number of questions");
+  }
+
+  if (testQuestionCountHint) {
+    testQuestionCountHint.textContent = roleText("Неше сұрақ жасалады", "Сколько вопросов подготовить", "How many questions to prepare");
+  }
+
+  if (testQuestionCountUnit) {
+    testQuestionCountUnit.textContent = roleText("сұрақ", "вопр.", "questions");
+  }
+
+  if (testDurationLabel) {
+    testDurationLabel.textContent = roleText("Жауап қабылдау уақыты", "Время приема ответов", "Answer time");
+  }
+
+  if (testDurationHint) {
+    testDurationHint.textContent = roleText("Уақыт біткенде тест жабылады", "После него тест закроется", "The test closes when time is over");
+  }
+
+  if (testDurationUnit) {
+    testDurationUnit.textContent = roleText("мин", "мин", "min");
   }
 
   if (testSettingsHint) {
-    if (!isLecture) {
-      testSettingsHint.textContent = t("testLectureOnly");
-    } else if (hasGeneratedTest) {
-      testSettingsHint.textContent = selectedRole === "kaz"
-        ? "QR іске қосылғаннан кейін уақыт барлық студентке ортақ жүреді. Алдымен тестті қарап, керек болса өңдеп алыңыз."
-        : "После запуска QR время станет общим для всех студентов. Сначала просмотрите тест и при необходимости отредактируйте его.";
-    } else {
-      testSettingsHint.textContent = selectedRole === "kaz"
-        ? "Сұрақ саны мен жалпы уақытты таңдаңыз. Таймер QR ашылған сәттен басталады."
-        : "Выберите количество вопросов и общее время. Таймер начнется в момент открытия QR.";
-    }
+    const hintText = testGenerationNotice || (!canPrepareTest ? t("selectMaterialFirst") : "");
+    testSettingsHint.textContent = hintText;
+    testSettingsHint.classList.toggle("hidden", !hintText);
   }
-};
+}
 
-renderTestBlock = function renderTestBlockEnhanced(showQrInline = false) {
+function renderTestBlock(showQrInline = false) {
   const material = getSelectedMaterial();
   const qrMode = showQrInline === true;
+
   renderTestSettingsPanel();
   setTestPaneMode(qrMode ? "qr" : "settings");
+  setTestLoadingState(Boolean(isTestGenerating && material));
+
+  const resetQrState = () => {
+    if (qrImageInline) {
+      qrImageInline.style.display = "none";
+    }
+    setTestQrCaption("", "", false, "");
+  };
 
   if (!material) {
     stopTeacherTestStatusTimer();
+    setTestLoadingState(false);
     setTestPanelInfo("");
-    qrImageInline.style.display = "none";
-    setTestQrCaption("", "", false);
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
+    resetQrState();
     setTestPaneMode("settings");
     updateActionButtonsState();
     return;
@@ -5815,23 +6810,29 @@ renderTestBlock = function renderTestBlockEnhanced(showQrInline = false) {
 
   if (material.type !== "lecture") {
     stopTeacherTestStatusTimer();
+    setTestLoadingState(false);
     setTestPanelInfo(t("testLectureOnly"), "error");
-    qrImageInline.style.display = "none";
-    setTestQrCaption("", "", false);
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
+    resetQrState();
     setTestPaneMode("settings");
     updateActionButtonsState();
     return;
   }
 
-  if (!generatedQuestions.length) {
+  if (isTestGenerating) {
     stopTeacherTestStatusTimer();
     setTestPanelInfo("");
-    qrImageInline.style.display = "none";
-    setTestQrCaption("", "", false);
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
+    resetQrState();
+    setTestPaneMode("settings");
+    updateActionButtonsState();
+    return;
+  }
+
+  setTestLoadingState(false);
+
+  if (!generatedQuestions.length || !shouldShowTeacherTestCard(currentTestSession)) {
+    stopTeacherTestStatusTimer();
+    setTestPanelInfo("");
+    resetQrState();
     setTestPaneMode("settings");
     updateActionButtonsState();
     return;
@@ -5840,7 +6841,6 @@ renderTestBlock = function renderTestBlockEnhanced(showQrInline = false) {
   const launchUrl = getCurrentTestLaunchUrl();
   const info = getTeacherTestInfoState(currentTestSession);
   const canDisplayQr = qrMode && info.state === "live" && Boolean(launchUrl);
-  const canOpenDirect = info.state === "live" && Boolean(launchUrl);
 
   syncTeacherTestPanelInfo(currentTestSession);
 
@@ -5851,30 +6851,101 @@ renderTestBlock = function renderTestBlockEnhanced(showQrInline = false) {
   }
 
   if (!launchUrl) {
-    qrImageInline.style.display = "none";
-    setTestQrCaption("", "", false);
-    setOpenTestDirectDisabled(true);
-    if (showQrBtn) showQrBtn.disabled = true;
+    resetQrState();
     updateActionButtonsState();
     return;
   }
 
-  if (canDisplayQr) {
+  if (canDisplayQr && qrImageInline) {
     qrImageInline.src = buildInlineQrUrl(launchUrl);
     qrImageInline.style.display = "block";
-    setTestQrCaption(info.qrTitle, info.qrHint, true);
+    setTestQrCaption(info.qrTitle, info.qrHint, true, info.qrTimer);
   } else {
-    qrImageInline.style.display = "none";
-    setTestQrCaption(info.qrTitle, info.qrHint, qrMode);
+    resetQrState();
+    setTestQrCaption(info.qrTitle, info.qrHint, qrMode, info.qrTimer);
   }
 
-  setOpenTestDirectDisabled(!canOpenDirect);
-  if (showQrBtn) showQrBtn.disabled = false;
   setTestPaneMode(qrMode ? "qr" : "settings");
   updateActionButtonsState();
-};
+}
 
-startPublicTestTimer = function startPublicTestTimerEnhanced() {
+async function launchTeacherTestFromCard() {
+  const material = getSelectedMaterial();
+  if (!material || material.type !== "lecture" || !shouldShowTeacherTestCard(currentTestSession)) {
+    renderTestBlock(false);
+    return;
+  }
+
+  try {
+    const info = getTeacherTestInfoState(currentTestSession);
+    if (info.state === "live") {
+      await showQr();
+      return;
+    }
+
+    if (info.state === "ready") {
+      await launchCurrentTestSession();
+    }
+    renderTestBlock(false);
+  } catch (error) {
+    console.error("TEST START ERROR:", error);
+    setTestPanelInfo(error?.message || t("aiTestError"), "error");
+    renderTestBlock(false);
+  }
+}
+
+async function showQr() {
+  const material = getSelectedMaterial();
+  if (!material || material.type !== "lecture" || !shouldShowTeacherTestCard(currentTestSession)) {
+    renderTestBlock(false);
+    return;
+  }
+
+  try {
+    const info = getTeacherTestInfoState(currentTestSession);
+    if (info.state === "ready") {
+      await launchCurrentTestSession();
+    } else if (info.state === "done") {
+      renderTestBlock(false);
+      return;
+    }
+    renderTestBlock(true);
+  } catch (error) {
+    console.error("TEST QR OPEN ERROR:", error);
+    setTestPanelInfo(error?.message || t("aiTestError"), "error");
+    renderTestBlock(false);
+  }
+}
+
+async function openTestDirect() {
+  const material = getSelectedMaterial();
+  if (!material || !shouldShowTeacherTestCard(currentTestSession)) {
+    return;
+  }
+
+  try {
+    const info = getTeacherTestInfoState(currentTestSession);
+    if (info.state === "ready") {
+      await launchCurrentTestSession();
+    } else if (info.state === "done") {
+      renderTestBlock(false);
+      return;
+    }
+
+    const launchUrl = getCurrentTestLaunchUrl();
+    if (!launchUrl) {
+      throw new Error(roleText("Тест сілтемесі табылмады.", "Ссылка на тест не найдена.", "Test link was not found."));
+    }
+
+    window.open(launchUrl, "_blank", "noopener");
+    renderTestBlock(false);
+  } catch (error) {
+    console.error("TEST DIRECT OPEN ERROR:", error);
+    setTestPanelInfo(error?.message || t("aiTestError"), "error");
+  }
+}
+
+function startPublicTestTimer() {
   stopPublicTestTimer();
 
   if (!publicTestSession) {
@@ -5907,9 +6978,9 @@ startPublicTestTimer = function startPublicTestTimerEnhanced() {
 
   updateTimer();
   publicTestCountdownTimer = setInterval(updateTimer, 1000);
-};
+}
 
-renderPublicTestState = function renderPublicTestStateEnhanced() {
+function renderPublicTestState() {
   if (!publicTestView) return;
 
   const session = publicTestSession;
@@ -5917,10 +6988,10 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
   const sessionStatus = String(session?.session_status || "").toLowerCase();
   const remainingSeconds = getSessionRemainingSeconds(session);
 
-  publicTestTitle.textContent = session?.title || (selectedRole === "kaz" ? "Тест" : "Тест");
-  publicTestCourse.textContent = session?.discipline_title || (selectedRole === "kaz" ? "Тест сессиясы" : "Тестовая сессия");
+  publicTestTitle.textContent = session?.title || roleText("Тест", "Тест", "Test");
+  publicTestCourse.textContent = session?.discipline_title || roleText("Тест сессиясы", "Тестовая сессия", "Test session");
   publicTestMeta.textContent = session
-    ? `${session.material_title} · ${session.question_count} ${selectedRole === "kaz" ? "сұрақ" : "вопросов"} · ${session.duration_minutes} ${selectedRole === "kaz" ? "мин" : "мин"}`
+    ? `${session.material_title} · ${session.question_count} ${roleText("сұрақ", "вопросов", "questions")} · ${session.duration_minutes} ${roleText("мин", "мин", "min")}`
     : "";
 
   publicTestResultCard.classList.add("hidden");
@@ -5934,9 +7005,11 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
     if (sessionStatus === "ready") {
       publicTestStartBtn.disabled = true;
       setPublicTestStatus(
-        selectedRole === "kaz"
-          ? "Тест әлі іске қосылған жоқ. Оқытушы QR-ды ашқаннан кейін ғана бастай аласыз."
-          : "Тест еще не запущен. Начать можно только после того, как преподаватель откроет QR.",
+        roleText(
+          "Тест әлі іске қосылған жоқ. Оқытушы QR-ды ашқаннан кейін ғана бастай аласыз.",
+          "Тест еще не запущен. Начать можно только после того, как преподаватель откроет QR.",
+          "The test has not started yet. You can begin only after the teacher opens the QR.",
+        ),
         "info",
       );
       return;
@@ -5946,18 +7019,22 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
       publicTestStartBtn.disabled = true;
       publicTestTimer.textContent = "00:00";
       setPublicTestStatus(
-        selectedRole === "kaz"
-          ? "Тест жабылды. Белгіленген уақыт аяқталды."
-          : "Тест закрыт. Отведенное время закончилось.",
+        roleText(
+          "Тест жабылды. Белгіленген уақыт аяқталды.",
+          "Тест закрыт. Отведенное время закончилось.",
+          "The test is closed. The allotted time has ended.",
+        ),
         "error",
       );
       return;
     }
 
     setPublicTestStatus(
-      selectedRole === "kaz"
-        ? `Тест ашық. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`
-        : `Тест открыт. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+      roleText(
+        `Тест ашық. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`,
+        `Тест открыт. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+        `The test is open. ${formatCountdown(remainingSeconds)} left until closing.`,
+      ),
       "info",
     );
     return;
@@ -5967,9 +7044,11 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
     publicTestStartCard.classList.add("hidden");
     renderPublicResultCard(attempt);
     setPublicTestStatus(
-      selectedRole === "kaz"
-        ? "Бұл құрылғы үшін тест бұрын тапсырылған."
-        : "Для этого устройства тест уже был отправлен.",
+      roleText(
+        "Бұл құрылғы үшін тест бұрын тапсырылған.",
+        "Для этого устройства тест уже был отправлен.",
+        "The test has already been submitted from this device.",
+      ),
       "success",
     );
     publicTestTimer.textContent = sessionStatus === "live" ? formatCountdown(remainingSeconds) : "00:00";
@@ -5980,11 +7059,13 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
   if (attempt.status === "expired" || sessionStatus === "expired") {
     publicTestStartCard.classList.add("hidden");
     publicTestResultCard.classList.remove("hidden");
-    publicTestResultCard.innerHTML = `<p style="color:#fff;">${selectedRole === "kaz" ? "Тест уақыты аяқталды. Енді тапсыру мүмкін емес." : "Время теста истекло. Отправить ответы больше нельзя."}</p>`;
+    publicTestResultCard.innerHTML = `<p style="color:#fff;">${roleText("Тест уақыты аяқталды. Енді тапсыру мүмкін емес.", "Время теста истекло. Отправить ответы больше нельзя.", "Test time is over. You can no longer submit answers.")}</p>`;
     setPublicTestStatus(
-      selectedRole === "kaz"
-        ? "Уақыт аяқталды. Бұл құрылғыдан тестке қайта кіруге болмайды."
-        : "Время истекло. Повторно войти в тест с этого устройства нельзя.",
+      roleText(
+        "Уақыт аяқталды. Бұл құрылғыдан тестке қайта кіруге болмайды.",
+        "Время истекло. Повторно войти в тест с этого устройства нельзя.",
+        "Time is over. This device cannot re-enter the test.",
+      ),
       "error",
     );
     publicTestTimer.textContent = "00:00";
@@ -5996,16 +7077,18 @@ renderPublicTestState = function renderPublicTestStateEnhanced() {
   publicTestQuestionsWrap.classList.remove("hidden");
   publicTestStudentNameInput.value = attempt.student_name || "";
   setPublicTestStatus(
-    selectedRole === "kaz"
-      ? `Тест жүріп жатыр. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`
-      : `Тест запущен. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+    roleText(
+      `Тест жүріп жатыр. Жабылуына ${formatCountdown(remainingSeconds)} қалды.`,
+      `Тест запущен. До закрытия осталось ${formatCountdown(remainingSeconds)}.`,
+      `The test is in progress. ${formatCountdown(remainingSeconds)} left until closing.`,
+    ),
     "info",
   );
   renderPublicTestQuestions();
   startPublicTestTimer();
-};
+}
 
-loadPublicTestSession = async function loadPublicTestSessionEnhanced() {
+async function loadPublicTestSession() {
   if (!publicTestSessionToken) return;
 
   const storedAttempt = readStoredPublicAttempt(publicTestSessionToken);
@@ -6025,7 +7108,7 @@ loadPublicTestSession = async function loadPublicTestSessionEnhanced() {
   publicTestSession = sessionPayload;
   publicTestAttempt = sessionPayload.attempt || null;
 
-  if (publicTestSession?.language && ["kaz", "rus"].includes(publicTestSession.language)) {
+  if (publicTestSession?.language && SUPPORTED_ROLES.includes(publicTestSession.language)) {
     selectedRole = publicTestSession.language;
     applyStaticTranslations();
   }
@@ -6043,15 +7126,15 @@ loadPublicTestSession = async function loadPublicTestSessionEnhanced() {
   }
 
   renderPublicTestState();
-};
+}
 
-startPublicTest = async function startPublicTestEnhanced() {
+async function startPublicTest() {
   if (!publicTestSessionToken) return;
 
   const studentName = publicTestStudentNameInput.value.trim();
   if (!studentName) {
     setPublicTestStatus(
-      selectedRole === "kaz" ? "Аты-жөніңізді енгізіңіз." : "Введите имя и фамилию.",
+      roleText("Аты-жөніңізді енгізіңіз.", "Введите имя и фамилию.", "Enter your full name."),
       "error",
     );
     publicTestStudentNameInput.focus();
@@ -6059,7 +7142,7 @@ startPublicTest = async function startPublicTestEnhanced() {
   }
 
   publicTestStartBtn.disabled = true;
-  setPublicTestStatus(selectedRole === "kaz" ? "Тест ашылып жатыр..." : "Тест открывается...", "info");
+  setPublicTestStatus(roleText("Тест ашылып жатыр...", "Тест открывается...", "Opening the test..."), "info");
 
   try {
     const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/start/`, {
@@ -6101,19 +7184,19 @@ startPublicTest = async function startPublicTestEnhanced() {
 
     renderPublicTestState();
     setPublicTestStatus(
-      error.message || (selectedRole === "kaz" ? "Тестті бастау мүмкін болмады." : "Не удалось начать тест."),
+      error.message || roleText("Тестті бастау мүмкін болмады.", "Не удалось начать тест.", "Could not start the test."),
       "error",
     );
   } finally {
     publicTestStartBtn.disabled = false;
   }
-};
+}
 
-submitPublicTest = async function submitPublicTestEnhanced() {
+async function submitPublicTest() {
   if (!publicTestSessionToken || !publicTestAttemptToken) return;
 
   publicTestSubmitBtn.disabled = true;
-  setPublicTestStatus(selectedRole === "kaz" ? "Жауаптар жіберіліп жатыр..." : "Ответы отправляются...", "info");
+  setPublicTestStatus(roleText("Жауаптар жіберіліп жатыр...", "Ответы отправляются...", "Submitting answers..."), "info");
 
   try {
     const payload = await fetchJSON(`${API_BASE}/results/public-test/${publicTestSessionToken}/submit/`, {
@@ -6147,21 +7230,20 @@ submitPublicTest = async function submitPublicTestEnhanced() {
     }
 
     setPublicTestStatus(
-      error.message || (selectedRole === "kaz" ? "Тестті тапсыру мүмкін болмады." : "Не удалось отправить тест."),
+      error.message || roleText("Тестті тапсыру мүмкін болмады.", "Не удалось отправить тест.", "Could not submit the test."),
       "error",
     );
   } finally {
     publicTestSubmitBtn.disabled = false;
   }
-};
-
+}
 if (buildTestBtn) {
   buildTestBtn.addEventListener("click", createAiQuestions);
 }
 
 if (previewTestBtn) {
   previewTestBtn.addEventListener("click", () => {
-    if (!generatedQuestions.length) return;
+    if (!shouldShowTeacherTestCard(currentTestSession)) return;
     renderQuestionModal(false);
     openModal(testModal);
   });
@@ -6169,25 +7251,29 @@ if (previewTestBtn) {
 
 if (launchTestBtn) {
   launchTestBtn.addEventListener("click", () => {
-    if (!generatedQuestions.length) return;
-    showQr();
+    if (!shouldShowTeacherTestCard(currentTestSession)) return;
+    launchTeacherTestFromCard();
   });
 }
 
 if (testQuestionCountInput) {
-  testQuestionCountInput.addEventListener("input", () => {
-    testConfig = clampTestConfig(testQuestionCountInput.value, testConfig.durationMinutes);
-    saveStoredTestConfig();
+  const commitQuestionCount = () => {
+    commitTestConfigFromInputs({ syncInputs: true, persist: true });
     renderTestSettingsPanel();
-  });
+  };
+
+  testQuestionCountInput.addEventListener("change", commitQuestionCount);
+  testQuestionCountInput.addEventListener("blur", commitQuestionCount);
 }
 
 if (testDurationInput) {
-  testDurationInput.addEventListener("input", () => {
-    testConfig = clampTestConfig(testConfig.questionCount, testDurationInput.value);
-    saveStoredTestConfig();
+  const commitDuration = () => {
+    commitTestConfigFromInputs({ syncInputs: true, persist: true });
     renderTestSettingsPanel();
-  });
+  };
+
+  testDurationInput.addEventListener("change", commitDuration);
+  testDurationInput.addEventListener("blur", commitDuration);
 }
 
 if (generateTestBtn) {
@@ -6201,7 +7287,7 @@ if (generateTestBtn) {
 
 if (openQrBtn) {
   openQrBtn.addEventListener("click", () => {
-    if (!generatedQuestions.length) return;
+    if (!shouldShowTeacherTestCard(currentTestSession)) return;
 
     isMaterialManagerOpen = false;
     renderMaterialManagerPanel();
@@ -6229,14 +7315,6 @@ if (openSlidesFullscreenBtn) {
 
 if (downloadSlidesBtn) {
   downloadSlidesBtn.addEventListener("click", downloadCurrentSlides);
-}
-
-if (openTestDirectBtn) {
-  openTestDirectBtn.addEventListener("click", openTestDirect);
-}
-
-if (showQrBtn) {
-  showQrBtn.addEventListener("click", showQr);
 }
 
 if (openResultsSheetBtn) {

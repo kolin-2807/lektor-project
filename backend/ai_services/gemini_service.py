@@ -1,5 +1,7 @@
 import json
+import logging
 import os
+import random
 import re
 import time
 from contextlib import contextmanager
@@ -22,23 +24,207 @@ GEMINI_FALLBACK_MODELS = tuple(
     if item.strip()
 )
 GEMINI_RETRY_DELAYS = (2, 4, 8, 12)
-GEMINI_TRANSIENT_ERROR_MARKERS = (
+GEMINI_QUOTA_ERROR_MARKERS = (
+    "quota",
+    "resource_exhausted",
+    "quota exceeded",
+    "insufficient quota",
+    "billing",
+)
+GEMINI_RATE_LIMIT_MARKERS = (
     "429",
+    "rate limit",
+    "too many requests",
+)
+GEMINI_SERVICE_BUSY_MARKERS = (
     "500",
     "503",
     "unavailable",
     "high demand",
-    "resource_exhausted",
-    "rate limit",
-    "too many requests",
-    "quota",
     "overloaded",
-    "timed out",
-    "timeout",
-    "deadline exceeded",
     "temporarily unavailable",
     "internal error",
 )
+GEMINI_TIMEOUT_MARKERS = (
+    "timed out",
+    "timeout",
+    "deadline exceeded",
+    "connection aborted",
+    "connection reset",
+)
+GEMINI_AUTH_ERROR_MARKERS = (
+    "401",
+    "403",
+    "api key not valid",
+    "invalid api key",
+    "permission denied",
+    "forbidden",
+    "unauthorized",
+    "authentication",
+    "credentials",
+)
+GEMINI_MODEL_ERROR_MARKERS = (
+    "404",
+    "model not found",
+    "not found for api version",
+    "unsupported model",
+    "unknown model",
+)
+GEMINI_TRANSIENT_ERROR_MARKERS = (
+    *GEMINI_RATE_LIMIT_MARKERS,
+    *GEMINI_SERVICE_BUSY_MARKERS,
+    *GEMINI_TIMEOUT_MARKERS,
+)
+logger = logging.getLogger(__name__)
+
+
+class GeminiServiceError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "gemini_error",
+        http_status: int = 503,
+        retryable: bool = False,
+        retry_after_seconds: int | None = None,
+        raw_message: str = "",
+        model_name: str = "",
+    ):
+        super().__init__(message)
+        self.code = code
+        self.http_status = http_status
+        self.retryable = retryable
+        self.retry_after_seconds = retry_after_seconds
+        self.raw_message = raw_message or message
+        self.model_name = model_name
+
+
+def _extract_gemini_error_text(exc: Exception) -> str:
+    chunks = []
+
+    def _append(value):
+        normalized = " ".join(str(value or "").split()).strip()
+        if normalized and normalized not in chunks:
+            chunks.append(normalized)
+
+    _append(exc)
+    _append(getattr(exc, "message", ""))
+    _append(getattr(exc, "details", ""))
+
+    response = getattr(exc, "response", None)
+    if response is not None:
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+
+        if isinstance(payload, dict):
+            error_payload = payload.get("error") or {}
+            _append(error_payload.get("message"))
+            _append(error_payload.get("status"))
+            for item in error_payload.get("details") or []:
+                if isinstance(item, dict):
+                    _append(item.get("reason"))
+                    _append(item.get("message"))
+        _append(getattr(response, "text", ""))
+
+    return " | ".join(chunks).strip()
+
+
+def _extract_gemini_status_code(exc: Exception) -> int | None:
+    candidates = (
+        getattr(exc, "status_code", None),
+        getattr(exc, "code", None),
+        getattr(getattr(exc, "response", None), "status_code", None),
+    )
+
+    for candidate in candidates:
+        try:
+            parsed = int(candidate)
+        except (TypeError, ValueError):
+            continue
+        if parsed > 0:
+            return parsed
+
+    return None
+
+
+def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiServiceError:
+    status_code = _extract_gemini_status_code(exc)
+    raw_message = _extract_gemini_error_text(exc) or "Gemini response failed."
+    error_text = raw_message.lower()
+
+    if status_code in {401, 403} or any(marker in error_text for marker in GEMINI_AUTH_ERROR_MARKERS):
+        return GeminiServiceError(
+            "Gemini API authorization failed. Check GEMINI_API_KEY and project access.",
+            code="gemini_auth_error",
+            http_status=503,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    if status_code == 404 or any(marker in error_text for marker in GEMINI_MODEL_ERROR_MARKERS):
+        model_hint = f' Model "{model_name}" is unavailable.' if model_name else ""
+        return GeminiServiceError(
+            f"Gemini model configuration failed.{model_hint} Check GEMINI_MODEL_NAME or fallback models.",
+            code="gemini_model_error",
+            http_status=503,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    if any(marker in error_text for marker in GEMINI_QUOTA_ERROR_MARKERS):
+        return GeminiServiceError(
+            "Gemini API quota is exhausted right now. Please retry in a few minutes or increase the API quota/billing limit.",
+            code="gemini_quota_exceeded",
+            http_status=429,
+            retry_after_seconds=120,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    if status_code == 429 or any(marker in error_text for marker in GEMINI_RATE_LIMIT_MARKERS):
+        return GeminiServiceError(
+            "Gemini rate limit was reached. Please retry in about 20-40 seconds.",
+            code="gemini_rate_limited",
+            http_status=429,
+            retryable=True,
+            retry_after_seconds=30,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    if isinstance(exc, (requests.Timeout, requests.ConnectionError)) or any(
+        marker in error_text for marker in GEMINI_TIMEOUT_MARKERS
+    ):
+        return GeminiServiceError(
+            "Gemini request timed out. Please retry in about 20-40 seconds.",
+            code="gemini_timeout",
+            http_status=503,
+            retryable=True,
+            retry_after_seconds=30,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    if status_code in {500, 503} or any(marker in error_text for marker in GEMINI_SERVICE_BUSY_MARKERS):
+        return GeminiServiceError(
+            "Gemini service is temporarily busy. Please retry in about 20-40 seconds.",
+            code="gemini_service_busy",
+            http_status=503,
+            retryable=True,
+            retry_after_seconds=30,
+            raw_message=raw_message,
+            model_name=model_name,
+        )
+
+    return GeminiServiceError(
+        raw_message,
+        code="gemini_error",
+        http_status=503,
+        raw_message=raw_message,
+        model_name=model_name,
+    )
 
 
 @contextmanager
@@ -74,15 +260,14 @@ def _generate_json_response(prompt: str):
 
 
 def _is_transient_gemini_error(exc: Exception) -> bool:
-    status_code = getattr(exc, "status_code", None)
+    if isinstance(exc, GeminiServiceError):
+        return exc.retryable
+
+    status_code = _extract_gemini_status_code(exc)
     if status_code in {429, 500, 503}:
         return True
 
-    code = getattr(exc, "code", None)
-    if code in {429, 500, 503}:
-        return True
-
-    error_text = str(exc or "").lower()
+    error_text = _extract_gemini_error_text(exc).lower()
     return any(marker in error_text for marker in GEMINI_TRANSIENT_ERROR_MARKERS)
 
 
@@ -100,7 +285,11 @@ def _iter_gemini_models(preferred_model: str) -> tuple[str, ...]:
 
 def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
     if not settings.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY tabylmady")
+        raise GeminiServiceError(
+            "Gemini API key is missing. Check GEMINI_API_KEY in the backend environment.",
+            code="gemini_config_error",
+            http_status=503,
+        )
 
     with _bypass_broken_local_proxy():
         last_exc = None
@@ -135,7 +324,18 @@ def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
                         },
                         timeout=60,
                     )
-                    response.raise_for_status()
+                    if not response.ok:
+                        try:
+                            payload = response.json()
+                            error_payload = payload.get("error") or {}
+                            error_message = error_payload.get("message") or response.text or f"Gemini HTTP {response.status_code}"
+                        except ValueError:
+                            error_message = response.text or f"Gemini HTTP {response.status_code}"
+
+                        http_error = requests.HTTPError(error_message, response=response)
+                        setattr(http_error, "status_code", response.status_code)
+                        raise http_error
+
                     payload = response.json()
                     candidates = payload.get("candidates") or []
                     if not candidates:
@@ -148,23 +348,32 @@ def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
                         raise RuntimeError("Gemini returned an empty response.")
                     return cleaned_text
                 except Exception as exc:
-                    last_exc = exc
+                    normalized_exc = exc if isinstance(exc, GeminiServiceError) else _build_gemini_service_error(exc, model_name)
+                    last_exc = normalized_exc
 
-                    if not _is_transient_gemini_error(exc):
-                        raise
+                    logger.warning(
+                        "Gemini request failed for model %s (attempt %s/%s): %s",
+                        model_name,
+                        attempt_index + 1,
+                        len(GEMINI_RETRY_DELAYS) + 1,
+                        normalized_exc.raw_message,
+                    )
+
+                    if normalized_exc.code == "gemini_model_error":
+                        break
+
+                    if not normalized_exc.retryable:
+                        raise normalized_exc from exc
 
                     if attempt_index >= len(GEMINI_RETRY_DELAYS):
                         break
 
                     time.sleep(GEMINI_RETRY_DELAYS[attempt_index])
 
-    if last_exc and _is_transient_gemini_error(last_exc):
-        raise RuntimeError(
-            "Gemini service is busy right now. I retried automatically several times. "
-            "Please try again in 20-40 seconds."
-        ) from last_exc
+    if isinstance(last_exc, GeminiServiceError):
+        raise last_exc
 
-    raise last_exc or RuntimeError("Gemini response failed")
+    raise last_exc or GeminiServiceError("Gemini response failed")
 
 
 def generate_gemini_text_response(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
@@ -177,6 +386,82 @@ def get_gemini_text_response(prompt: str, model: str = GEMINI_MODEL_NAME) -> str
 
 def _strip_option_prefix(value: str) -> str:
     return re.sub(r"^\s*[A-D]\s*[\)\.\:\-]\s*", "", str(value or "").strip(), flags=re.IGNORECASE)
+
+
+def _normalize_option_text(raw_option) -> str:
+    normalized_option = " ".join(str(raw_option or "").split())[:300]
+    if not normalized_option:
+        return ""
+
+    stripped_option = _strip_option_prefix(normalized_option)
+    return stripped_option or normalized_option
+
+
+def _is_predictable_answer_pattern(answer_slots: list[int], option_count: int) -> bool:
+    if len(answer_slots) < 3 or option_count <= 1:
+        return False
+
+    if len(set(answer_slots)) == 1:
+        return True
+
+    deltas = [
+        (answer_slots[index] - answer_slots[index - 1]) % option_count
+        for index in range(1, len(answer_slots))
+    ]
+    return all(delta == 1 for delta in deltas) or all(delta == option_count - 1 for delta in deltas)
+
+
+def _build_random_answer_slots(question_count: int, option_count: int = 4, rng=None) -> list[int]:
+    if question_count <= 0 or option_count <= 0:
+        return []
+
+    rng = rng or random.SystemRandom()
+    full_cycles, remainder = divmod(question_count, option_count)
+    answer_slots = []
+
+    for _ in range(full_cycles):
+        answer_slots.extend(range(option_count))
+
+    if remainder:
+        remainder_slots = list(range(option_count))
+        rng.shuffle(remainder_slots)
+        answer_slots.extend(remainder_slots[:remainder])
+
+    for _ in range(12):
+        rng.shuffle(answer_slots)
+        if not _is_predictable_answer_pattern(answer_slots, option_count):
+            return answer_slots
+
+    return answer_slots
+
+
+def _rebalance_question_options(
+    options: list[str],
+    correct_index: int,
+    target_index: int,
+    rng=None,
+) -> tuple[list[str], str]:
+    if not options or correct_index < 0 or correct_index >= len(options):
+        return options, ""
+
+    target_index = target_index % len(options)
+    rng = rng or random.SystemRandom()
+    correct_option = options[correct_index]
+    distractors = [option for index, option in enumerate(options) if index != correct_index]
+    rng.shuffle(distractors)
+
+    balanced_options = []
+    distractor_index = 0
+
+    for index in range(len(options)):
+        if index == target_index:
+            balanced_options.append(correct_option)
+            continue
+
+        balanced_options.append(distractors[distractor_index])
+        distractor_index += 1
+
+    return balanced_options, ANSWER_LETTERS[target_index]
 
 
 def _normalize_answer_letter(raw_answer, options: list[str]) -> str:
@@ -221,11 +506,12 @@ def _normalize_test_items(raw_items, question_count: int) -> list[dict]:
 
     normalized_items = []
     safe_question_count = max(3, min(int(question_count or 5), 25))
+    answer_slots = _build_random_answer_slots(safe_question_count, len(ANSWER_LETTERS))
 
-    for item in raw_items[:safe_question_count]:
+    for position, item in enumerate(raw_items[:safe_question_count]):
         question_text = " ".join(str((item or {}).get("question") or "").split())
         raw_options = (item or {}).get("options") or []
-        options = [" ".join(str(option or "").split())[:300] for option in raw_options if str(option or "").strip()]
+        options = [_normalize_option_text(option) for option in raw_options if str(option or "").strip()]
 
         if len(options) != 4:
             raise ValueError("Each AI test question must contain exactly 4 options.")
@@ -238,10 +524,17 @@ def _normalize_test_items(raw_items, question_count: int) -> list[dict]:
         if not question_text or not answer_letter:
             raise ValueError("AI test response contains an invalid question or answer.")
 
+        correct_index = ANSWER_LETTERS.index(answer_letter)
+        balanced_options, balanced_answer_letter = _rebalance_question_options(
+            options,
+            correct_index,
+            answer_slots[position],
+        )
+
         normalized_items.append({
             "question": question_text[:500],
-            "options": options,
-            "answer": answer_letter,
+            "options": balanced_options,
+            "answer": balanced_answer_letter,
         })
 
     if len(normalized_items) != safe_question_count:
@@ -288,9 +581,8 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
 
 
 def generate_test_from_text(text: str, language: str = "kaz", question_count: int = 5) -> list:
-    is_russian = language == "rus"
     safe_question_count = max(3, min(int(question_count or 5), 25))
-    target_language = "Russian" if is_russian else "Kazakh"
+    target_language = {"rus": "Russian", "eng": "English"}.get(language, "Kazakh")
 
     prompt = f"""
 You generate multiple-choice tests for a university teacher.
@@ -324,14 +616,12 @@ Rules:
 Material:
 {text}
 """
-
     return _normalize_test_items(_generate_json_response(prompt), safe_question_count)
 
 
 def generate_slide_outline_from_text(text: str, language: str = "kaz", slide_count: int = 7) -> dict:
-    is_russian = language == "rus"
     safe_slide_count = max(4, min(int(slide_count or 7), 10))
-    target_language = "Russian" if is_russian else "Kazakh"
+    target_language = {"rus": "Russian", "eng": "English"}.get(language, "Kazakh")
 
     prompt = f"""
 You generate a university lecture presentation plan for a teacher.

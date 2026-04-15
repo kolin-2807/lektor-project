@@ -14,12 +14,14 @@ from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from users.google_oauth import bypass_broken_local_proxy, credentials_from_dict, credentials_to_dict
 
 
+SUPPORTED_DRIVE_LANGUAGES = {"kaz", "rus", "eng"}
+
 CATEGORY_FOLDER_LABELS = {
-    "lecture": {"kaz": "Дәріс", "rus": "Лекция"},
-    "practice": {"kaz": "Практикалық жұмыс", "rus": "Практическая работа"},
-    "lab": {"kaz": "Зертханалық жұмыс", "rus": "Лабораторная работа"},
-    "sowj": {"kaz": "СӨЖ", "rus": "СРС"},
-    "syllabus": {"kaz": "Силлабус", "rus": "Силлабус"},
+    "lecture": {"kaz": "Дәріс", "rus": "Лекция", "eng": "Lecture"},
+    "practice": {"kaz": "Практикалық жұмыс", "rus": "Практическая работа", "eng": "Practice"},
+    "lab": {"kaz": "Зертханалық жұмыс", "rus": "Лабораторная работа", "eng": "Lab"},
+    "sowj": {"kaz": "СӨЖ", "rus": "СРС", "eng": "SIW"},
+    "syllabus": {"kaz": "Силлабус", "rus": "Силлабус", "eng": "Syllabus"},
 }
 
 
@@ -80,7 +82,8 @@ def ensure_folder(service, name: str, parent_id: str | None = None) -> str:
 
 def _get_category_folder_name(category: str, language: str) -> str:
     labels = CATEGORY_FOLDER_LABELS.get(category, CATEGORY_FOLDER_LABELS["lecture"])
-    return labels["rus"] if language == "rus" else labels["kaz"]
+    normalized_language = language if language in SUPPORTED_DRIVE_LANGUAGES else "kaz"
+    return labels.get(normalized_language) or labels["kaz"]
 
 
 def ensure_material_folder_tree(connection, discipline, category: str):
@@ -91,7 +94,9 @@ def ensure_material_folder_tree(connection, discipline, category: str):
         connection.root_folder_id = root_folder_id
         connection.save(update_fields=["root_folder_id", "updated_at"])
 
-    course_folder_id = ensure_folder(service, f"{discipline.course.number} курс", root_folder_id)
+    language = discipline.language if discipline.language in SUPPORTED_DRIVE_LANGUAGES else "kaz"
+    language_folder_id = ensure_folder(service, language, root_folder_id)
+    course_folder_id = ensure_folder(service, f"{discipline.course.number} курс", language_folder_id)
     discipline_folder_id = ensure_folder(service, discipline.title, course_folder_id)
     category_folder_id = ensure_folder(
         service,

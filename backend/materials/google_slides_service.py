@@ -221,8 +221,15 @@ def create_presentation_from_outline(
     closing_slide_id = _safe_object_id("closing_slide")
     closing_title_id = _safe_object_id("closing_title")
     closing_subtitle_id = _safe_object_id("closing_subtitle")
-    closing_title = "Спасибо за внимание" if language == "rus" else "Назарларыңызға рахмет"
-    closing_subtitle = "Сұрақтарыңыз болса, қоя аласыздар." if language != "rus" else "Если есть вопросы, можете задать их."
+    if language == "eng":
+        closing_title = "Thank you for your attention"
+        closing_subtitle = "If you have questions, you can ask them."
+    elif language == "rus":
+        closing_title = "Спасибо за внимание"
+        closing_subtitle = "Если есть вопросы, можете задать их."
+    else:
+        closing_title = "Назарларыңызға рахмет"
+        closing_subtitle = "Сұрақтарыңыз болса, қоя аласыздар."
 
     requests.extend([
         {

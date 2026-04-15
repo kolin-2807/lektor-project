@@ -20,8 +20,9 @@ except ImportError:  # pragma: no cover - optional dependency in some environmen
 
 from academics.models import Discipline
 from ai_services.assistant_service import detect_assistant_intent
-from ai_services.gemini_service import generate_slide_outline_from_text, generate_test_from_text
+from ai_services.gemini_service import GeminiServiceError, generate_slide_outline_from_text, generate_test_from_text
 from ai_services.stt_service import transcribe_audio
+from ai_services.tts_service import TTSServiceError, synthesize_assistant_speech
 from users.models import get_active_google_drive_connection, resolve_google_drive_connection
 
 from .models import Material
@@ -29,6 +30,7 @@ from .serializers import MaterialSerializer
 
 MAX_ASSISTANT_COMMAND_CHARS = 500
 MAX_ASSISTANT_AUDIO_BYTES = 15 * 1024 * 1024
+SUPPORTED_MATERIAL_LANGUAGES = {"kaz", "rus", "eng"}
 
 
 def _require_google_session(request, owner_email: str = ""):
@@ -48,8 +50,13 @@ def _require_google_session(request, owner_email: str = ""):
 
 
 def _resolve_material_language(request, material):
-    requested_language = request.data.get("language")
-    return requested_language if requested_language in {"kaz", "rus"} else material.discipline.language
+    requested_language = str(request.data.get("language") or "").strip().lower()
+    discipline_language = str(getattr(material.discipline, "language", "kaz") or "kaz").strip().lower()
+    if requested_language in SUPPORTED_MATERIAL_LANGUAGES:
+        return requested_language
+    if discipline_language in SUPPORTED_MATERIAL_LANGUAGES:
+        return discipline_language
+    return "kaz"
 
 
 def _build_material_source_text(material, language: str, connection=None) -> str:
@@ -71,6 +78,16 @@ def _build_material_source_text(material, language: str, connection=None) -> str
     content_excerpt = (extracted_text or material.description or material.title)[:20000]
 
     if language == "rus":
+        return f"""
+        Discipline: {material.discipline.title}
+        Material title: {material.title}
+        Description: {material.description}
+        Category: {material.category}
+        Material text:
+        {content_excerpt}
+        """
+
+    if language == "eng":
         return f"""
         Discipline: {material.discipline.title}
         Material title: {material.title}
@@ -142,6 +159,24 @@ def _format_google_api_error(exc, fallback_message: str) -> str:
         return "Google рұқсаттары жеткіліксіз. Google Drive-ты қайта қосып, барлық жаңа рұқсаттарды беріңіз."
 
     return error_text or fallback_message
+
+
+def _build_gemini_error_response(exc: GeminiServiceError, fallback_message: str):
+    payload = {
+        "detail": str(exc) or fallback_message,
+        "code": exc.code,
+        "retryable": bool(exc.retryable),
+    }
+
+    if exc.retry_after_seconds:
+        payload["retry_after_seconds"] = exc.retry_after_seconds
+
+    response = Response(payload, status=exc.http_status)
+
+    if exc.retry_after_seconds:
+        response["Retry-After"] = str(exc.retry_after_seconds)
+
+    return response
 
 
 def _get_material_preview_kind(material) -> str:
@@ -358,6 +393,8 @@ def generate_material_test(request, material_id):
     try:
         result = generate_test_from_text(source_text, language=language, question_count=question_count)
         return Response({"test": result})
+    except GeminiServiceError as exc:
+        return _build_gemini_error_response(exc, "AI test generation failed")
     except Exception as exc:
         return Response(
             {"detail": str(exc) or "AI test generation failed"},
@@ -368,9 +405,6 @@ def generate_material_test(request, material_id):
 @api_view(["POST"])
 def generate_material_slides(request, material_id):
     material = get_object_or_404(Material, id=material_id)
-
-    if material.category != "lecture":
-        return Response({"detail": "Slides are available only for lecture materials."}, status=400)
 
     connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
     if auth_error:
@@ -414,6 +448,8 @@ def generate_material_slides(request, material_id):
                 "slides_download_url",
             ]
         )
+    except GeminiServiceError as exc:
+        return _build_gemini_error_response(exc, "AI slide generation failed")
     except Exception as exc:
         return Response(
             {"detail": _format_google_api_error(exc, "AI slide generation failed")},
@@ -483,3 +519,36 @@ def transcribe_voice(request):
     finally:
         if os.path.exists(temp_path):
             os.remove(temp_path)
+
+
+@api_view(["POST"])
+def speak_assistant_reply(request):
+    text = str(request.data.get("text") or "").strip()
+    language = str(request.data.get("language") or "kaz").strip().lower()
+
+    if not text:
+        return Response({"detail": "Text is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if len(text) > MAX_ASSISTANT_COMMAND_CHARS:
+        return Response(
+            {"detail": "Speech text is too long."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        audio_bytes, mime_type, provider = synthesize_assistant_speech(text, language=language)
+    except TTSServiceError as exc:
+        return Response(
+            {
+                "detail": str(exc),
+                "code": exc.code,
+                "retryable": bool(exc.retryable),
+                "provider": exc.provider,
+            },
+            status=exc.http_status,
+        )
+
+    response = HttpResponse(audio_bytes, content_type=mime_type)
+    response["Cache-Control"] = "no-store"
+    response["X-TTS-Provider"] = provider
+    return response

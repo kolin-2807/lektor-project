@@ -16,8 +16,27 @@ from urllib.parse import urlparse
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - optional dependency in some environments
-    def load_dotenv(*args, **kwargs):
-        return False
+    def load_dotenv(dotenv_path=None, *args, **kwargs):
+        if not dotenv_path:
+            return False
+
+        path = Path(dotenv_path)
+        if not path.exists():
+            return False
+
+        loaded = False
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if not key:
+                continue
+            os.environ.setdefault(key, value)
+            loaded = True
+        return loaded
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -172,3 +191,13 @@ if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(PUBLIC_APP_ORIGIN)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "").strip()
+AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "").strip()
+AZURE_SPEECH_TTS_VOICE_KK = os.getenv("AZURE_SPEECH_TTS_VOICE_KK", "kk-KZ-AigulNeural").strip()
+AZURE_SPEECH_TTS_VOICE_RU = os.getenv("AZURE_SPEECH_TTS_VOICE_RU", "ru-RU-SvetlanaNeural").strip()
+AZURE_SPEECH_TTS_VOICE_EN = os.getenv("AZURE_SPEECH_TTS_VOICE_EN", "en-US-JennyNeural").strip()
+AZURE_SPEECH_TTS_OUTPUT_FORMAT = os.getenv(
+    "AZURE_SPEECH_TTS_OUTPUT_FORMAT",
+    "audio-24khz-48kbitrate-mono-mp3",
+).strip()
+VOICE_ASSISTANT_NAME = os.getenv("VOICE_ASSISTANT_NAME", "Ayla").strip() or "Ayla"
