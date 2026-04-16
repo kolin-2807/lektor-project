@@ -45,27 +45,59 @@ load_dotenv(BASE_DIR / ".env")
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$dc5aow8tw$jzw7z+5%7=4vkk-^dhmk4fol@o=rq64#@7j#0&t'
-
 def _split_env_list(name: str) -> list[str]:
     raw_value = os.getenv(name, "")
     return [item.strip() for item in raw_value.split(",") if item.strip()]
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int = 0) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        return int(raw_value.strip())
+    except (TypeError, ValueError):
+        return default
+
+
+# SECURITY WARNING: keep the secret key used in production secret!
+DEV_SECRET_KEY = 'django-insecure-$dc5aow8tw$jzw7z+5%7=4vkk-^dhmk4fol@o=rq64#@7j#0&t'
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
+DEBUG = _env_bool("DJANGO_DEBUG", True)
+
+if not DEBUG and SECRET_KEY == DEV_SECRET_KEY:
+    raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=false.")
 
 PUBLIC_APP_ORIGIN = os.getenv("PUBLIC_APP_ORIGIN", "").strip().rstrip("/")
 _PUBLIC_APP_HOST = urlparse(PUBLIC_APP_ORIGIN).hostname if PUBLIC_APP_ORIGIN else ""
+ALLOW_TUNNEL_HOSTS = _env_bool("DJANGO_ALLOW_TUNNEL_HOSTS", DEBUG)
 
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "testserver",
-    ".trycloudflare.com",
     *_split_env_list("DJANGO_ALLOWED_HOSTS"),
 ]
+
+if ALLOW_TUNNEL_HOSTS:
+    ALLOWED_HOSTS.extend([
+        ".trycloudflare.com",
+        ".ngrok-free.app",
+        ".ngrok-free.dev",
+        ".ngrok.app",
+        ".ngrok.dev",
+        ".ngrok.io",
+    ])
 
 if _PUBLIC_APP_HOST and _PUBLIC_APP_HOST not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_PUBLIC_APP_HOST)
@@ -166,29 +198,51 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
+    *(
+        [
+            "http://127.0.0.1:5500",
+            "http://localhost:5500",
+        ]
+        if DEBUG
+        else []
+    ),
     *[origin.rstrip("/") for origin in _split_env_list("CORS_ALLOWED_ORIGINS")],
 ]
 
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+CSRF_TRUSTED_ORIGINS = [
+    *(
+        [
+            "http://127.0.0.1:5500",
+            "http://localhost:5500",
+        ]
+        if DEBUG
+        else []
+    ),
+    *[origin.rstrip("/") for origin in _split_env_list("CSRF_TRUSTED_ORIGINS")],
+]
 
 if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CORS_ALLOWED_ORIGINS:
     CORS_ALLOWED_ORIGINS.append(PUBLIC_APP_ORIGIN)
 
-CORS_ALLOW_CREDENTIALS = True
-
-CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    *[origin.rstrip("/") for origin in _split_env_list("CSRF_TRUSTED_ORIGINS")],
-]
-
 if PUBLIC_APP_ORIGIN and PUBLIC_APP_ORIGIN not in CSRF_TRUSTED_ORIGINS:
     CSRF_TRUSTED_ORIGINS.append(PUBLIC_APP_ORIGIN)
+
+CORS_ALLOW_CREDENTIALS = True
+
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", not DEBUG)
+SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", not DEBUG)
+SECURE_HSTS_SECONDS = _env_int("DJANGO_SECURE_HSTS_SECONDS", 31536000 if not DEBUG else 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    not DEBUG and SECURE_HSTS_SECONDS > 0,
+)
+SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "").strip()
@@ -200,4 +254,8 @@ AZURE_SPEECH_TTS_OUTPUT_FORMAT = os.getenv(
     "AZURE_SPEECH_TTS_OUTPUT_FORMAT",
     "audio-24khz-48kbitrate-mono-mp3",
 ).strip()
+AZURE_SPEECH_STT_API_VERSION = os.getenv("AZURE_SPEECH_STT_API_VERSION", "2025-10-15").strip()
+AZURE_SPEECH_STT_LOCALES = _split_env_list("AZURE_SPEECH_STT_LOCALES") or ["kk-KZ"]
+AZURE_SPEECH_STT_TIMEOUT_SECONDS = _env_int("AZURE_SPEECH_STT_TIMEOUT_SECONDS", 60)
 VOICE_ASSISTANT_NAME = os.getenv("VOICE_ASSISTANT_NAME", "Ayla").strip() or "Ayla"
+MAX_MATERIAL_UPLOAD_BYTES = _env_int("MAX_MATERIAL_UPLOAD_BYTES", 50 * 1024 * 1024)

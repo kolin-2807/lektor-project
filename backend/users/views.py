@@ -1,3 +1,5 @@
+import logging
+
 from django.http import HttpResponseRedirect
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET
@@ -18,6 +20,9 @@ from .google_oauth import (
     is_local_oauth_redirect,
 )
 from .models import GoogleDriveConnection, get_active_google_drive_connection
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_session_connection(request):
@@ -99,7 +104,7 @@ def drive_callback(request):
         flow = build_google_drive_flow(request=request, state=incoming_state, code_verifier=code_verifier)
         exchange_google_oauth_code(flow, authorization_code)
     except Exception as exc:
-        print("Google Drive token exchange error:", repr(exc))
+        logger.exception("Google Drive token exchange failed")
         return HttpResponseRedirect(
             build_frontend_redirect_url(
                 request,

@@ -371,6 +371,8 @@ def _safe_int(value: Any) -> int | None:
 def _reply(context: AssistantContext, kazakh: str, russian: str | None = None) -> str:
     if context.selected_role == "rus":
         return russian or kazakh
+    if context.selected_role == "eng":
+        return russian or kazakh
     return kazakh
 
 
@@ -399,7 +401,7 @@ def _resolve_reply_role(raw_text: str, current_role: str = "kaz") -> str:
     if russian_score > kazakh_score and russian_score > 0:
         return "rus"
 
-    return current_role if current_role in {"kaz", "rus"} else "kaz"
+    return current_role if current_role in {"kaz", "rus", "eng"} else "kaz"
 
 
 def _normalize_entity_list(items: Any, kind: str) -> list[dict[str, Any]]:
@@ -822,54 +824,6 @@ def _build_material_response(
     )
 
 
-def _build_smalltalk_response(text: str, context: AssistantContext) -> dict[str, Any] | None:
-    if _looks_like_greeting(text):
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
-                "Сәлем! Мен сізге материал, тест, слайд және нәтижелер бойынша көмектесе аламын.",
-                "Здравствуйте! Я могу помочь с материалами, тестами, слайдами и результатами.",
-            ),
-            confidence=0.99,
-        )
-
-    if _looks_like_thanks(text):
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
-                "Әрқашан көмектесемін.",
-                "Всегда рад помочь.",
-            ),
-            confidence=0.98,
-        )
-
-    if _looks_like_how_are_you(text):
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
-                "Жақсымын. Қандай бөлімді ашу керек екенін айта беріңіз.",
-                "Все хорошо. Скажите, какой раздел нужно открыть.",
-            ),
-            confidence=0.97,
-        )
-
-    if _looks_like_who_are_you(text):
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
-                "Мен осы жүйедегі дауыстық көмекшімін. Материалдарды, тесттерді, слайдтарды және нәтижелерді ашуға көмектесемін.",
-                "Я голосовой помощник этой системы. Помогаю открывать материалы, тесты, слайды и результаты.",
-            ),
-            confidence=0.98,
-        )
-
-    return None
-
-
 def _build_local_question_response(text: str, context: AssistantContext) -> dict[str, Any] | None:
     if _looks_like_help_request(text):
         return _build_response(
@@ -1004,104 +958,6 @@ def _gemini_fallback(user_text: str, context: AssistantContext) -> dict[str, Any
             action="unknown",
             reply=_reply(
                 context,
-                "Мен қазір негізінен жүйені басқаруға көмектесемін. Мысалы: «материалдарды аш», «тестті аш», «нәтижелерді аш».",
-                "Сейчас я в основном помогаю управлять системой. Например: «открой материалы», «открой тест», «открой результаты».",
-            ),
-            confidence=0.2,
-        )
-
-    prompt = f"""
-You are a voice assistant for a university teacher dashboard.
-Understand the user command and return only valid JSON.
-
-Allowed actions:
-{sorted(ALLOWED_ACTIONS)}
-
-Allowed material types:
-{sorted(MATERIAL_TYPES)}
-
-Current UI context:
-{json.dumps({
-    "selected_role": context.selected_role,
-    "current_view": context.current_view,
-    "active_panel": context.active_panel,
-    "selected_course_number": context.selected_course_number,
-    "selected_subject": context.selected_subject,
-    "selected_material": context.selected_material,
-    "available_subjects": context.available_subjects,
-    "available_materials": context.available_materials,
-    "has_generated_test": context.has_generated_test,
-    "has_results": context.has_results,
-}, ensure_ascii=False)}
-
-Rules:
-- Use only the allowed actions.
-- If the request is ambiguous, return action="unknown" and ask a short clarifying question.
-- If the user is greeting you or asking a general question, return action="unknown" and answer naturally.
-- If the user asks a short conversational question, prefer a direct answer in reply instead of asking for clarification.
-- Use subject_id and material_id only if they exist in the context.
-- reply must be short, natural, and in the user's UI language.
-- confidence must be between 0 and 1.
-- Return JSON only without markdown.
-
-Response JSON shape:
-{{
-  "action": "open_subject",
-  "reply": "Желілік қауіпсіздік пәнін ашамын.",
-  "subject_id": 12,
-  "subject_title": "Желілік қауіпсіздік",
-  "course_number": 3,
-  "material_id": 55,
-  "material_title": "15 апта дәрісі",
-  "material_type": "lecture",
-  "confidence": 0.76
-}}
-
-User command:
-{user_text}
-"""
-
-    try:
-        parsed = _clean_gemini_json_response(get_gemini_text_response(prompt))
-    except Exception:
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
-                "Қазір толық жауап бере алмадым. Бірақ материалдар, тесттер, слайдтар және нәтижелер бойынша көмектесе аламын.",
-                "Сейчас не удалось дать полный ответ. Но я могу помочь с материалами, тестами, слайдами и результатами.",
-            ),
-            confidence=0.24,
-        )
-    action = str(parsed.get("action") or "unknown").strip()
-    if action not in ALLOWED_ACTIONS:
-        action = "unknown"
-
-    result = _build_response(
-        action=action,
-        reply=str(parsed.get("reply") or "").strip(),
-        confidence=float(parsed.get("confidence") or 0.55),
-        subject_id=_safe_int(parsed.get("subject_id")),
-        subject_title=str(parsed.get("subject_title") or "").strip(),
-        course_number=_safe_int(parsed.get("course_number")),
-        material_id=_safe_int(parsed.get("material_id")),
-        material_title=str(parsed.get("material_title") or "").strip(),
-        material_type=str(parsed.get("material_type") or "").strip().lower(),
-    )
-
-    if result.get("material_type") not in MATERIAL_TYPES:
-        result["metadata"].pop("material_type", None)
-        result.pop("material_type", None)
-
-    return result
-
-
-def _gemini_fallback(user_text: str, context: AssistantContext) -> dict[str, Any]:
-    if not settings.GEMINI_API_KEY:
-        return _build_response(
-            action="unknown",
-            reply=_reply(
-                context,
                 "Мен жүйеде негізінен материал, тест, слайд және нәтижелер бойынша көмектесемін. Қай бөлім керек екенін айтыңыз.",
                 "Сейчас я в основном помогаю с материалами, тестами, слайдами и результатами. Скажите, какой раздел нужен.",
             ),
@@ -1203,9 +1059,13 @@ User command:
 def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
     text = normalize_assistant_text(user_text)
     parsed_context = _build_context(context)
+    reply_role = parsed_context.selected_role if parsed_context.selected_role in {"kaz", "rus", "eng"} else _resolve_reply_role(
+        user_text,
+        parsed_context.selected_role,
+    )
     parsed_context = replace(
         parsed_context,
-        selected_role=_resolve_reply_role(user_text, parsed_context.selected_role),
+        selected_role=reply_role,
     )
 
     if not text:

@@ -428,92 +428,6 @@ def _format_form_deadline_message(session: TestSession, now=None) -> str:
 
         return (
             f"Тест открыт. До закрытия осталось примерно {remaining_minutes} мин. "
-            f"Форма закроется в {closes_at.strftime('%H:%M')}. Повторно открыть QR на этом устройстве нельзя."
-        )
-
-    if _get_session_status(session, now=now) == "ready":
-        return "Тест дайын, бірақ оқытушы әлі іске қоспаған."
-
-    if _get_session_status(session, now=now) == "expired":
-        return "Тест жабылды. Жауап қабылдау уақыты аяқталды."
-
-    return (
-        f"Тест ашық. Жабылуына шамамен {remaining_minutes} минут қалды. "
-        f"Форма {closes_at.strftime('%H:%M')} кезінде жабылады. Осы құрылғыда QR-ды қайта ашу бұғатталады."
-    )
-
-def _format_form_deadline_message(session: TestSession, now=None) -> str:
-    now = now or timezone.now()
-    remaining_seconds = _get_session_remaining_seconds(session, now=now)
-    remaining_minutes = max(1, (remaining_seconds + 59) // 60) if remaining_seconds else 0
-    closes_at = timezone.localtime(session.public_expires_at) if session.public_expires_at else None
-
-    language = session.material.discipline.language
-
-    if language == "eng":
-        if _get_session_status(session, now=now) == "ready":
-            return "The test is prepared, but the teacher has not launched it yet."
-
-        if _get_session_status(session, now=now) == "expired":
-            return "The test is closed. The answer submission time has expired."
-
-        return (
-            f"The test is open. About {remaining_minutes} min left before closing. "
-            f"The form will close at {closes_at.strftime('%H:%M')}."
-        )
-
-    if language == "rus":
-        if _get_session_status(session, now=now) == "ready":
-            return "РўРµСЃС‚ РїРѕРґРіРѕС‚РѕРІР»РµРЅ, РЅРѕ РµС‰Рµ РЅРµ Р·Р°РїСѓС‰РµРЅ РїСЂРµРїРѕРґР°РІР°С‚РµР»РµРј."
-
-        if _get_session_status(session, now=now) == "expired":
-            return "РўРµСЃС‚ Р·Р°РєСЂС‹С‚. Р’СЂРµРјСЏ РїСЂРёРµРјР° РѕС‚РІРµС‚РѕРІ СѓР¶Рµ РёСЃС‚РµРєР»Рѕ."
-
-        return (
-            f"РўРµСЃС‚ РѕС‚РєСЂС‹С‚. Р”Рѕ Р·Р°РєСЂС‹С‚РёСЏ РѕСЃС‚Р°Р»РѕСЃСЊ РїСЂРёРјРµСЂРЅРѕ {remaining_minutes} РјРёРЅ. "
-            f"Р¤РѕСЂРјР° Р·Р°РєСЂРѕРµС‚СЃСЏ РІ {closes_at.strftime('%H:%M')}."
-        )
-
-    if _get_session_status(session, now=now) == "ready":
-        return "РўРµСЃС‚ РґР°Р№С‹РЅ, Р±С–СЂР°Т› РѕТ›С‹С‚СѓС€С‹ У™Р»С– С–СЃРєРµ Т›РѕСЃРїР°Т“Р°РЅ."
-
-    if _get_session_status(session, now=now) == "expired":
-        return "РўРµСЃС‚ Р¶Р°Р±С‹Р»РґС‹. Р–Р°СѓР°Рї Т›Р°Р±С‹Р»РґР°Сѓ СѓР°Т›С‹С‚С‹ Р°СЏТ›С‚Р°Р»РґС‹."
-
-    return (
-        f"РўРµСЃС‚ Р°С€С‹Т›. Р–Р°Р±С‹Р»СѓС‹РЅР° С€Р°РјР°РјРµРЅ {remaining_minutes} РјРёРЅСѓС‚ Т›Р°Р»РґС‹. "
-        f"Р¤РѕСЂРјР° {closes_at.strftime('%H:%M')} РєРµР·С–РЅРґРµ Р¶Р°Р±С‹Р»Р°РґС‹."
-    )
-
-def _format_form_deadline_message(session: TestSession, now=None) -> str:
-    now = now or timezone.now()
-    remaining_seconds = _get_session_remaining_seconds(session, now=now)
-    remaining_minutes = max(1, (remaining_seconds + 59) // 60) if remaining_seconds else 0
-    closes_at = timezone.localtime(session.public_expires_at) if session.public_expires_at else None
-
-    language = session.material.discipline.language
-
-    if language == "eng":
-        if _get_session_status(session, now=now) == "ready":
-            return "The test is prepared, but the teacher has not launched it yet."
-
-        if _get_session_status(session, now=now) == "expired":
-            return "The test is closed. The answer submission time has expired."
-
-        return (
-            f"The test is open. About {remaining_minutes} min left before closing. "
-            f"The form will close at {closes_at.strftime('%H:%M')}."
-        )
-
-    if language == "rus":
-        if _get_session_status(session, now=now) == "ready":
-            return "Тест подготовлен, но еще не запущен преподавателем."
-
-        if _get_session_status(session, now=now) == "expired":
-            return "Тест закрыт. Время приема ответов уже истекло."
-
-        return (
-            f"Тест открыт. До закрытия осталось примерно {remaining_minutes} мин. "
             f"Форма закроется в {closes_at.strftime('%H:%M')}."
         )
 
@@ -765,7 +679,13 @@ class ResultListAPIView(generics.ListAPIView):
     permission_classes = [HasGoogleSession]
 
     def get_queryset(self):
-        queryset = Result.objects.select_related("discipline").all().order_by("-created_at")
+        connection = get_active_google_drive_connection(self.request)
+        if not connection:
+            return Result.objects.none()
+
+        queryset = Result.objects.select_related("discipline").filter(
+            discipline__owner_email__iexact=connection.google_email
+        ).order_by("-created_at")
         discipline_id = self.request.GET.get("discipline_id")
 
         if discipline_id:
@@ -775,9 +695,31 @@ class ResultListAPIView(generics.ListAPIView):
 
 
 class ResultViewSet(viewsets.ModelViewSet):
-    queryset = Result.objects.all()
     serializer_class = ResultSerializer
     permission_classes = [HasGoogleSession]
+
+    def get_queryset(self):
+        connection = get_active_google_drive_connection(self.request)
+        if not connection:
+            return Result.objects.none()
+
+        return Result.objects.filter(
+            discipline__owner_email__iexact=connection.google_email
+        ).order_by("-created_at")
+
+    def _validate_owned_discipline(self, discipline):
+        connection = get_active_google_drive_connection(self.request)
+        if not connection or not discipline or discipline.owner_email.lower() != connection.google_email.lower():
+            raise ValidationError({"detail": "Result discipline does not belong to the active Google account."})
+
+    def perform_create(self, serializer):
+        self._validate_owned_discipline(serializer.validated_data.get("discipline"))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        discipline = serializer.validated_data.get("discipline", serializer.instance.discipline)
+        self._validate_owned_discipline(discipline)
+        serializer.save()
 
 
 class TestSessionViewSet(viewsets.ModelViewSet):

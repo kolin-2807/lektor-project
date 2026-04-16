@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import quote
 
+from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.views.decorators.clickjacking import xframe_options_exempt
@@ -20,8 +21,12 @@ except ImportError:  # pragma: no cover - optional dependency in some environmen
 
 from academics.models import Discipline
 from ai_services.assistant_service import detect_assistant_intent
-from ai_services.gemini_service import GeminiServiceError, generate_slide_outline_from_text, generate_test_from_text
-from ai_services.stt_service import transcribe_audio
+from ai_services.gemini_service import (
+    GeminiServiceError,
+    generate_slide_outline_from_text,
+    generate_test_from_text,
+)
+from ai_services.stt_service import STTServiceError, transcribe_audio
 from ai_services.tts_service import TTSServiceError, synthesize_assistant_speech
 from users.models import get_active_google_drive_connection, resolve_google_drive_connection
 
@@ -138,6 +143,32 @@ def _has_sufficient_material_text(material, source_text: str) -> bool:
 
     cleaned = " ".join(cleaned.split())
     return len(cleaned) >= 180
+
+
+def _parse_total_slide_count(raw_value, default: int = 7) -> int:
+    try:
+        parsed = int(raw_value or default)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(4, min(parsed, 12))
+
+
+def _content_slide_count_from_total(total_slide_count: int) -> int:
+    return max(2, min(int(total_slide_count or 7) - 2, 10))
+
+
+def _clear_material_slides(material):
+    material.slides_presentation_id = ""
+    material.slides_url = ""
+    material.slides_embed_url = ""
+    material.slides_download_url = ""
+    material.slides_count = 0
+
+
+def _is_not_found_drive_error(exc) -> bool:
+    response = getattr(exc, "resp", None)
+    status_code = getattr(response, "status", None)
+    return status_code == 404 or "File not found" in str(exc)
 
 
 def _format_google_api_error(exc, fallback_message: str) -> str:
@@ -259,8 +290,18 @@ def upload_material(request):
     )
     created_materials = []
     errors = []
+    max_upload_bytes = int(getattr(settings, "MAX_MATERIAL_UPLOAD_BYTES", 50 * 1024 * 1024))
 
     for uploaded_file in uploaded_files:
+        if max_upload_bytes > 0 and getattr(uploaded_file, "size", 0) > max_upload_bytes:
+            errors.append(
+                {
+                    "filename": Path(getattr(uploaded_file, "name", "material")).name,
+                    "detail": f"File is too large. Maximum allowed size is {max_upload_bytes // (1024 * 1024)} MB.",
+                }
+            )
+            continue
+
         try:
             from .google_drive_service import upload_material_file
 
@@ -351,6 +392,14 @@ def delete_material(request, material_id):
     if auth_error:
         return auth_error
 
+    if connection and material.slides_presentation_id:
+        try:
+            from .google_drive_service import delete_material_file
+
+            delete_material_file(connection, material.slides_presentation_id)
+        except Exception:
+            pass
+
     if connection and material.drive_file_id:
         try:
             from .google_drive_service import delete_material_file
@@ -395,6 +444,15 @@ def generate_material_test(request, material_id):
         return Response({"test": result})
     except GeminiServiceError as exc:
         return _build_gemini_error_response(exc, "AI test generation failed")
+    except (json.JSONDecodeError, ValueError) as exc:
+        return Response(
+            {
+                "detail": str(exc) or "AI returned an invalid test format. Please try again.",
+                "code": "ai_invalid_test_response",
+                "retryable": True,
+            },
+            status=503,
+        )
     except Exception as exc:
         return Response(
             {"detail": str(exc) or "AI test generation failed"},
@@ -410,13 +468,41 @@ def generate_material_slides(request, material_id):
     if auth_error:
         return auth_error
 
+    if material.category != "lecture":
+        return Response({"detail": "Slides are available only for lecture materials."}, status=400)
+
+    requested_total_slide_count = _parse_total_slide_count(request.data.get("slide_count"), default=7)
+
+    if material.slides_presentation_id and material.slides_url and material.slides_embed_url:
+        if not material.slides_count:
+            material.slides_count = requested_total_slide_count
+            material.save(update_fields=["slides_count"])
+        return Response(MaterialSerializer(material).data)
+
     language = _resolve_material_language(request, material)
     source_text = _build_material_source_text(material, language, connection=connection)
 
+    if not _has_sufficient_material_text(material, source_text):
+        return Response(
+            {
+                "detail": (
+                    "Материал мәтіні толық оқылмады. Слайд сапалы шығуы үшін DOCX, PPTX, PDF немесе мәтіндік форматтағы "
+                    "файлды жүктеп, қайта көріңіз."
+                )
+            },
+            status=400,
+        )
+
     try:
         from .google_slides_service import create_presentation_from_outline
+        from .google_drive_service import ensure_slide_output_folder
 
-        outline = generate_slide_outline_from_text(source_text, language=language, slide_count=7)
+        _, slides_folder_id = ensure_slide_output_folder(connection, material.discipline)
+        outline = generate_slide_outline_from_text(
+            source_text,
+            language=language,
+            slide_count=_content_slide_count_from_total(requested_total_slide_count),
+        )
         presentation_title = (outline.get("presentation_title") or material.title or "AI Slides").strip()
         presentation_subtitle = (
             outline.get("presentation_subtitle")
@@ -432,7 +518,7 @@ def generate_material_slides(request, material_id):
             title=presentation_title,
             subtitle=presentation_subtitle,
             slides=content_slides,
-            folder_id=material.drive_folder_id,
+            folder_id=slides_folder_id,
             language=language,
         )
 
@@ -440,12 +526,14 @@ def generate_material_slides(request, material_id):
         material.slides_url = presentation_meta.get("slides_url", "")
         material.slides_embed_url = presentation_meta.get("slides_embed_url", "")
         material.slides_download_url = presentation_meta.get("slides_download_url", "")
+        material.slides_count = requested_total_slide_count
         material.save(
             update_fields=[
                 "slides_presentation_id",
                 "slides_url",
                 "slides_embed_url",
                 "slides_download_url",
+                "slides_count",
             ]
         )
     except GeminiServiceError as exc:
@@ -456,6 +544,39 @@ def generate_material_slides(request, material_id):
             status=503,
         )
 
+    return Response(MaterialSerializer(material).data)
+
+
+@api_view(["POST"])
+def reset_material_slides(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
+
+    if material.slides_presentation_id:
+        try:
+            from .google_drive_service import delete_material_file
+
+            delete_material_file(connection, material.slides_presentation_id)
+        except Exception as exc:
+            if not _is_not_found_drive_error(exc):
+                return Response(
+                    {"detail": _format_google_api_error(exc, "Slide reset failed")},
+                    status=503,
+                )
+
+    _clear_material_slides(material)
+    material.save(
+        update_fields=[
+            "slides_presentation_id",
+            "slides_url",
+            "slides_embed_url",
+            "slides_download_url",
+            "slides_count",
+        ]
+    )
     return Response(MaterialSerializer(material).data)
 
 
@@ -509,8 +630,23 @@ def transcribe_voice(request):
             destination.write(chunk)
 
     try:
-        text = transcribe_audio(temp_path)
+        text = transcribe_audio(
+            temp_path,
+            filename=getattr(audio_file, "name", "voice.webm"),
+            content_type=getattr(audio_file, "content_type", "") or None,
+            locale=str(request.data.get("language") or "").strip() or None,
+        )
         return Response({"text": text})
+    except STTServiceError as exc:
+        return Response(
+            {
+                "detail": str(exc),
+                "code": exc.code,
+                "retryable": bool(exc.retryable),
+                "provider": exc.provider,
+            },
+            status=exc.http_status,
+        )
     except Exception as exc:
         return Response(
             {"detail": str(exc) or "Speech-to-text service is temporarily unavailable."},

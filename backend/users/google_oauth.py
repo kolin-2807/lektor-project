@@ -50,6 +50,7 @@ def bypass_broken_local_proxy():
         for key, value in removed_values.items():
             os.environ[key] = value
 
+
 def _get_request_origin(request=None):
     if request is None:
         return ""
@@ -82,7 +83,7 @@ def _load_web_client_config(request=None):
         }
 
     credentials_file = Path(settings.BASE_DIR) / "credentials.json"
-    if credentials_file.exists():
+    if settings.DEBUG and credentials_file.exists():
         data = json.loads(credentials_file.read_text(encoding="utf-8"))
         if "web" in data:
             return data

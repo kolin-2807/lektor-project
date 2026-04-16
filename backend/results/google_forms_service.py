@@ -145,7 +145,7 @@ def replace_questions_in_form(connection, form_id: str, questions: list, languag
                     "location": {"index": index},
                 }
             }
-            for index in range(len(items) - 1, 0, -1)
+            for index in range(len(items) - 1, -1, -1)
         ]
 
         if delete_requests:
@@ -154,17 +154,10 @@ def replace_questions_in_form(connection, form_id: str, questions: list, languag
                 body={"requests": delete_requests},
             ).execute()
 
-        if items:
-            forms_service.forms().batchUpdate(
-                formId=form_id,
-                body={"requests": [_build_update_name_item_request(items[0], language)]},
-            ).execute()
-
-        if not items:
-            forms_service.forms().batchUpdate(
-                formId=form_id,
-                body={"requests": [_build_name_item_request(language)]},
-            ).execute()
+        forms_service.forms().batchUpdate(
+            formId=form_id,
+            body={"requests": [_build_name_item_request(language)]},
+        ).execute()
 
         question_requests = _build_question_create_requests(questions)
         if question_requests:

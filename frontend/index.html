@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lektor</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260415-56" />
+  <link rel="stylesheet" href="./css/style.css?v=20260416-100" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -104,7 +104,7 @@
 
         <div class="home-stage hidden" id="disciplineStage">
           <div class="section-head-inline discipline-stage-head">
-            <button class="back-chip-btn" id="courseBackBtn" type="button">← Артқа</button>
+            <button class="back-chip-btn" id="courseBackBtn" type="button">Артқа</button>
             <button class="add-discipline-btn" id="addDisciplineBtn" type="button">
               <span class="add-discipline-btn-plus">+</span>
               <span id="addDisciplineBtnText">Пән қосу</span>
@@ -121,7 +121,7 @@
           <!-- ЖОҒАРЫҒА КӨТЕРІЛГЕН SUBJECT HEADER -->
           <div class="subject-cover-top" id="subjectCoverTop">
             <div class="subject-cover-head">
-              <button class="cover-back-btn" id="backBtn" type="button">← Артқа</button>
+              <button class="cover-back-btn" id="backBtn" type="button">Артқа</button>
 
               <button class="subject-manage-toggle" id="toggleMaterialManagerBtn" type="button">Материал жүктеу</button>
             </div>
@@ -129,12 +129,7 @@
             <div class="subject-cover-main">
             <div class="subject-course-card" aria-hidden="true">
               <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
-                <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration">
-                  <span class="course-card-asset asset-base"></span>
-                  <span class="course-card-asset asset-sheet"></span>
-                  <span class="course-card-asset asset-tool"></span>
-                  <span class="course-card-asset asset-chip"></span>
-                </div>
+                <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration"></div>
               </div>
             </div>
 
@@ -286,6 +281,7 @@
                   <div class="content-view-actions">
                     <button class="small-btn" id="openSlidesFullscreenBtn" type="button">Толық экран</button>
                     <button class="small-btn primary" id="downloadSlidesBtn" type="button">Жүктеп алу</button>
+                    <button class="small-btn hidden" id="regenerateSlidesBtn" type="button">Қайта жасау</button>
                   </div>
                 </div>
 
@@ -444,6 +440,7 @@
                 class="voice-input"
                 id="voiceInput"
                 rows="2"
+                enterkeyhint="send"
               ></textarea>
 
               <button class="voice-send-btn" id="voiceSendBtn" type="button" aria-label="Жіберу">
@@ -542,7 +539,7 @@
 
           <div class="edit-field">
             <label for="profileBioInput">Био</label>
-            <textarea id="profileBioInput">Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.</textarea>
+            <textarea id="profileBioInput"></textarea>
           </div>
         </div>
 
@@ -624,6 +621,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260415-56"></script>
+  <script src="./js/app.js?v=20260416-100"></script>
 </body>
 </html>

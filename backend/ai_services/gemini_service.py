@@ -547,7 +547,7 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
     if not isinstance(raw_outline, dict):
         raise ValueError("AI slide response must be a JSON object.")
 
-    safe_slide_count = max(4, min(int(slide_count or 7), 10))
+    safe_slide_count = max(2, min(int(slide_count or 5), 10))
     raw_slides = raw_outline.get("slides") or []
     normalized_slides = []
 
@@ -620,7 +620,7 @@ Material:
 
 
 def generate_slide_outline_from_text(text: str, language: str = "kaz", slide_count: int = 7) -> dict:
-    safe_slide_count = max(4, min(int(slide_count or 7), 10))
+    safe_slide_count = max(2, min(int(slide_count or 5), 10))
     target_language = {"rus": "Russian", "eng": "English"}.get(language, "Kazakh")
 
     prompt = f"""

@@ -16,6 +16,12 @@ from users.google_oauth import bypass_broken_local_proxy, credentials_from_dict,
 
 SUPPORTED_DRIVE_LANGUAGES = {"kaz", "rus", "eng"}
 
+SLIDES_FOLDER_LABELS = {
+    "kaz": "Слайд",
+    "rus": "Слайды",
+    "eng": "Slides",
+}
+
 CATEGORY_FOLDER_LABELS = {
     "lecture": {"kaz": "Дәріс", "rus": "Лекция", "eng": "Lecture"},
     "practice": {"kaz": "Практикалық жұмыс", "rus": "Практическая работа", "eng": "Practice"},
@@ -105,6 +111,42 @@ def ensure_material_folder_tree(connection, discipline, category: str):
     )
 
     return service, category_folder_id
+
+
+def _get_slides_folder_name(language: str) -> str:
+    normalized_language = language if language in SUPPORTED_DRIVE_LANGUAGES else "kaz"
+    return SLIDES_FOLDER_LABELS.get(normalized_language) or SLIDES_FOLDER_LABELS["kaz"]
+
+
+def ensure_discipline_folder_tree(connection, discipline):
+    service = get_drive_service(connection)
+    root_folder_id = connection.root_folder_id or ensure_folder(service, "Lektor")
+
+    if root_folder_id != connection.root_folder_id:
+        connection.root_folder_id = root_folder_id
+        connection.save(update_fields=["root_folder_id", "updated_at"])
+
+    language = discipline.language if discipline.language in SUPPORTED_DRIVE_LANGUAGES else "kaz"
+    language_folder_id = ensure_folder(service, language, root_folder_id)
+    course_folder_id = ensure_folder(service, f"{discipline.course.number} курс", language_folder_id)
+    discipline_folder_id = ensure_folder(service, discipline.title, course_folder_id)
+    return service, discipline_folder_id, language
+
+
+def ensure_material_folder_tree(connection, discipline, category: str):
+    service, discipline_folder_id, _ = ensure_discipline_folder_tree(connection, discipline)
+    category_folder_id = ensure_folder(
+        service,
+        _get_category_folder_name(category, discipline.language),
+        discipline_folder_id,
+    )
+    return service, category_folder_id
+
+
+def ensure_slide_output_folder(connection, discipline):
+    service, discipline_folder_id, language = ensure_discipline_folder_tree(connection, discipline)
+    slides_folder_id = ensure_folder(service, _get_slides_folder_name(language), discipline_folder_id)
+    return service, slides_folder_id
 
 
 def upload_material_file(connection, discipline, category: str, uploaded_file):

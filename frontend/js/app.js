@@ -2,6 +2,7 @@
 const runtimeApiBase = window.__APP_CONFIG__?.apiBase?.trim();
 const isLocalStaticPreview = ["127.0.0.1:5500", "localhost:5500"].includes(window.location.host);
 const API_BASE = runtimeApiBase || (isLocalStaticPreview ? LOCAL_API_BASE : `${window.location.origin}/api`);
+const TEST_GENERATION_TIMEOUT_MS = 180000;
 
 const DEFAULT_PROFILE_STATE = {
   fullName: "Қаламан Ерболат Тлеуханұлы",
@@ -9,7 +10,7 @@ const DEFAULT_PROFILE_STATE = {
   roleShort: "оқытушы",
   username: "kalaman_erbolat",
   email: "kalaman@university.kz",
-  bio: "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
+  bio: "",
   avatarUrl: ""
 };
 
@@ -38,10 +39,16 @@ const ROLE_HTML_LANG = Object.freeze({
 });
 
 const DEFAULT_PROFILE_BIOS = {
-  kaz: "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
-  rus: "Преподаватель по дисциплинам информационной безопасности и программирования.",
-  eng: "Lecturer in information security and programming disciplines."
+  kaz: "",
+  rus: "",
+  eng: ""
 };
+
+const LEGACY_PROFILE_BIOS = new Set([
+  "Ақпараттық қауіпсіздік және бағдарламалау пәндері бойынша оқытушы.",
+  "Преподаватель по дисциплинам информационной безопасности и программирования.",
+  "Lecturer in information security and programming disciplines."
+]);
 
 const UI_TEXT = {
   kaz: {
@@ -50,7 +57,7 @@ const UI_TEXT = {
     roleShort: "оқытушы",
     roleLabel: "Оқытушы",
     profileBioDefault: DEFAULT_PROFILE_BIOS.kaz,
-    back: "← Артқа",
+    back: "Артқа",
     edit: "Өңдеу",
     save: "Сақтау",
     editProfile: "Профильді өңдеу",
@@ -179,7 +186,7 @@ const UI_TEXT = {
     roleShort: "преподаватель",
     roleLabel: "Лектор",
     profileBioDefault: DEFAULT_PROFILE_BIOS.rus,
-    back: "← Назад",
+    back: "Назад",
     edit: "Изменить",
     save: "Сохранить",
     editProfile: "Редактировать профиль",
@@ -310,11 +317,22 @@ Object.assign(UI_TEXT.kaz, {
   slidesLectureOnly: "Слайд тек дәріс материалы үшін қолжетімді.",
   slidesSelectPrompt: "Слайд дайындау үшін дәріс материалын таңдаңыз.",
   slidesEmptyTitle: "AI презентация осында ашылады",
-  slidesEmptyText: "Слайд батырмасын басқанда жүйе дәріс материалы бойынша дайын презентация жасап береді.",
+  slidesEmptyText: "Дәрісті таңдап, слайд параметрлерін берсеңіз, жүйе дайын презентация жасап береді.",
   slidesLoadingTitle: "Презентация құрастырылып жатыр",
   slidesLoadingText: "AI материалдың мазмұнын жинап, негізгі ойларды слайдтарға бөліп жатыр.",
   slidesOpen: "Слайдты ашу",
   downloadSlides: "Жүктеп алу",
+  regenerateSlides: "Қайта жасау",
+  buildSlides: "Презентация дайындау",
+  slidesSettingsTitle: "Слайд параметрлері",
+  slidesCountLabel: "Слайд саны",
+  slidesCountHint: "Дайын презентациядағы жалпы слайд саны",
+  slidesCountUnit: "слайд",
+  slidesReadyMeta: ({ count, subject }) => `${count} слайд · ${subject}`,
+  slidesResetting: "Презентация өшіріліп жатыр...",
+  slidesResettingTitle: "Презентация жаңартылуға дайындалып жатыр",
+  slidesResettingText: "Ескі файл Google Drive-тан өшіріліп, жаңа параметрлерге орын босатылып жатыр.",
+  slidesSettingsReady: "Слайд параметрлері ашылды.",
   slidesError: "Слайд жасау кезінде қате шықты.",
   slidesDownloadUnavailable: "Презентацияны жүктеу сілтемесі әлі дайын емес.",
 });
@@ -326,11 +344,22 @@ Object.assign(UI_TEXT.rus, {
   slidesLectureOnly: "Слайды доступны только для лекционного материала.",
   slidesSelectPrompt: "Выберите лекционный материал для презентации.",
   slidesEmptyTitle: "AI-презентация появится здесь",
-  slidesEmptyText: "Нажмите кнопку слайдов, и система соберет готовую презентацию по содержанию лекции.",
+  slidesEmptyText: "Выберите лекцию, укажите параметры, и система соберет готовую презентацию.",
   slidesLoadingTitle: "Презентация собирается",
   slidesLoadingText: "AI выделяет ключевые идеи материала и превращает их в слайды.",
   slidesOpen: "Открыть слайды",
   downloadSlides: "Скачать",
+  regenerateSlides: "Пересоздать",
+  buildSlides: "Подготовить презентацию",
+  slidesSettingsTitle: "Параметры слайдов",
+  slidesCountLabel: "Количество слайдов",
+  slidesCountHint: "Общее число слайдов в готовой презентации",
+  slidesCountUnit: "слайдов",
+  slidesReadyMeta: ({ count, subject }) => `${count} слайдов · ${subject}`,
+  slidesResetting: "Презентация удаляется...",
+  slidesResettingTitle: "Готовим презентацию к пересозданию",
+  slidesResettingText: "Старый файл удаляется из Google Drive, после чего снова откроются параметры.",
+  slidesSettingsReady: "Параметры слайдов открыты.",
   slidesError: "Произошла ошибка при создании презентации.",
   slidesDownloadUnavailable: "Ссылка на скачивание презентации пока не готова.",
 });
@@ -378,7 +407,7 @@ UI_TEXT.eng = {
   roleShort: "lecturer",
   roleLabel: "Lektor",
   profileBioDefault: DEFAULT_PROFILE_BIOS.eng,
-  back: "← Back",
+  back: "Back",
   edit: "Edit",
   save: "Save",
   editProfile: "Edit profile",
@@ -510,6 +539,17 @@ UI_TEXT.eng = {
   slidesLoadingText: "AI is extracting key ideas and turning them into slides.",
   slidesOpen: "Open slides",
   downloadSlides: "Download",
+  regenerateSlides: "Regenerate",
+  buildSlides: "Prepare presentation",
+  slidesSettingsTitle: "Slide settings",
+  slidesCountLabel: "Slide count",
+  slidesCountHint: "Total number of slides in the final presentation",
+  slidesCountUnit: "slides",
+  slidesReadyMeta: ({ count, subject }) => `${count} slides · ${subject}`,
+  slidesResetting: "Removing the presentation...",
+  slidesResettingTitle: "Preparing to regenerate the presentation",
+  slidesResettingText: "The old file is being removed from Google Drive so new settings can be applied.",
+  slidesSettingsReady: "Slide settings are open.",
   slidesError: "An error occurred while creating slides.",
   slidesDownloadUnavailable: "The presentation download link is not ready yet.",
   homeLogo: "Go to home page",
@@ -539,6 +579,7 @@ const typeOrder = [
 
 const APP_STATE_KEY = "lektor-teacher-state-v1";
 const TEST_CONFIG_KEY = "lektor-test-config-v1";
+const SLIDES_CONFIG_KEY = "lektor-slides-config-v1";
 const PUBLIC_TEST_ATTEMPT_KEY = "lektor-public-test-attempt-v1";
 const PUBLIC_TEST_DEVICE_KEY = "lektor-public-test-device-v1";
 const PROFILE_STATE_KEY = "lektor-profile-state-v1";
@@ -550,11 +591,11 @@ const DISCIPLINE_THEMES = [
   },
   {
     coverClass: "discipline-cover-2",
-    background: "linear-gradient(135deg, #12787d 0%, #2ea9ab 52%, #114d57 100%)"
+    background: "linear-gradient(135deg, #005db0 0%, #4f95da 52%, #00498c 100%)"
   },
   {
     coverClass: "discipline-cover-3",
-    background: "linear-gradient(135deg, #197f9e 0%, #58b9d3 52%, #0f5871 100%)"
+    background: "linear-gradient(135deg, #005db0 0%, #7bb5e6 52%, #00498c 100%)"
   },
   {
     coverClass: "discipline-cover-4",
@@ -646,6 +687,7 @@ const folderMaterialUploadInput = document.getElementById("folderMaterialUploadI
 const openMaterialFullscreenBtn = document.getElementById("openMaterialFullscreenBtn");
 const openSlidesFullscreenBtn = document.getElementById("openSlidesFullscreenBtn");
 const downloadSlidesBtn = document.getElementById("downloadSlidesBtn");
+const regenerateSlidesBtn = document.getElementById("regenerateSlidesBtn");
 
 const testInfoRow = testPane?.querySelector(".test-info-row");
 const testLoadingCard = document.getElementById("testLoadingCard");
@@ -786,8 +828,12 @@ let testConfig = {
   questionCount: 5,
   durationMinutes: 20,
 };
+let slidesConfig = {
+  slideCount: 7,
+};
 let isTestGenerating = false;
 let isSlidesGenerating = false;
+let isSlidesResetting = false;
 let slidesErrorMessage = "";
 let appStateRestoreDone = false;
 let publicTestSessionToken = new URLSearchParams(window.location.search).get("session");
@@ -857,6 +903,10 @@ function roleText(kazText, rusText, engText = rusText) {
   return rusText;
 }
 
+function isSlidesBusy() {
+  return isSlidesGenerating || isSlidesResetting;
+}
+
 function getRoleLocale() {
   return ROLE_LOCALES[selectedRole] || ROLE_LOCALES.kaz;
 }
@@ -868,13 +918,28 @@ function formatCourseLabel(number) {
 function getCourseVisualConfig(courseNumber) {
   const normalizedNumber = Number(courseNumber) || 1;
   const visualMap = {
-    1: { coverClass: "course-card-cover-1", illustrationClass: "course-card-illustration-1" },
-    2: { coverClass: "course-card-cover-2", illustrationClass: "course-card-illustration-2" },
-    3: { coverClass: "course-card-cover-3", illustrationClass: "course-card-illustration-3" },
-    4: { coverClass: "course-card-cover-4", illustrationClass: "course-card-illustration-4" }
+    1: {
+      coverClass: "course-card-cover-1",
+    },
+    2: {
+      coverClass: "course-card-cover-2",
+    },
+    3: {
+      coverClass: "course-card-cover-3",
+    },
+    4: {
+      coverClass: "course-card-cover-4",
+    },
   };
 
   return visualMap[normalizedNumber] || visualMap[1];
+}
+
+function buildCourseBookMarkup(courseNumber, { compact = false } = {}) {
+  const normalizedNumber = Number(courseNumber) || 1;
+  return `
+    <div class="course-book course-book-art-${normalizedNumber}${compact ? " is-compact" : ""}" aria-hidden="true"></div>
+  `;
 }
 
 function getPreferredSubject(preferredSubjectId = null) {
@@ -892,11 +957,9 @@ function getPreferredSubject(preferredSubjectId = null) {
 }
 
 function navigateToMainPage() {
-  if (!subjectView.classList.contains("hidden")) {
-    showHome();
-  }
-
+  showHome();
   showCourseStage();
+  renderCourseCards();
 }
 
 function setVoicePanelOpen(shouldOpen) {
@@ -975,13 +1038,14 @@ function applyStaticTranslations() {
   if (materialTypeLabel) materialTypeLabel.textContent = t("materialType");
   if (topicLabel) topicLabel.textContent = t("topic");
   setActionButtonLabel(openMaterialBtn, t("material"));
-  setActionButtonLabel(openSlidesBtn, isSlidesGenerating ? t("slidesGenerating") : t("slides"));
+  setActionButtonLabel(openSlidesBtn, t("slides"));
   setActionButtonLabel(generateTestBtn, t("generateTest"));
   setActionButtonLabel(openQrBtn, t("testQr"));
   setActionButtonLabel(openResultsBtn, t("results"));
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
   if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
   if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
+  if (regenerateSlidesBtn) regenerateSlidesBtn.textContent = t("regenerateSlides");
   if (openResultsSheetBtn) openResultsSheetBtn.textContent = t("openResultsSheet");
   if (downloadResultsBtn) downloadResultsBtn.textContent = t("downloadResults");
   if (qrCodeLabel) qrCodeLabel.textContent = t("qrJoin");
@@ -1238,6 +1302,136 @@ function clampTestConfig(questionCount, durationMinutes) {
   };
 }
 
+function clampSlidesConfig(slideCount) {
+  const parsedSlideCount = Number.parseInt(String(slideCount ?? "").trim(), 10);
+  return {
+    slideCount: Math.max(4, Math.min(Number.isFinite(parsedSlideCount) ? parsedSlideCount : 7, 12)),
+  };
+}
+
+function getDraftSlidesConfig() {
+  const input = document.getElementById("slidesCountInput");
+  return clampSlidesConfig(input?.value ?? slidesConfig.slideCount);
+}
+
+function syncSlidesConfigInput() {
+  const input = document.getElementById("slidesCountInput");
+  if (input) {
+    input.value = String(slidesConfig.slideCount);
+  }
+}
+
+function commitSlidesConfigFromInput({ persist = true } = {}) {
+  slidesConfig = getDraftSlidesConfig();
+  syncSlidesConfigInput();
+  if (persist) {
+    saveStoredSlidesConfig();
+  }
+  return slidesConfig;
+}
+
+function saveStoredSlidesConfig() {
+  localStorage.setItem(SLIDES_CONFIG_KEY, JSON.stringify(slidesConfig));
+}
+
+function loadStoredSlidesConfig() {
+  try {
+    const raw = localStorage.getItem(SLIDES_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      slidesConfig = clampSlidesConfig(parsed?.slideCount);
+    }
+  } catch (error) {
+    console.error("Slides config restore error:", error);
+    slidesConfig = clampSlidesConfig(7);
+  }
+
+  syncSlidesConfigInput();
+}
+
+function bindSlidesSettingsInput() {
+  const slidesCountInput = document.getElementById("slidesCountInput");
+  if (!slidesCountInput) return;
+
+  const normalizeValue = (value) => String(value ?? "").replace(/[^\d]/g, "").slice(0, 2);
+  let lastCommittedValue = slidesConfig.slideCount;
+
+  const syncValue = (value, { commitInput = false, fallbackValue = lastCommittedValue } = {}) => {
+    const rawValue = String(value ?? "").trim();
+    const parsedValue = Number.parseInt(rawValue, 10);
+    const safeValue = Number.isFinite(parsedValue)
+      ? clampSlidesConfig(parsedValue).slideCount
+      : clampSlidesConfig(fallbackValue).slideCount;
+
+    if (commitInput || !rawValue) {
+      slidesCountInput.value = String(safeValue);
+    }
+
+    return safeValue;
+  };
+
+  slidesCountInput.addEventListener("input", () => {
+    const normalizedValue = normalizeValue(slidesCountInput.value);
+    if (slidesCountInput.value !== normalizedValue) {
+      slidesCountInput.value = normalizedValue;
+    }
+  });
+
+  slidesCountInput.addEventListener("focus", () => {
+    window.requestAnimationFrame(() => {
+      slidesCountInput.select();
+    });
+  });
+
+  slidesCountInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      lastCommittedValue = syncValue(slidesCountInput.value, { commitInput: true });
+      slidesConfig = clampSlidesConfig(lastCommittedValue);
+      saveStoredSlidesConfig();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      lastCommittedValue = syncValue(lastCommittedValue, { commitInput: true });
+      window.requestAnimationFrame(() => {
+        slidesCountInput.select();
+      });
+      return;
+    }
+
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+
+    event.preventDefault();
+    const baseValue = syncValue(slidesCountInput.value, {
+      commitInput: false,
+      fallbackValue: lastCommittedValue,
+    });
+    const nextValue = baseValue + (event.key === "ArrowDown" ? -1 : 1);
+    lastCommittedValue = syncValue(nextValue, { commitInput: true });
+    slidesConfig = clampSlidesConfig(lastCommittedValue);
+    saveStoredSlidesConfig();
+    window.requestAnimationFrame(() => {
+      slidesCountInput.select();
+    });
+  });
+
+  slidesCountInput.addEventListener("change", () => {
+    lastCommittedValue = syncValue(slidesCountInput.value, { commitInput: true });
+    slidesConfig = clampSlidesConfig(lastCommittedValue);
+    saveStoredSlidesConfig();
+  });
+
+  slidesCountInput.addEventListener("blur", () => {
+    lastCommittedValue = syncValue(slidesCountInput.value, { commitInput: true });
+    slidesConfig = clampSlidesConfig(lastCommittedValue);
+    saveStoredSlidesConfig();
+  });
+
+  lastCommittedValue = syncValue(slidesConfig.slideCount, { commitInput: true });
+}
+
 function getClampedDurationMinutes(durationMinutes, fallback = testConfig.durationMinutes) {
   const rawValue = String(durationMinutes ?? "").trim();
   if (!rawValue) {
@@ -1257,12 +1451,14 @@ function buildDurationEditorMarkup({
         <input
           id="${inputId}"
           class="edit-input test-modal-summary-input"
-          type="number"
-          min="5"
-          max="180"
-          step="1"
+          type="text"
           inputmode="numeric"
+          enterkeyhint="done"
+          pattern="[0-9]*"
           autocomplete="off"
+          spellcheck="false"
+          aria-label="${roleText("Тест уақыты минутпен", "Время теста в минутах", "Test duration in minutes")}"
+          title="${roleText("Санды теріңіз. Shift + ↑/↓ арқылы 10 минутқа өзгертуге болады.", "Введите число. Shift + ↑/↓ меняет время на 10 минут.", "Type a number. Shift + Up/Down changes it by 10 minutes.")}"
           value="${value}"
         />
         <span class="test-settings-unit">${roleText("мин", "мин", "min")}</span>
@@ -1283,12 +1479,15 @@ function bindTestModalDurationEditor(initialDuration) {
 
   if (!modalDurationInput) return;
 
-  const syncEditorState = (value, { commitInput = false } = {}) => {
+  const normalizeEditorValue = (value) => String(value ?? "").replace(/[^\d]/g, "").slice(0, 3);
+  let lastCommittedDuration = getClampedDurationMinutes(initialDuration, initialDuration);
+
+  const syncEditorState = (value, { commitInput = false, fallbackDuration = lastCommittedDuration } = {}) => {
     const rawValue = String(value ?? "").trim();
     const parsedDuration = Number.parseInt(rawValue, 10);
     const safeDuration = Number.isFinite(parsedDuration)
       ? Math.max(5, Math.min(parsedDuration, 180))
-      : getClampedDurationMinutes(initialDuration, initialDuration);
+      : getClampedDurationMinutes(fallbackDuration, fallbackDuration);
 
     if (commitInput || !rawValue) {
       modalDurationInput.value = String(safeDuration);
@@ -1299,18 +1498,67 @@ function bindTestModalDurationEditor(initialDuration) {
   };
 
   modalDurationInput.addEventListener("input", () => {
-    syncEditorState(modalDurationInput.value, { commitInput: false });
+    const normalizedValue = normalizeEditorValue(modalDurationInput.value);
+    if (modalDurationInput.value !== normalizedValue) {
+      modalDurationInput.value = normalizedValue;
+    }
+
+    if (!normalizedValue) {
+      updateTestModalCloseTimePreview(lastCommittedDuration);
+      return;
+    }
+
+    syncEditorState(normalizedValue, { commitInput: false });
+  });
+
+  modalDurationInput.addEventListener("focus", () => {
+    window.requestAnimationFrame(() => {
+      modalDurationInput.select();
+    });
+  });
+
+  modalDurationInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      lastCommittedDuration = syncEditorState(modalDurationInput.value, { commitInput: true });
+      return;
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      lastCommittedDuration = syncEditorState(lastCommittedDuration, { commitInput: true });
+      window.requestAnimationFrame(() => {
+        modalDurationInput.select();
+      });
+      return;
+    }
+
+    const isArrowStep = event.key === "ArrowUp" || event.key === "ArrowDown";
+    const isPageStep = event.key === "PageUp" || event.key === "PageDown";
+    if (!isArrowStep && !isPageStep) return;
+
+    event.preventDefault();
+    const baseDuration = syncEditorState(modalDurationInput.value, {
+      commitInput: false,
+      fallbackDuration: lastCommittedDuration,
+    });
+    const step = isPageStep ? 5 : event.shiftKey ? 10 : 1;
+    const direction = event.key === "ArrowDown" || event.key === "PageDown" ? -1 : 1;
+    lastCommittedDuration = syncEditorState(baseDuration + direction * step, { commitInput: true });
+    window.requestAnimationFrame(() => {
+      modalDurationInput.select();
+    });
   });
 
   modalDurationInput.addEventListener("change", () => {
-    syncEditorState(modalDurationInput.value, { commitInput: true });
+    lastCommittedDuration = syncEditorState(modalDurationInput.value, { commitInput: true });
   });
 
   modalDurationInput.addEventListener("blur", () => {
-    syncEditorState(modalDurationInput.value, { commitInput: true });
+    lastCommittedDuration = syncEditorState(modalDurationInput.value, { commitInput: true });
   });
 
-  syncEditorState(initialDuration, { commitInput: true });
+  lastCommittedDuration = syncEditorState(initialDuration, { commitInput: true });
 }
 
 function hasRecentTestSaveFeedback() {
@@ -1764,19 +2012,24 @@ function applyStoredProfileState(email = driveConnection.google_email || profile
   }
 
   const nextUsername = String(storedProfile.username || "").trim();
-  const nextBio = String(storedProfile.bio || "").trim();
+  const nextBio = normalizeProfileBio(storedProfile.bio);
   const nextAvatarUrl = typeof storedProfile.avatarUrl === "string" ? storedProfile.avatarUrl : "";
 
   if (nextUsername) {
     profileState.username = nextUsername;
   }
 
-  if (nextBio) {
+  if (Object.prototype.hasOwnProperty.call(storedProfile, "bio")) {
     profileState.bio = nextBio;
   }
 
   profileState.avatarUrl = nextAvatarUrl;
   return true;
+}
+
+function normalizeProfileBio(value = "") {
+  const bio = String(value || "").trim();
+  return LEGACY_PROFILE_BIOS.has(bio) ? "" : bio;
 }
 
 function persistProfileState(email = driveConnection.google_email || profileState.email) {
@@ -2387,7 +2640,7 @@ function closeModal(modal) {
 
 function saveProfile() {
   profileState.username = profileUsernameInput.value.trim() || profileState.username;
-  profileState.bio = profileBioInput.value.trim() || profileState.bio;
+  profileState.bio = normalizeProfileBio(profileBioInput.value);
   persistProfileState();
   renderProfile();
   closeModal(profileModal);
@@ -2847,6 +3100,7 @@ async function restoreTeacherAppState() {
   if (appStateRestoreDone || publicTestSessionToken) return;
 
   loadStoredTestConfig();
+  loadStoredSlidesConfig();
 
   const savedState = readTeacherAppState();
   if (!savedState) {
@@ -2984,29 +3238,23 @@ function renderCourseCards() {
     return;
   }
 
-  const coverClasses = {
-    1: "course-card-cover-1",
-    2: "course-card-cover-2",
-    3: "course-card-cover-3",
-    4: "course-card-cover-4"
-  };
+  courseGrid.innerHTML = coursesData.map(course => {
+    const visual = getCourseVisualConfig(course.number);
 
-  courseGrid.innerHTML = coursesData.map(course => `
-    <article class="course-card" data-course-number="${course.number}">
-      <div class="course-card-cover ${coverClasses[course.number] || coverClasses[1]}">
-        <div class="course-card-illustration course-card-illustration-${course.number}">
-          <span class="course-card-asset asset-base"></span>
-          <span class="course-card-asset asset-sheet"></span>
-          <span class="course-card-asset asset-tool"></span>
-          <span class="course-card-asset asset-chip"></span>
+    return `
+      <article class="course-card" data-course-number="${course.number}">
+        <div class="course-card-cover ${visual.coverClass}">
+          <div class="course-card-illustration">
+            ${buildCourseBookMarkup(course.number)}
+          </div>
         </div>
-      </div>
 
-      <div class="course-card-body">
-        <div class="course-card-title">${formatCourseLabel(course.number)}</div>
-      </div>
-    </article>
-  `).join("");
+        <div class="course-card-body">
+          <div class="course-card-title">${formatCourseLabel(course.number)}</div>
+        </div>
+      </article>
+    `;
+  }).join("");
 
   document.querySelectorAll(".course-card").forEach(card => {
     card.addEventListener("click", async () => {
@@ -3172,6 +3420,7 @@ function mapMaterialFromApi(item) {
     slidesEmbedUrl: item.slides_embed_url || "",
     slidesDownloadUrl: item.slides_download_url || "",
     slidesPresentationId: item.slides_presentation_id || "",
+    slidesCount: Number(item.slides_count) || 0,
     createdAt: item.created_at || "",
     mimeType: item.mime_type || "",
     originalFilename: item.original_filename || "",
@@ -3526,7 +3775,8 @@ function renderSubjectHeader() {
     subjectCourseCardCover.className = `course-card-cover subject-course-card-cover ${courseVisual.coverClass}`;
   }
   if (subjectCourseIllustration) {
-    subjectCourseIllustration.className = `course-card-illustration subject-course-illustration ${courseVisual.illustrationClass}`;
+    subjectCourseIllustration.className = "course-card-illustration subject-course-illustration";
+    subjectCourseIllustration.innerHTML = buildCourseBookMarkup(courseNumber, { compact: true });
   }
   if (changeCoverBtn) {
     changeCoverBtn.textContent = isEditingSubjectTitle ? t("save") : t("edit");
@@ -3724,12 +3974,88 @@ function buildSlidesEmptyCard(title, text, extraClass = "") {
   `;
 }
 
+function buildSlidesSettingsCard(material) {
+  return `
+    <div class="slides-preview-shell">
+      <div class="test-settings-panel slides-settings-panel">
+        <div class="test-settings-shell">
+          <div class="test-settings-head">
+            <span class="test-settings-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 5.5h14"></path>
+                <path d="M5 11.5h14"></path>
+                <path d="M5 17.5h14"></path>
+                <path d="M8 4v3"></path>
+                <path d="M12 10v3"></path>
+                <path d="M16 16v3"></path>
+              </svg>
+            </span>
+
+            <div class="test-settings-copy">
+              <p class="test-settings-title">${escapeHtml(t("slidesSettingsTitle"))}</p>
+            </div>
+          </div>
+
+          <div class="test-settings-body">
+            <div class="test-settings-grid slides-settings-grid">
+              <label class="test-settings-field" for="slidesCountInput">
+                <span class="test-settings-field-label">${escapeHtml(t("slidesCountLabel"))}</span>
+                <span class="test-settings-field-note">${escapeHtml(t("slidesCountHint"))}</span>
+                <div class="test-settings-input-shell">
+                  <input
+                    id="slidesCountInput"
+                    type="text"
+                    inputmode="numeric"
+                    enterkeyhint="done"
+                    pattern="[0-9]*"
+                    autocomplete="off"
+                    spellcheck="false"
+                    value="${slidesConfig.slideCount}"
+                  />
+                  <span class="test-settings-unit">${escapeHtml(t("slidesCountUnit"))}</span>
+                </div>
+              </label>
+
+              <div class="test-settings-cta slides-settings-cta">
+                <button class="small-btn primary" id="buildSlidesBtn" type="button">${escapeHtml(t("buildSlides"))}</button>
+              </div>
+            </div>
+
+            <div class="slides-settings-material">
+              <strong>${escapeHtml(material?.title || "")}</strong>
+              <span>${escapeHtml(selectedSubject?.title || "")}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function syncSlidesActionButtons(material, hasSlides) {
+  if (openSlidesFullscreenBtn) {
+    openSlidesFullscreenBtn.disabled = !hasSlides || isSlidesBusy();
+    openSlidesFullscreenBtn.classList.toggle("hidden", !hasSlides);
+  }
+
+  if (downloadSlidesBtn) {
+    downloadSlidesBtn.disabled = !material?.slidesDownloadUrl || isSlidesBusy();
+    downloadSlidesBtn.classList.toggle("hidden", !hasSlides);
+  }
+
+  if (regenerateSlidesBtn) {
+    regenerateSlidesBtn.disabled = !hasSlides || isSlidesBusy();
+    regenerateSlidesBtn.classList.toggle("hidden", !hasSlides);
+  }
+}
+
 function renderSlidesPreview() {
   if (!slidesPreview) return;
 
   if (!selectedSubject) {
     slidesErrorMessage = "";
     setSlidesStatus("");
+    syncSlidesActionButtons(null, false);
     slidesPreview.innerHTML = buildSlidesEmptyCard(
       t("slidesEmptyTitle"),
       isDisciplineAccessLocked ? getAuthRequiredWorkspaceMessage() : t("subjectSelectFirst")
@@ -3739,31 +4065,33 @@ function renderSlidesPreview() {
 
   const material = getSelectedMaterial();
   const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
-
-  if (openSlidesFullscreenBtn) {
-    openSlidesFullscreenBtn.disabled = !hasSlides || isSlidesGenerating;
-  }
-
-  if (downloadSlidesBtn) {
-    downloadSlidesBtn.disabled = !material?.slidesDownloadUrl || isSlidesGenerating;
-  }
+  syncSlidesActionButtons(material, hasSlides);
 
   if (!material) {
     slidesErrorMessage = "";
     setSlidesStatus("");
+    syncSlidesActionButtons(null, false);
     slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesSelectPrompt"));
     return;
   }
 
-  if (isSlidesGenerating) {
-    setSlidesStatus(t("slidesGenerating"));
+  if (material.type !== "lecture") {
+    slidesErrorMessage = "";
+    setSlidesStatus(t("slidesLectureOnly"), "error");
+    syncSlidesActionButtons(material, false);
+    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesLectureOnly"));
+    return;
+  }
+
+  if (isSlidesGenerating || isSlidesResetting) {
+    setSlidesStatus(isSlidesResetting ? t("slidesResetting") : t("slidesGenerating"));
     slidesPreview.innerHTML = `
       <div class="slides-preview-shell">
         <div class="slides-preview-card is-loading">
           <div class="slides-preview-copy">
             <div class="slides-loader"></div>
-            <h3>${t("slidesLoadingTitle")}</h3>
-            <p>${t("slidesLoadingText")}</p>
+            <h3>${isSlidesResetting ? t("slidesResettingTitle") : t("slidesLoadingTitle")}</h3>
+            <p>${isSlidesResetting ? t("slidesResettingText") : t("slidesLoadingText")}</p>
           </div>
         </div>
       </div>
@@ -3772,14 +4100,17 @@ function renderSlidesPreview() {
   }
 
   if (!hasSlides) {
-    if (slidesErrorMessage) {
-      setSlidesStatus(slidesErrorMessage, "error");
-      slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), slidesErrorMessage);
-      return;
-    }
+    setSlidesStatus(slidesErrorMessage || "", slidesErrorMessage ? "error" : "neutral");
+    slidesPreview.innerHTML = buildSlidesSettingsCard(material);
+    bindSlidesSettingsInput();
 
-    setSlidesStatus("");
-    slidesPreview.innerHTML = buildSlidesEmptyCard(t("slidesEmptyTitle"), t("slidesEmptyText"));
+    const buildSlidesBtn = document.getElementById("buildSlidesBtn");
+    if (buildSlidesBtn) {
+      buildSlidesBtn.disabled = isSlidesBusy();
+      buildSlidesBtn.addEventListener("click", () => {
+        generateSlidesForSelectedMaterial();
+      });
+    }
     return;
   }
 
@@ -3790,7 +4121,10 @@ function renderSlidesPreview() {
       <div class="slides-embed-meta">
         <div>
           <strong>${escapeHtml(material.title)}</strong>
-          <span>${escapeHtml(selectedSubject?.title || "")}</span>
+          <span>${escapeHtml(t("slidesReadyMeta", {
+            count: material.slidesCount || slidesConfig.slideCount,
+            subject: selectedSubject?.title || "",
+          }))}</span>
         </div>
       </div>
 
@@ -3843,8 +4177,8 @@ function updateActionButtonsState() {
   const sessionStatus = getNormalizedTestSessionStatus(currentTestSession);
   const canOpenQr = sessionStatus === "live" && hasGeneratedTest && hasSessionLink && !isTestGenerating;
 
-  openSlidesBtn.disabled = !hasMaterial || isSlidesGenerating;
-  setActionButtonLabel(openSlidesBtn, isSlidesGenerating ? t("slidesGenerating") : t("slides"));
+  openSlidesBtn.disabled = !hasMaterial || isSlidesBusy();
+  setActionButtonLabel(openSlidesBtn, t("slides"));
   generateTestBtn.disabled = !hasMaterial || isTestGenerating;
   openQrBtn.disabled = !canOpenQr;
   openResultsBtn.disabled = !hasResults;
@@ -4516,9 +4850,9 @@ function renderQuestionModal(editMode = false) {
             <div style="
               min-height:44px;
               border-radius:12px;
-              border:1px solid ${q.answer === oIndex ? "rgba(110,169,79,0.24)" : "rgba(0,93,176,0.14)"};
-              background:${q.answer === oIndex ? "rgba(235,247,226,0.92)" : "#f5f8fc"};
-              color:${q.answer === oIndex ? "#2f6a29" : "#17314b"};
+              border:1px solid ${q.answer === oIndex ? "rgba(68,150,55,0.32)" : "rgba(0,93,176,0.14)"};
+              background:${q.answer === oIndex ? "rgba(232,248,226,0.96)" : "#f5f8fc"};
+              color:${q.answer === oIndex ? "#2f6f28" : "#17314b"};
               display:flex;
               align-items:center;
               gap:10px;
@@ -4528,10 +4862,10 @@ function renderQuestionModal(editMode = false) {
             ">
               <div style="
                 width:26px;height:26px;border-radius:50%;
-                background:${q.answer === oIndex ? "rgba(110,169,79,0.16)" : "rgba(0,93,176,0.10)"};
+                background:${q.answer === oIndex ? "#58b947" : "rgba(0,93,176,0.10)"};
                 display:flex;align-items:center;justify-content:center;
                 font-size:11px;font-weight:800;flex-shrink:0;
-                color:${q.answer === oIndex ? "#39742f" : "#4d6784"};
+                color:${q.answer === oIndex ? "#ffffff" : "#4d6784"};
               ">${String.fromCharCode(65 + oIndex)}</div>
               <div>${escapeHtml(option)}</div>
             </div>
@@ -4561,6 +4895,10 @@ function normalizeVoiceText(text) {
 }
 
 function detectAssistantReplyLanguage(text) {
+  if (selectedRole === "rus" || selectedRole === "eng") {
+    return selectedRole;
+  }
+
   const rawText = String(text || "").toLowerCase();
   const normalized = normalizeVoiceText(text);
   const kazakhCharMatch = /[әіңғүұқөһ]/i.test(rawText);
@@ -4606,8 +4944,10 @@ function detectAssistantReplyLanguage(text) {
   return selectedRole;
 }
 
-function selectLocalizedAssistantReply(language, kazakhText, russianText) {
-  return language === "rus" ? russianText : kazakhText;
+function selectLocalizedAssistantReply(language, kazakhText, russianText, englishText = russianText) {
+  if (language === "rus") return russianText;
+  if (language === "eng") return englishText;
+  return kazakhText;
 }
 
 const LOCAL_ASSISTANT_OPEN_WORDS = ["аш", "көрсет", "открой", "покажи", "перейди", "open", "show"];
@@ -5195,6 +5535,7 @@ function resolveLocalAssistantCommand(transcript) {
 async function sendAudioToAssistant(audioBlob) {
   const formData = new FormData();
   formData.append("audio", audioBlob, "voice.webm");
+  formData.append("language", getSpeechLanguage());
 
   return fetchJSON(`${API_BASE}/assistant/transcribe/`, {
     method: "POST",
@@ -5365,7 +5706,8 @@ async function submitVoiceInput(customText, options = {}) {
   }
 
   if (voiceInput && source !== "voice") {
-    voiceInput.value = message;
+    voiceInput.value = "";
+    lastManualVoiceInputValue = "";
   }
 
   if (source === "voice") {
@@ -6135,7 +6477,11 @@ if (courseBackBtn) {
 }
 
 if (homeLogoBtn) {
-  homeLogoBtn.addEventListener("click", navigateToMainPage);
+  homeLogoBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    navigateToMainPage();
+  });
 }
 
 function handleDriveReturnParams() {
@@ -6348,26 +6694,15 @@ if (openMaterialBtn) {
 }
 
 if (openSlidesBtn) {
-  openSlidesBtn.addEventListener("click", async () => {
+  openSlidesBtn.addEventListener("click", () => {
     isMaterialManagerOpen = false;
     renderMaterialManagerPanel();
     switchSubjectPanel("slides");
     renderSlidesPreview();
-
-    const material = getSelectedMaterial();
-    if (!material || isSlidesGenerating) {
-      return;
-    }
-
-    if (material.slidesEmbedUrl || material.slidesUrl) {
-      return;
-    }
-
-    await generateSlidesForSelectedMaterial();
   });
 }
 
-async function generateSlidesForSelectedMaterial() {
+async function generateSlidesForSelectedMaterial({ force = false, slideCount = null } = {}) {
   const currentMaterial = getSelectedMaterial();
 
   switchSubjectPanel("slides");
@@ -6378,6 +6713,26 @@ async function generateSlidesForSelectedMaterial() {
     return;
   }
 
+  if (currentMaterial.type !== "lecture") {
+    setSlidesStatus(t("slidesLectureOnly"), "error");
+    renderSlidesPreview();
+    return;
+  }
+
+  if (isSlidesBusy()) {
+    return;
+  }
+
+  if (!force && (currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl)) {
+    renderSlidesPreview();
+    return;
+  }
+
+  const nextSlidesConfig = slideCount != null
+    ? clampSlidesConfig(slideCount)
+    : commitSlidesConfigFromInput({ persist: true });
+  slidesConfig = nextSlidesConfig;
+  saveStoredSlidesConfig();
   slidesErrorMessage = "";
   isSlidesGenerating = true;
   updateActionButtonsState();
@@ -6391,6 +6746,7 @@ async function generateSlidesForSelectedMaterial() {
       },
       body: JSON.stringify({
         language: selectedRole,
+        slide_count: slidesConfig.slideCount,
       })
     });
 
@@ -6405,6 +6761,47 @@ async function generateSlidesForSelectedMaterial() {
     isSlidesGenerating = false;
     updateActionButtonsState();
     renderSlidesPreview();
+  }
+}
+
+async function resetSlidesForSelectedMaterial() {
+  const currentMaterial = getSelectedMaterial();
+  let resetCompleted = false;
+
+  switchSubjectPanel("slides");
+
+  if (!currentMaterial || !currentMaterial.slidesPresentationId || isSlidesBusy()) {
+    renderSlidesPreview();
+    return;
+  }
+
+  slidesErrorMessage = "";
+  isSlidesResetting = true;
+  updateActionButtonsState();
+  renderSlidesPreview();
+
+  try {
+    const updatedMaterial = await fetchJSON(`${API_BASE}/materials/${currentMaterial.id}/reset-slides/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({}),
+    });
+
+    upsertSelectedSubjectMaterial(updatedMaterial);
+    resetCompleted = true;
+    saveTeacherAppState();
+  } catch (error) {
+    console.error("SLIDES RESET ERROR:", error);
+    slidesErrorMessage = error?.message || t("slidesError");
+  } finally {
+    isSlidesResetting = false;
+    updateActionButtonsState();
+    renderSlidesPreview();
+    if (resetCompleted) {
+      setSlidesStatus(t("slidesSettingsReady"));
+    }
   }
 }
 
@@ -6608,6 +7005,11 @@ async function createAiQuestions(options = {}) {
   isTestGenerating = true;
   cancelActiveTestGeneration({ keepUiState: true });
   const abortController = new AbortController();
+  let didTimeout = false;
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    abortController.abort();
+  }, TEST_GENERATION_TIMEOUT_MS);
   testGenerationAbortController = abortController;
   activeTestGenerationMaterialId = currentMaterialId;
   activeTestGenerationStartedAt = Date.now() - 5000;
@@ -6639,6 +7041,14 @@ async function createAiQuestions(options = {}) {
       signal: abortController.signal,
     });
 
+    if (!Array.isArray(data.test) || !data.test.length) {
+      throw new Error(roleText(
+        "Backend тест сұрақтарын қайтара алмады.",
+        "Backend не вернул вопросы теста.",
+        "The backend did not return test questions.",
+      ));
+    }
+
     generatedQuestions = data.test.map((item, index) => ({
       id: index + 1,
       question: item.question,
@@ -6646,6 +7056,15 @@ async function createAiQuestions(options = {}) {
       answer: resolveQuestionAnswerIndex(item),
       answerRaw: item.answer || "",
     }));
+
+    const invalidQuestion = generatedQuestions.find(q => !q.question || q.options.length !== 4 || q.answer < 0);
+    if (invalidQuestion) {
+      throw new Error(roleText(
+        "AI тест құрылымы толық емес. Қайта дайындап көріңіз.",
+        "Структура AI-теста неполная. Попробуйте подготовить заново.",
+        "The AI test structure is incomplete. Try preparing it again.",
+      ));
+    }
 
     const sessionData = await fetchJSON(`${API_BASE}/results/test-sessions/create-from-ai/`, {
       method: "POST",
@@ -6679,7 +7098,14 @@ async function createAiQuestions(options = {}) {
     }
   } catch (error) {
     if (error?.name === "AbortError") {
-      return;
+      if (!didTimeout) {
+        return;
+      }
+      error = new Error(roleText(
+        "Тест дайындау тым ұзаққа созылды. Интернет, Gemini quota немесе Google Forms жағын тексеріп, қайта көріңіз.",
+        "Подготовка теста заняла слишком много времени. Проверьте интернет, квоту Gemini или Google Forms и попробуйте снова.",
+        "Test preparation took too long. Check the internet connection, Gemini quota, or Google Forms and try again.",
+      ));
     }
 
     console.error("AI TEST ERROR:", error);
@@ -6695,6 +7121,7 @@ async function createAiQuestions(options = {}) {
       setTestPanelInfo(testGenerationNotice, "error");
     }
   } finally {
+    window.clearTimeout(timeoutId);
     const isCurrentGeneration = testGenerationAbortController === abortController;
 
     if (isCurrentGeneration) {
@@ -7317,6 +7744,10 @@ if (downloadSlidesBtn) {
   downloadSlidesBtn.addEventListener("click", downloadCurrentSlides);
 }
 
+if (regenerateSlidesBtn) {
+  regenerateSlidesBtn.addEventListener("click", resetSlidesForSelectedMaterial);
+}
+
 if (openResultsSheetBtn) {
   openResultsSheetBtn.addEventListener("click", openResultsSheetDirect);
 }
@@ -7405,10 +7836,18 @@ if (voiceInput) {
   });
 
   voiceInput.addEventListener("keydown", async (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      await submitVoiceInput();
+    const isPlainEnter = (event.key === "Enter" || event.code === "NumpadEnter")
+      && !event.shiftKey
+      && !event.altKey
+      && !event.ctrlKey
+      && !event.metaKey;
+
+    if (!isPlainEnter || event.isComposing || event.keyCode === 229) {
+      return;
     }
+
+    event.preventDefault();
+    await submitVoiceInput();
   });
 }
 
@@ -7476,6 +7915,7 @@ document.addEventListener("click", (e) => {
 
 async function bootstrapApp() {
   loadStoredTestConfig();
+  loadStoredSlidesConfig();
   applyStaticTranslations();
   renderProfile();
   renderAuthState();

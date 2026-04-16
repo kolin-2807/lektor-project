@@ -1,7 +1,12 @@
+import json
+import os
+import tempfile
 from unittest.mock import Mock, patch
 
-from django.test import Client, SimpleTestCase, override_settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 
+from academics.models import Course, Discipline
 from ai_services.assistant_service import detect_assistant_intent
 from ai_services.gemini_service import (
     GeminiServiceError,
@@ -10,6 +15,8 @@ from ai_services.gemini_service import (
     _is_predictable_answer_pattern,
     _normalize_test_items,
 )
+from materials.models import Material
+from ai_services.stt_service import STTServiceError, transcribe_audio
 from ai_services.tts_service import TTSServiceError, synthesize_assistant_speech
 from materials.views import _build_gemini_error_response
 
@@ -50,7 +57,7 @@ class AssistantIntentServiceTests(SimpleTestCase):
         self.assertEqual(result["action"], "unknown")
         self.assertIn("\u0442\u0435\u0441\u0442", result["reply"].lower())
 
-    def test_prefers_kazakh_reply_for_kazakh_text_even_if_role_is_russian(self):
+    def test_uses_selected_russian_role_for_reply_language(self):
         result = detect_assistant_intent(
             "\u041c\u0430\u0442\u0435\u0440\u0438\u0430\u043b\u0434\u0430\u0440\u0434\u044b \u0430\u0448",
             context={
@@ -59,7 +66,7 @@ class AssistantIntentServiceTests(SimpleTestCase):
         )
 
         self.assertEqual(result["action"], "open_materials")
-        self.assertIn("\u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b", result["reply"].lower())
+        self.assertIn("\u0440\u0430\u0437\u0434\u0435\u043b", result["reply"].lower())
 
     def test_detects_course_navigation(self):
         result = detect_assistant_intent("3 \u043a\u0443\u0440\u0441 \u0430\u0448")
@@ -321,6 +328,174 @@ class GeminiTestNormalizationTests(SimpleTestCase):
             self.assertEqual(set(item["options"]), {f"Right {index}", f"Wrong {index}A", f"Wrong {index}B", f"Wrong {index}C"})
             answer_index = ord(item["answer"]) - ord("A")
             self.assertEqual(item["options"][answer_index], f"Right {index}")
+
+
+class SlideGenerationFlowTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.course = Course.objects.create(number=3)
+        self.discipline = Discipline.objects.create(
+            course=self.course,
+            title="Geometry",
+            language="kaz",
+            owner_email="teacher@example.com",
+        )
+        self.material = Material.objects.create(
+            discipline=self.discipline,
+            title="Lecture 1",
+            category="lecture",
+            cloud_url="https://drive.google.com/file/d/material/view",
+            description="Lecture description",
+            drive_folder_id="lecture-folder-id",
+            owner_email="teacher@example.com",
+        )
+        self.connection = Mock(google_email="teacher@example.com")
+
+    def test_generate_slides_uses_dedicated_slides_folder_and_saves_total_slide_count(self):
+        with (
+            patch("materials.views._require_google_session", return_value=(self.connection, None)),
+            patch("materials.views._build_material_source_text", return_value="source material text"),
+            patch("materials.views._has_sufficient_material_text", return_value=True),
+            patch(
+                "materials.views.generate_slide_outline_from_text",
+                return_value={
+                    "presentation_title": "Generated deck",
+                    "presentation_subtitle": "Short subtitle",
+                    "slides": [
+                        {"title": f"Slide {index}", "bullets": ["One", "Two", "Three"]}
+                        for index in range(1, 7)
+                    ],
+                },
+            ) as mocked_outline,
+            patch(
+                "materials.google_drive_service.ensure_slide_output_folder",
+                return_value=(Mock(), "slides-folder-id"),
+            ) as mocked_ensure_folder,
+            patch(
+                "materials.google_slides_service.create_presentation_from_outline",
+                return_value={
+                    "presentation_id": "presentation-123",
+                    "slides_url": "https://docs.google.com/presentation/d/presentation-123/edit",
+                    "slides_embed_url": "https://docs.google.com/presentation/d/presentation-123/embed",
+                    "slides_download_url": "https://docs.google.com/presentation/d/presentation-123/export/pptx",
+                },
+            ) as mocked_create,
+        ):
+            response = self.client.post(
+                f"/api/materials/{self.material.id}/generate-slides/",
+                data=json.dumps({"language": "kaz", "slide_count": 8}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.material.refresh_from_db()
+
+        mocked_ensure_folder.assert_called_once_with(self.connection, self.discipline)
+        mocked_outline.assert_called_once_with("source material text", language="kaz", slide_count=6)
+        mocked_create.assert_called_once()
+        self.assertEqual(mocked_create.call_args.kwargs["folder_id"], "slides-folder-id")
+        self.assertEqual(payload["slides_count"], 8)
+        self.assertEqual(self.material.slides_count, 8)
+        self.assertEqual(self.material.slides_presentation_id, "presentation-123")
+
+    def test_reset_slides_deletes_drive_file_and_clears_material_fields(self):
+        self.material.slides_presentation_id = "presentation-123"
+        self.material.slides_url = "https://docs.google.com/presentation/d/presentation-123/edit"
+        self.material.slides_embed_url = "https://docs.google.com/presentation/d/presentation-123/embed"
+        self.material.slides_download_url = "https://docs.google.com/presentation/d/presentation-123/export/pptx"
+        self.material.slides_count = 8
+        self.material.save()
+
+        with (
+            patch("materials.views._require_google_session", return_value=(self.connection, None)),
+            patch("materials.google_drive_service.delete_material_file") as mocked_delete,
+        ):
+            response = self.client.post(
+                f"/api/materials/{self.material.id}/reset-slides/",
+                data=json.dumps({}),
+                content_type="application/json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.material.refresh_from_db()
+
+        mocked_delete.assert_called_once_with(self.connection, "presentation-123")
+        self.assertEqual(payload["slides_presentation_id"], "")
+        self.assertEqual(payload["slides_count"], 0)
+        self.assertEqual(self.material.slides_presentation_id, "")
+        self.assertEqual(self.material.slides_url, "")
+        self.assertEqual(self.material.slides_embed_url, "")
+        self.assertEqual(self.material.slides_download_url, "")
+        self.assertEqual(self.material.slides_count, 0)
+
+
+class AssistantTranscriptionTests(SimpleTestCase):
+    @override_settings(
+        AZURE_SPEECH_KEY="azure-key",
+        AZURE_SPEECH_REGION="swedencentral",
+        AZURE_SPEECH_STT_API_VERSION="2025-10-15",
+        AZURE_SPEECH_STT_LOCALES=["kk-KZ"],
+        AZURE_SPEECH_STT_TIMEOUT_SECONDS=60,
+    )
+    @patch("ai_services.stt_service.requests.post")
+    def test_transcribes_audio_with_azure_fast_transcription(self, mocked_post):
+        response = Mock(ok=True)
+        response.json.return_value = {"combinedPhrases": [{"text": "Сәлем, жүйе"}]}
+        mocked_post.return_value = response
+
+        temp_path = ""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as audio_file:
+            temp_path = audio_file.name
+            audio_file.write(b"audio-bytes")
+
+        try:
+            transcript = transcribe_audio(
+                temp_path,
+                filename="voice.webm",
+                content_type="audio/webm",
+                locale="kk-KZ",
+            )
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        self.assertEqual(transcript, "Сәлем, жүйе")
+        call_args = mocked_post.call_args
+        self.assertIn(
+            "https://swedencentral.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe",
+            call_args.args[0],
+        )
+        self.assertIn("api-version=2025-10-15", call_args.args[0])
+        self.assertEqual(call_args.kwargs["headers"]["Ocp-Apim-Subscription-Key"], "azure-key")
+        self.assertEqual(json.loads(call_args.kwargs["data"]["definition"]), {"locales": ["kk-KZ"]})
+        self.assertEqual(call_args.kwargs["files"]["audio"][0], "voice.webm")
+        self.assertEqual(call_args.kwargs["files"]["audio"][2], "audio/webm")
+
+    @override_settings(AZURE_SPEECH_KEY="", AZURE_SPEECH_REGION="")
+    def test_raises_when_azure_transcription_is_not_configured(self):
+        with self.assertRaises(STTServiceError) as captured:
+            transcribe_audio("missing.webm")
+
+        self.assertEqual(captured.exception.code, "azure_stt_not_configured")
+
+    @patch("materials.views.transcribe_audio", return_value="Дауыстық мәтін")
+    def test_assistant_transcribe_endpoint_passes_audio_metadata(self, mocked_transcribe):
+        client = Client()
+        upload = SimpleUploadedFile("voice.webm", b"audio-bytes", content_type="audio/webm")
+
+        response = client.post(
+            "/api/assistant/transcribe/",
+            data={"audio": upload, "language": "kk-KZ"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"text": "Дауыстық мәтін"})
+        call_kwargs = mocked_transcribe.call_args.kwargs
+        self.assertEqual(call_kwargs["filename"], "voice.webm")
+        self.assertEqual(call_kwargs["content_type"], "audio/webm")
+        self.assertEqual(call_kwargs["locale"], "kk-KZ")
 
 
 class AssistantSpeechTests(SimpleTestCase):

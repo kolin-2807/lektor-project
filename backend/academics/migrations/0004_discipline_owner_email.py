@@ -36,7 +36,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("academics", "0003_alter_discipline_language"),
-        ("materials", "0001_initial"),
+        ("materials", "0003_material_drive_file_id_material_drive_folder_id_and_more"),
     ]
 
     operations = [
