@@ -12,6 +12,10 @@ backend/ai_services/piper_models/assistant_reply.wav
 *.log
 *.err
 cloudflared.exe
+start-tunnel.cmd
+start-tunnel.ps1
+stop-tunnel.cmd
+stop-tunnel.ps1
 cf-diagnose.log
 lt-diag-host.log
 lt-diag.log
