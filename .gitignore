@@ -2,6 +2,8 @@ backend/.env
 backend/db.sqlite3
 backend/credentials.json
 backend/token.json
+backend/*service-account*.json
+backend/lektor-ai-test-integration-*.json
 backend/venv/
 backend/staticfiles/
 backend/assistant_edge.mp3

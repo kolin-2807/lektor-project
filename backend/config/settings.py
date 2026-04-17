@@ -40,7 +40,52 @@ except ImportError:  # pragma: no cover - optional dependency in some environmen
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+DOTENV_PATH = BASE_DIR / ".env"
+load_dotenv(DOTENV_PATH)
+
+
+def _read_dotenv_value(name: str) -> str:
+    if not DOTENV_PATH.exists():
+        return ""
+
+    for raw_line in DOTENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        if line.startswith("export "):
+            line = line.removeprefix("export ").strip()
+
+        key, value = line.split("=", 1)
+        if key.strip() != name:
+            continue
+
+        return value.strip().strip("\"'")
+
+    return ""
+
+
+def _normalize_dotenv_path(raw_value: str) -> str:
+    path = Path(raw_value).expanduser()
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    return str(path)
+
+
+def _prefer_existing_dotenv_google_credentials():
+    dotenv_credentials = _read_dotenv_value("GOOGLE_APPLICATION_CREDENTIALS")
+    if not dotenv_credentials:
+        return
+
+    current_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    dotenv_credentials_path = _normalize_dotenv_path(dotenv_credentials)
+    current_credentials_exists = bool(current_credentials) and Path(current_credentials).expanduser().is_file()
+
+    if not current_credentials_exists and Path(dotenv_credentials_path).is_file():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = dotenv_credentials_path
+
+
+_prefer_existing_dotenv_google_credentials()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -245,6 +290,20 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool(
 SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "").strip()
+GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1").strip()
+GOOGLE_GENAI_USE_VERTEXAI = _env_bool("GOOGLE_GENAI_USE_VERTEXAI", False)
+GOOGLE_GENAI_MODEL_NAME = (
+    os.getenv("GOOGLE_GENAI_MODEL_NAME")
+    or os.getenv("VERTEX_AI_MODEL_NAME")
+    or os.getenv("GEMINI_MODEL_NAME")
+    or "gemini-2.5-flash"
+).strip()
+GOOGLE_GENAI_FALLBACK_MODELS = (
+    _split_env_list("GOOGLE_GENAI_FALLBACK_MODELS")
+    or _split_env_list("VERTEX_AI_FALLBACK_MODELS")
+    or _split_env_list("GEMINI_FALLBACK_MODELS")
+)
 AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY", "").strip()
 AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION", "").strip()
 AZURE_SPEECH_TTS_VOICE_KK = os.getenv("AZURE_SPEECH_TTS_VOICE_KK", "kk-KZ-AigulNeural").strip()

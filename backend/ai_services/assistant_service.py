@@ -9,7 +9,7 @@ from typing import Any
 
 from django.conf import settings
 
-from .gemini_service import get_gemini_text_response
+from .gemini_service import get_gemini_text_response, is_google_genai_configured
 
 
 ALLOWED_ACTIONS = {
@@ -953,7 +953,7 @@ def _clean_gemini_json_response(raw_text: str) -> dict[str, Any]:
 
 
 def _gemini_fallback(user_text: str, context: AssistantContext) -> dict[str, Any]:
-    if not settings.GEMINI_API_KEY:
+    if not is_google_genai_configured():
         return _build_response(
             action="unknown",
             reply=_reply(

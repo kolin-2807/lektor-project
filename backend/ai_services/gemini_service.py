@@ -14,15 +14,32 @@ try:
 except ImportError:  # pragma: no cover - optional dependency in some environments
     genai = None
 
+try:
+    import google.auth as google_auth
+    from google.auth.transport.requests import Request as GoogleAuthRequest
+except ImportError:  # pragma: no cover - optional dependency in some environments
+    google_auth = None
+    GoogleAuthRequest = None
+
 
 BROKEN_LOCAL_PROXY_MARKERS = ("127.0.0.1:9", "localhost:9")
 ANSWER_LETTERS = ("A", "B", "C", "D")
-GEMINI_MODEL_NAME = (os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash") or "gemini-2.5-flash").strip()
+GEMINI_MODEL_NAME = (
+    os.getenv("GOOGLE_GENAI_MODEL_NAME")
+    or os.getenv("VERTEX_AI_MODEL_NAME")
+    or os.getenv("GEMINI_MODEL_NAME")
+    or "gemini-2.5-flash"
+).strip()
 GEMINI_FALLBACK_MODELS = tuple(
     item.strip()
-    for item in os.getenv("GEMINI_FALLBACK_MODELS", "").split(",")
+    for item in (
+        os.getenv("GOOGLE_GENAI_FALLBACK_MODELS")
+        or os.getenv("VERTEX_AI_FALLBACK_MODELS")
+        or os.getenv("GEMINI_FALLBACK_MODELS", "")
+    ).split(",")
     if item.strip()
 )
+VERTEX_AI_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 GEMINI_RETRY_DELAYS = (2, 4, 8, 12)
 GEMINI_QUOTA_ERROR_MARKERS = (
     "quota",
@@ -76,6 +93,47 @@ GEMINI_TRANSIENT_ERROR_MARKERS = (
     *GEMINI_TIMEOUT_MARKERS,
 )
 logger = logging.getLogger(__name__)
+
+
+def _use_vertex_ai() -> bool:
+    return bool(getattr(settings, "GOOGLE_GENAI_USE_VERTEXAI", False))
+
+
+def _provider_label() -> str:
+    return "Vertex AI" if _use_vertex_ai() else "Gemini API"
+
+
+def _configured_model_name() -> str:
+    configured_model = (
+        getattr(settings, "GOOGLE_GENAI_MODEL_NAME", "")
+        or os.getenv("GOOGLE_GENAI_MODEL_NAME")
+        or os.getenv("VERTEX_AI_MODEL_NAME")
+        or os.getenv("GEMINI_MODEL_NAME")
+        or GEMINI_MODEL_NAME
+    )
+    return str(configured_model or GEMINI_MODEL_NAME).strip() or GEMINI_MODEL_NAME
+
+
+def _configured_fallback_models() -> tuple[str, ...]:
+    settings_fallbacks = getattr(settings, "GOOGLE_GENAI_FALLBACK_MODELS", None)
+    if settings_fallbacks:
+        return tuple(str(item).strip() for item in settings_fallbacks if str(item).strip())
+    return GEMINI_FALLBACK_MODELS
+
+
+def _vertex_project() -> str:
+    return str(getattr(settings, "GOOGLE_CLOUD_PROJECT", "") or os.getenv("GOOGLE_CLOUD_PROJECT", "")).strip()
+
+
+def _vertex_location() -> str:
+    location = getattr(settings, "GOOGLE_CLOUD_LOCATION", "") or os.getenv("GOOGLE_CLOUD_LOCATION", "")
+    return str(location or "us-central1").strip()
+
+
+def is_google_genai_configured() -> bool:
+    if _use_vertex_ai():
+        return bool(_vertex_project() and _vertex_location())
+    return bool(getattr(settings, "GEMINI_API_KEY", ""))
 
 
 class GeminiServiceError(RuntimeError):
@@ -149,14 +207,24 @@ def _extract_gemini_status_code(exc: Exception) -> int | None:
     return None
 
 
-def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiServiceError:
+def _build_gemini_service_error(
+    exc: Exception,
+    model_name: str = "",
+    provider_label: str | None = None,
+) -> GeminiServiceError:
+    provider = provider_label or _provider_label()
     status_code = _extract_gemini_status_code(exc)
-    raw_message = _extract_gemini_error_text(exc) or "Gemini response failed."
+    raw_message = _extract_gemini_error_text(exc) or f"{provider} response failed."
     error_text = raw_message.lower()
 
     if status_code in {401, 403} or any(marker in error_text for marker in GEMINI_AUTH_ERROR_MARKERS):
+        auth_hint = (
+            "Check GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_CLOUD_PROJECT, Vertex AI API, and IAM permissions."
+            if provider == "Vertex AI"
+            else "Check GEMINI_API_KEY and project access."
+        )
         return GeminiServiceError(
-            "Gemini API authorization failed. Check GEMINI_API_KEY and project access.",
+            f"{provider} authorization failed. {auth_hint}",
             code="gemini_auth_error",
             http_status=503,
             raw_message=raw_message,
@@ -165,8 +233,13 @@ def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiS
 
     if status_code == 404 or any(marker in error_text for marker in GEMINI_MODEL_ERROR_MARKERS):
         model_hint = f' Model "{model_name}" is unavailable.' if model_name else ""
+        config_hint = (
+            "Check GOOGLE_GENAI_MODEL_NAME and GOOGLE_CLOUD_LOCATION."
+            if provider == "Vertex AI"
+            else "Check GEMINI_MODEL_NAME or fallback models."
+        )
         return GeminiServiceError(
-            f"Gemini model configuration failed.{model_hint} Check GEMINI_MODEL_NAME or fallback models.",
+            f"{provider} model configuration failed.{model_hint} {config_hint}",
             code="gemini_model_error",
             http_status=503,
             raw_message=raw_message,
@@ -175,7 +248,7 @@ def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiS
 
     if any(marker in error_text for marker in GEMINI_QUOTA_ERROR_MARKERS):
         return GeminiServiceError(
-            "Gemini API quota is exhausted right now. Please retry in a few minutes or increase the API quota/billing limit.",
+            f"{provider} quota or billing is exhausted right now. Please retry in a few minutes or check the quota/billing limit.",
             code="gemini_quota_exceeded",
             http_status=429,
             retry_after_seconds=120,
@@ -185,7 +258,7 @@ def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiS
 
     if status_code == 429 or any(marker in error_text for marker in GEMINI_RATE_LIMIT_MARKERS):
         return GeminiServiceError(
-            "Gemini rate limit was reached. Please retry in about 20-40 seconds.",
+            f"{provider} rate limit was reached. Please retry in about 20-40 seconds.",
             code="gemini_rate_limited",
             http_status=429,
             retryable=True,
@@ -198,7 +271,7 @@ def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiS
         marker in error_text for marker in GEMINI_TIMEOUT_MARKERS
     ):
         return GeminiServiceError(
-            "Gemini request timed out. Please retry in about 20-40 seconds.",
+            f"{provider} request timed out. Please retry in about 20-40 seconds.",
             code="gemini_timeout",
             http_status=503,
             retryable=True,
@@ -209,7 +282,7 @@ def _build_gemini_service_error(exc: Exception, model_name: str = "") -> GeminiS
 
     if status_code in {500, 503} or any(marker in error_text for marker in GEMINI_SERVICE_BUSY_MARKERS):
         return GeminiServiceError(
-            "Gemini service is temporarily busy. Please retry in about 20-40 seconds.",
+            f"{provider} service is temporarily busy. Please retry in about 20-40 seconds.",
             code="gemini_service_busy",
             http_status=503,
             retryable=True,
@@ -272,7 +345,7 @@ def _is_transient_gemini_error(exc: Exception) -> bool:
 
 
 def _iter_gemini_models(preferred_model: str) -> tuple[str, ...]:
-    ordered_models = [preferred_model, *GEMINI_FALLBACK_MODELS]
+    ordered_models = [preferred_model or _configured_model_name(), *_configured_fallback_models()]
     unique_models = []
 
     for model_name in ordered_models:
@@ -283,7 +356,27 @@ def _iter_gemini_models(preferred_model: str) -> tuple[str, ...]:
     return tuple(unique_models or (GEMINI_MODEL_NAME,))
 
 
-def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
+def _validate_generation_config():
+    if _use_vertex_ai():
+        missing = []
+        if not _vertex_project():
+            missing.append("GOOGLE_CLOUD_PROJECT")
+        if not _vertex_location():
+            missing.append("GOOGLE_CLOUD_LOCATION")
+        if missing:
+            raise GeminiServiceError(
+                f"Vertex AI configuration is missing: {', '.join(missing)}.",
+                code="vertex_config_error",
+                http_status=503,
+            )
+        if genai is None and google_auth is None:
+            raise GeminiServiceError(
+                "Vertex AI dependencies are missing. Install google-genai or google-auth.",
+                code="vertex_dependency_error",
+                http_status=503,
+            )
+        return
+
     if not settings.GEMINI_API_KEY:
         raise GeminiServiceError(
             "Gemini API key is missing. Check GEMINI_API_KEY in the backend environment.",
@@ -291,68 +384,166 @@ def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
             http_status=503,
         )
 
+
+def _build_genai_client():
+    if genai is None:
+        return None
+
+    if _use_vertex_ai():
+        return genai.Client(
+            vertexai=True,
+            project=_vertex_project(),
+            location=_vertex_location(),
+        )
+
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
+def _vertex_endpoint(model_name: str) -> str:
+    location = _vertex_location()
+    host = "aiplatform.googleapis.com" if location == "global" else f"{location}-aiplatform.googleapis.com"
+    return (
+        f"https://{host}/v1/projects/{_vertex_project()}/locations/{location}"
+        f"/publishers/google/models/{model_name}:generateContent"
+    )
+
+
+def _get_vertex_access_token() -> str:
+    if google_auth is None or GoogleAuthRequest is None:
+        raise GeminiServiceError(
+            "Vertex AI auth dependency is missing. Install google-auth.",
+            code="vertex_dependency_error",
+            http_status=503,
+        )
+
+    credentials, _ = google_auth.default(scopes=[VERTEX_AI_SCOPE])
+    if not credentials.valid:
+        credentials.refresh(GoogleAuthRequest())
+    return str(credentials.token or "")
+
+
+def _raise_http_error(response, provider_label: str):
+    try:
+        payload = response.json()
+        error_payload = payload.get("error") or {}
+        error_message = error_payload.get("message") or response.text or f"{provider_label} HTTP {response.status_code}"
+    except ValueError:
+        error_message = response.text or f"{provider_label} HTTP {response.status_code}"
+
+    http_error = requests.HTTPError(error_message, response=response)
+    setattr(http_error, "status_code", response.status_code)
+    raise http_error
+
+
+def _extract_text_from_payload(payload: dict, provider_label: str) -> str:
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        raise RuntimeError(f"{provider_label} returned no candidates.")
+
+    parts = ((candidates[0].get("content") or {}).get("parts") or [])
+    text_chunks = [
+        str(part.get("text") or "").strip()
+        for part in parts
+        if str(part.get("text") or "").strip()
+    ]
+    cleaned_text = "\n".join(text_chunks).strip()
+    if not cleaned_text:
+        raise RuntimeError(f"{provider_label} returned an empty response.")
+    return cleaned_text
+
+
+def _request_vertex_text_rest(prompt: str, model_name: str, provider_label: str) -> str:
+    response = requests.post(
+        _vertex_endpoint(model_name),
+        headers={
+            "Authorization": f"Bearer {_get_vertex_access_token()}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": prompt,
+                        }
+                    ],
+                }
+            ]
+        },
+        timeout=60,
+    )
+    if not response.ok:
+        _raise_http_error(response, provider_label)
+
+    return _extract_text_from_payload(response.json(), provider_label)
+
+
+def _request_gemini_text_rest(prompt: str, model_name: str, provider_label: str) -> str:
+    response = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
+        headers={
+            "x-goog-api-key": settings.GEMINI_API_KEY,
+            "Content-Type": "application/json",
+        },
+        json={
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt,
+                        }
+                    ]
+                }
+            ]
+        },
+        timeout=60,
+    )
+    if not response.ok:
+        _raise_http_error(response, provider_label)
+
+    return _extract_text_from_payload(response.json(), provider_label)
+
+
+def _request_model_text_rest(prompt: str, model_name: str, provider_label: str) -> str:
+    if _use_vertex_ai():
+        return _request_vertex_text_rest(prompt, model_name, provider_label)
+    return _request_gemini_text_rest(prompt, model_name, provider_label)
+
+
+def _request_gemini_text(prompt: str, model: str = "") -> str:
+    _validate_generation_config()
+    provider_label = _provider_label()
+
     with _bypass_broken_local_proxy():
         last_exc = None
 
         for model_name in _iter_gemini_models(model):
             for attempt_index in range(len(GEMINI_RETRY_DELAYS) + 1):
                 try:
-                    if genai is not None:
-                        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                    client = _build_genai_client()
+                    if client is not None:
                         response = client.models.generate_content(
                             model=model_name,
                             contents=prompt,
                         )
-                        return (response.text or "").strip()
+                        cleaned_text = (response.text or "").strip()
+                        if not cleaned_text:
+                            raise RuntimeError(f"{provider_label} returned an empty response.")
+                        return cleaned_text
 
-                    response = requests.post(
-                        f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent",
-                        headers={
-                            "x-goog-api-key": settings.GEMINI_API_KEY,
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "contents": [
-                                {
-                                    "parts": [
-                                        {
-                                            "text": prompt,
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        timeout=60,
-                    )
-                    if not response.ok:
-                        try:
-                            payload = response.json()
-                            error_payload = payload.get("error") or {}
-                            error_message = error_payload.get("message") or response.text or f"Gemini HTTP {response.status_code}"
-                        except ValueError:
-                            error_message = response.text or f"Gemini HTTP {response.status_code}"
-
-                        http_error = requests.HTTPError(error_message, response=response)
-                        setattr(http_error, "status_code", response.status_code)
-                        raise http_error
-
-                    payload = response.json()
-                    candidates = payload.get("candidates") or []
-                    if not candidates:
-                        raise RuntimeError("Gemini returned no candidates.")
-
-                    parts = ((candidates[0].get("content") or {}).get("parts") or [])
-                    text_chunks = [str(part.get("text") or "").strip() for part in parts if str(part.get("text") or "").strip()]
-                    cleaned_text = "\n".join(text_chunks).strip()
-                    if not cleaned_text:
-                        raise RuntimeError("Gemini returned an empty response.")
-                    return cleaned_text
+                    return _request_model_text_rest(prompt, model_name, provider_label)
                 except Exception as exc:
-                    normalized_exc = exc if isinstance(exc, GeminiServiceError) else _build_gemini_service_error(exc, model_name)
+                    normalized_exc = (
+                        exc
+                        if isinstance(exc, GeminiServiceError)
+                        else _build_gemini_service_error(exc, model_name, provider_label)
+                    )
                     last_exc = normalized_exc
 
                     logger.warning(
-                        "Gemini request failed for model %s (attempt %s/%s): %s",
+                        "%s request failed for model %s (attempt %s/%s): %s",
+                        provider_label,
                         model_name,
                         attempt_index + 1,
                         len(GEMINI_RETRY_DELAYS) + 1,
@@ -373,14 +564,14 @@ def _request_gemini_text(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
     if isinstance(last_exc, GeminiServiceError):
         raise last_exc
 
-    raise last_exc or GeminiServiceError("Gemini response failed")
+    raise last_exc or GeminiServiceError(f"{provider_label} response failed")
 
 
-def generate_gemini_text_response(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
+def generate_gemini_text_response(prompt: str, model: str = "") -> str:
     return _request_gemini_text(prompt, model)
 
 
-def get_gemini_text_response(prompt: str, model: str = GEMINI_MODEL_NAME) -> str:
+def get_gemini_text_response(prompt: str, model: str = "") -> str:
     return _request_gemini_text(prompt, model)
 
 

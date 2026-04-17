@@ -14,6 +14,7 @@ from ai_services.gemini_service import (
     _build_gemini_service_error,
     _is_predictable_answer_pattern,
     _normalize_test_items,
+    get_gemini_text_response,
 )
 from materials.models import Material
 from ai_services.stt_service import STTServiceError, transcribe_audio
@@ -276,6 +277,54 @@ class GeminiErrorHandlingTests(SimpleTestCase):
         self.assertEqual(response.data["code"], "gemini_service_busy")
         self.assertEqual(response.data["retry_after_seconds"], 30)
         self.assertEqual(response["Retry-After"], "30")
+
+
+class VertexGenerationTests(SimpleTestCase):
+    @override_settings(
+        GEMINI_API_KEY="",
+        GOOGLE_CLOUD_PROJECT="vertex-project",
+        GOOGLE_CLOUD_LOCATION="us-central1",
+        GOOGLE_GENAI_USE_VERTEXAI=True,
+        GOOGLE_GENAI_MODEL_NAME="gemini-2.5-flash",
+        GOOGLE_GENAI_FALLBACK_MODELS=[],
+    )
+    @patch("ai_services.gemini_service.requests.post")
+    @patch("ai_services.gemini_service.google_auth.default")
+    @patch("ai_services.gemini_service.genai", None)
+    def test_vertex_generation_uses_adc_without_gemini_api_key(self, mocked_default, mocked_post):
+        credentials = Mock(valid=True, token="vertex-token")
+        mocked_default.return_value = (credentials, "vertex-project")
+        mocked_post.return_value = Mock(
+            ok=True,
+            status_code=200,
+            json=Mock(
+                return_value={
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {
+                                        "text": "Vertex answer",
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ),
+        )
+
+        result = get_gemini_text_response("Make a short test")
+
+        self.assertEqual(result, "Vertex answer")
+        request_url = mocked_post.call_args.args[0]
+        request_headers = mocked_post.call_args.kwargs["headers"]
+        self.assertIn(
+            "https://us-central1-aiplatform.googleapis.com/v1/projects/vertex-project/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent",
+            request_url,
+        )
+        self.assertEqual(request_headers["Authorization"], "Bearer vertex-token")
+        self.assertNotIn("x-goog-api-key", request_headers)
 
 
 class GeminiTestNormalizationTests(SimpleTestCase):
