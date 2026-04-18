@@ -27,3 +27,5 @@ ngrok-live.log
 ngrok-live.err
 backend/ai_services/piper_models/*.onnx
 backend/ai_services/piper_models/*.onnx.json
+.chrome-headless/
+.edge-headless/
