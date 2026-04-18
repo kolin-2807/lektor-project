@@ -993,8 +993,11 @@ function getCourseVisualConfig(courseNumber) {
 
 function buildCourseBookMarkup(courseNumber, { compact = false } = {}) {
   const normalizedNumber = Number(courseNumber) || 1;
+  const assetNumber = [1, 2, 3, 4].includes(normalizedNumber) ? normalizedNumber : 1;
   return `
-    <div class="course-book course-book-art-${normalizedNumber}${compact ? " is-compact" : ""}" aria-hidden="true"></div>
+    <div class="course-book course-book-art-${assetNumber}${compact ? " is-compact" : ""}" aria-hidden="true">
+      <img class="course-book-image" src="./assets/images/education_icon_${assetNumber}.png?v=20260418-01" alt="" loading="lazy" decoding="async" />
+    </div>
   `;
 }
 
