@@ -26,8 +26,6 @@ CATEGORY_FOLDER_LABELS = {
     "lecture": {"kaz": "Дәріс", "rus": "Лекция", "eng": "Lecture"},
     "practice": {"kaz": "Практикалық жұмыс", "rus": "Практическая работа", "eng": "Practice"},
     "lab": {"kaz": "Зертханалық жұмыс", "rus": "Лабораторная работа", "eng": "Lab"},
-    "sowj": {"kaz": "СӨЖ", "rus": "СРС", "eng": "SIW"},
-    "syllabus": {"kaz": "Силлабус", "rus": "Силлабус", "eng": "Syllabus"},
 }
 
 
@@ -94,7 +92,7 @@ def _get_category_folder_name(category: str, language: str) -> str:
 
 def ensure_material_folder_tree(connection, discipline, category: str):
     service = get_drive_service(connection)
-    root_folder_id = connection.root_folder_id or ensure_folder(service, "Lektor")
+    root_folder_id = connection.root_folder_id or ensure_folder(service, "iLector")
 
     if root_folder_id != connection.root_folder_id:
         connection.root_folder_id = root_folder_id
@@ -120,7 +118,7 @@ def _get_slides_folder_name(language: str) -> str:
 
 def ensure_discipline_folder_tree(connection, discipline):
     service = get_drive_service(connection)
-    root_folder_id = connection.root_folder_id or ensure_folder(service, "Lektor")
+    root_folder_id = connection.root_folder_id or ensure_folder(service, "iLector")
 
     if root_folder_id != connection.root_folder_id:
         connection.root_folder_id = root_folder_id

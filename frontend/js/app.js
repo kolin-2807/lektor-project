@@ -4,28 +4,11 @@ const isLocalStaticPreview = ["127.0.0.1:5500", "localhost:5500"].includes(windo
 const API_BASE = runtimeApiBase || (isLocalStaticPreview ? LOCAL_API_BASE : `${window.location.origin}/api`);
 const TEST_GENERATION_TIMEOUT_MS = 180000;
 
-const DEFAULT_PROFILE_STATE = {
-  fullName: "Қаламан Ерболат Тлеуханұлы",
-  roleLabel: "Оқытушы",
-  roleShort: "оқытушы",
-  username: "kalaman_erbolat",
-  email: "kalaman@university.kz",
-  bio: "",
-  avatarUrl: ""
-};
-
-const profileState = { ...DEFAULT_PROFILE_STATE };
-
-let subjects = [];
-let coursesData = [];
-let selectedRole = "kaz";
-let selectedCourseNumber = null;
-
 const SUPPORTED_ROLES = Object.freeze(["kaz", "rus", "eng"]);
-const ROLE_MENU_LABELS = Object.freeze({
+const ROLE_LABELS = Object.freeze({
   kaz: "Оқытушы",
   rus: "Лектор",
-  eng: "Lektor",
+  eng: "Lector",
 });
 const ROLE_LOCALES = Object.freeze({
   kaz: "kk-KZ",
@@ -37,6 +20,34 @@ const ROLE_HTML_LANG = Object.freeze({
   rus: "ru",
   eng: "en",
 });
+const PORTAL_URL = "https://sso.satbayev.university";
+const DEPARTMENT_URLS = Object.freeze({
+  kaz: "https://official.satbayev.university/kk/information-telecommunication-technologies/kafedra-informatsionnykh-sistem",
+  rus: "https://official.satbayev.university/ru/information-telecommunication-technologies/kafedra-informatsionnykh-sistem",
+  eng: "https://official.satbayev.university/en/information-telecommunication-technologies/kafedra-informatsionnykh-sistem",
+});
+const DEPARTMENT_FOOTER_LABELS = Object.freeze([
+  "\"Ақпараттық жүйелер\" кафедрасы",
+  "кафедра \"Информационные системы\"",
+  "Department of Information Systems",
+]);
+
+const DEFAULT_PROFILE_STATE = {
+  fullName: "",
+  roleLabel: ROLE_LABELS.kaz,
+  roleShort: ROLE_LABELS.kaz,
+  username: "",
+  email: "",
+  bio: "",
+  avatarUrl: ""
+};
+
+const profileState = { ...DEFAULT_PROFILE_STATE };
+
+let subjects = [];
+let coursesData = [];
+let selectedRole = "kaz";
+let selectedCourseNumber = null;
 
 const DEFAULT_PROFILE_BIOS = {
   kaz: "",
@@ -52,10 +63,6 @@ const LEGACY_PROFILE_BIOS = new Set([
 
 const UI_TEXT = {
   kaz: {
-    roleTeacher: "Оқытушы",
-    roleLecturer: "Лектор",
-    roleShort: "оқытушы",
-    roleLabel: "Оқытушы",
     profileBioDefault: DEFAULT_PROFILE_BIOS.kaz,
     back: "Артқа",
     edit: "Өңдеу",
@@ -149,11 +156,28 @@ const UI_TEXT = {
     bio: "Био",
     sheetFrameTitle: "Тест нәтижелері",
     authLogin: "Кіру",
-    authModalTitle: "Жүйеге кіру",
-    authModalText: "Материалдарды жүктеу мен профильді сақтау үшін Google арқылы кіріңіз.",
+    authModalTitle: "Авторизациялану",
+    authModalText: [
+      {
+        lead: true,
+        text: "Құрметті ОҚЫТУШЫ сізді “iLector” веб-қосымшасын таңдағаныңыз үшін алғыс білдіреміз !"
+      },
+      {
+        label: "Кіру:",
+        text: "Қосымшаға кіру үшін тек Google аккаунттың болуы, егер болмаса тіркелу автоматты түрде Google талаптары бойынша жүреді."
+      },
+      {
+        label: "Мүмкіншілігі:",
+        text: "қосымшаға дайын дәріс материалын жүктеу арқылы, сіз автоматты түрде «дауыстық көмекші», «презентация», «тест», «тест нәтижесі» сияқты ыңғайлы әдістерге қол жеткізесіз."
+      },
+      {
+        label: "Артықшылығы:",
+        text: "Тест сұрақтарын жариялау QR арқылы. Қолайлы интерфейс. Киберқауіпсіз орта. Ақпараттарыңыз өз Google Drive-та сақталады."
+      }
+    ],
     authGoogle: "Google арқылы жалғастыру",
     authGooglePending: "Google-ға өту...",
-    authModalNote: "Google аккаунты бар болса кіресіз, жаңа болса тіркелу автоматты жүреді.",
+    authModalNote: "sso.satbayev.university\nCopyright © 2026 \"Ақпараттық жүйелер\" кафедрасы\nIP: 10.7.0.40",
     authRequiredHome: "Файлдар мен пәндерді көру үшін алдымен Google арқылы кіріңіз.",
     authRequiredDisciplines: "Пәндер мен материалдар кіргеннен кейін ашылады.",
     authRequiredAction: "Алдымен жүйеге Google арқылы кіріңіз.",
@@ -181,10 +205,6 @@ const UI_TEXT = {
   },
 
   rus: {
-    roleTeacher: "Оқытушы",
-    roleLecturer: "Лектор",
-    roleShort: "преподаватель",
-    roleLabel: "Лектор",
     profileBioDefault: DEFAULT_PROFILE_BIOS.rus,
     back: "Назад",
     edit: "Изменить",
@@ -278,11 +298,28 @@ const UI_TEXT = {
     bio: "Био",
     sheetFrameTitle: "Результаты теста",
     authLogin: "Войти",
-    authModalTitle: "Вход в систему",
-    authModalText: "Чтобы загружать материалы и сохранять профиль, войдите через Google.",
+    authModalTitle: "Авторизация",
+    authModalText: [
+      {
+        lead: true,
+        text: "Уважаемый ЛЕКТОР, благодарим вас за выбор веб-приложения “iLector”!"
+      },
+      {
+        label: "Вход:",
+        text: "Для входа в приложение нужен только Google аккаунт. Если его нет, регистрация проходит автоматически по требованиям Google."
+      },
+      {
+        label: "Возможности:",
+        text: "загрузив готовый лекционный материал, вы получите доступ к голосовому помощнику, презентации, тесту и результатам теста."
+      },
+      {
+        label: "Преимущества:",
+        text: "Публикация тестов через QR. Удобный интерфейс. Кибербезопасная среда. Ваши данные сохраняются в Google Drive."
+      }
+    ],
     authGoogle: "Продолжить с Google",
     authGooglePending: "Переход в Google...",
-    authModalNote: "Если аккаунт уже есть, вы войдете. Если нет, регистрация пройдет автоматически.",
+    authModalNote: "sso.satbayev.university\nCopyright © 2026 кафедра \"Информационные системы\"\nIP: 10.7.0.40",
     authRequiredHome: "Чтобы видеть файлы и дисциплины, сначала войдите через Google.",
     authRequiredDisciplines: "Дисциплины и материалы откроются после входа.",
     authRequiredAction: "Сначала войдите в систему через Google.",
@@ -402,10 +439,6 @@ Object.assign(UI_TEXT.rus, {
 
 UI_TEXT.eng = {
   ...UI_TEXT.rus,
-  roleTeacher: "Оқытушы",
-  roleLecturer: "Лектор",
-  roleShort: "lecturer",
-  roleLabel: "Lektor",
   profileBioDefault: DEFAULT_PROFILE_BIOS.eng,
   back: "Back",
   edit: "Edit",
@@ -499,11 +532,28 @@ UI_TEXT.eng = {
   bio: "Bio",
   sheetFrameTitle: "Test results",
   authLogin: "Sign in",
-  authModalTitle: "Sign in",
-  authModalText: "Sign in with Google to upload materials and save your profile.",
+  authModalTitle: "Authorization",
+  authModalText: [
+    {
+      lead: true,
+      text: "Dear LECTOR, thank you for choosing the “iLector” web application!"
+    },
+    {
+      label: "Sign in:",
+      text: "You only need a Google account to enter the application. If you do not have one, registration continues automatically according to Google requirements."
+    },
+    {
+      label: "Features:",
+      text: "after uploading a ready lecture material, you get access to the voice assistant, presentation, test, and test results."
+    },
+    {
+      label: "Advantages:",
+      text: "Publish test questions with QR. Convenient interface. Cyber-secure environment. Your information is stored in Google Drive."
+    }
+  ],
   authGoogle: "Continue with Google",
   authGooglePending: "Opening Google...",
-  authModalNote: "If you already have an account, you will sign in. New accounts are created automatically.",
+  authModalNote: "sso.satbayev.university\nCopyright © 2026 Department of Information Systems\nIP: 10.7.0.40",
   authRequiredHome: "Sign in with Google first to view files and subjects.",
   authRequiredDisciplines: "Subjects and materials open after sign-in.",
   authRequiredAction: "Sign in with Google first.",
@@ -572,10 +622,12 @@ UI_TEXT.eng = {
 const typeOrder = [
   { key: "lecture", label: "Р”У™СЂС–СЃ" },
   { key: "practice", label: "РџСЂР°РєС‚РёРєР°" },
-  { key: "lab", label: "Р—РµСЂС‚С…Р°РЅР°" },
-  { key: "siw", label: "РЎУЁР–" },
-  { key: "syllabus", label: "РЎРёР»Р»Р°Р±СѓСЃ" }
+  { key: "lab", label: "Р—РµСЂС‚С…Р°РЅР°" }
 ];
+
+function isSupportedMaterialType(type) {
+  return typeOrder.some(item => item.key === type);
+}
 
 const APP_STATE_KEY = "lektor-teacher-state-v1";
 const TEST_CONFIG_KEY = "lektor-test-config-v1";
@@ -903,6 +955,10 @@ function roleText(kazText, rusText, engText = rusText) {
   return rusText;
 }
 
+function getRoleLabel(role = selectedRole) {
+  return ROLE_LABELS[role] || ROLE_LABELS.kaz;
+}
+
 function isSlidesBusy() {
   return isSlidesGenerating || isSlidesResetting;
 }
@@ -998,10 +1054,68 @@ function getSpeechLanguage() {
   return getRoleLocale();
 }
 
+function renderAuthModalText() {
+  if (!authModalText) return;
+
+  const content = t("authModalText");
+
+  if (!Array.isArray(content)) {
+    authModalText.textContent = content || "";
+    return;
+  }
+
+  authModalText.innerHTML = content.map((item) => {
+    if (item?.lead) {
+      return `<p class="auth-modal-line is-lead">${escapeHtml(item.text || "")}</p>`;
+    }
+
+    const label = item?.label ? `<strong>${escapeHtml(item.label)}</strong> ` : "";
+    return `<p class="auth-modal-line">${label}${escapeHtml(item?.text || "")}</p>`;
+  }).join("");
+}
+
+function renderAuthModalFooter() {
+  if (!authModalNote) return;
+
+  authModalNote.innerHTML = String(t("authModalNote") || "")
+    .split("\n")
+    .map(line => renderAuthModalFooterLine(line))
+    .join("");
+}
+
+function renderAuthModalFooterLine(line) {
+  const cleanLine = String(line || "");
+  const portalLabel = "sso.satbayev.university";
+
+  if (cleanLine.trim() === portalLabel) {
+    return `<span><a href="${PORTAL_URL}" target="_blank" rel="noopener noreferrer">${escapeHtml(portalLabel)}</a></span>`;
+  }
+
+  const departmentLabel = DEPARTMENT_FOOTER_LABELS.find(label => cleanLine.includes(label));
+  if (departmentLabel) {
+    const departmentUrl = DEPARTMENT_URLS[selectedRole] || DEPARTMENT_URLS.kaz;
+    const [before, after] = cleanLine.split(departmentLabel);
+    return `<span>${escapeHtml(before)}<a href="${departmentUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(departmentLabel)}</a>${escapeHtml(after)}</span>`;
+  }
+
+  return `<span>${escapeHtml(cleanLine)}</span>`;
+}
+
+function renderAuthModal() {
+  if (authModalTitle) authModalTitle.textContent = t("authModalTitle");
+  renderAuthModalText();
+  renderAuthModalFooter();
+
+  if (authGoogleBtnText) {
+    authGoogleBtnText.textContent = isAuthSubmitting ? t("authGooglePending") : t("authGoogle");
+  }
+}
+
 function applyRoleProfileState() {
   const hadDefaultBio = Object.values(DEFAULT_PROFILE_BIOS).includes(profileState.bio);
-  profileState.roleLabel = t("roleLabel");
-  profileState.roleShort = t("roleShort");
+  const roleLabel = getRoleLabel();
+  profileState.roleLabel = roleLabel;
+  profileState.roleShort = roleLabel;
 
   if (hadDefaultBio) {
     profileState.bio = t("profileBioDefault");
@@ -1027,7 +1141,7 @@ function applyStaticTranslations() {
   updateRoleMenuActive();
 
   roleMenuItems.forEach(btn => {
-    btn.textContent = ROLE_MENU_LABELS[btn.dataset.roleValue] || t("roleLecturer");
+    btn.textContent = getRoleLabel(btn.dataset.roleValue);
   });
 
   if (courseBackBtn) courseBackBtn.textContent = t("back");
@@ -1052,10 +1166,7 @@ function applyStaticTranslations() {
   if (editProfileBtn) editProfileBtn.textContent = t("editProfile");
   if (logoutBtn) logoutBtn.textContent = t("logout");
   if (authOpenBtn) authOpenBtn.textContent = t("authLogin");
-  if (authModalTitle) authModalTitle.textContent = t("authModalTitle");
-  if (authModalText) authModalText.textContent = t("authModalText");
-  if (authModalNote) authModalNote.textContent = t("authModalNote");
-  if (authGoogleBtnText) authGoogleBtnText.textContent = isAuthSubmitting ? t("authGooglePending") : t("authGoogle");
+  renderAuthModal();
   if (profileModalTitle) profileModalTitle.textContent = t("profileModalTitle");
   if (qrModalTitle) qrModalTitle.textContent = t("qrModalTitle");
   if (playerDetailTitle) playerDetailTitle.textContent = t("participantTitle");
@@ -1126,24 +1237,14 @@ function normalizeMaterialType(type) {
     "lab": "lab",
     "laboratory": "lab",
     "Р·РµСЂС‚С…Р°РЅР°": "lab",
-    "Р·РµСЂС‚С…Р°РЅР°Р»С‹Т›": "lab",
-
-    "sowj": "siw",
-    "siw": "siw",
-    "СЃУ©Р¶": "siw",
-    "СЃСЂСЃ": "siw",
-    "self": "siw",
-
-    "syllabus": "syllabus",
-    "СЃРёР»Р»Р°Р±СѓСЃ": "syllabus"
+    "Р·РµСЂС‚С…Р°РЅР°Р»С‹Т›": "lab"
   };
 
   return map[normalized] || normalized || "lecture";
 }
 
 function toUploadCategory(type) {
-  if (type === "siw") return "sowj";
-  return type || "lecture";
+  return isSupportedMaterialType(type) ? type : "lecture";
 }
 
 async function fetchJSON(url, options = {}) {
@@ -2054,7 +2155,7 @@ function getCurrentTestJoinUrl(session = currentTestSession) {
 
 function readTeacherAppState() {
   try {
-    const raw = localStorage.getItem(getTeacherAppStateKey());
+    const raw = localStorage.getItem(getTeacherAppStateKey()) || localStorage.getItem(APP_STATE_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch (error) {
     console.error("App state parse error:", error);
@@ -2076,7 +2177,9 @@ function saveTeacherAppState() {
     isMaterialManagerOpen,
   };
 
-  localStorage.setItem(getTeacherAppStateKey(), JSON.stringify(payload));
+  const serializedPayload = JSON.stringify(payload);
+  localStorage.setItem(getTeacherAppStateKey(), serializedPayload);
+  localStorage.setItem(APP_STATE_KEY, serializedPayload);
 }
 
 function clearTeacherAppState(email = driveConnection.google_email || profileState.email) {
@@ -2580,7 +2683,7 @@ function getInitials(name) {
     .filter(Boolean)
     .slice(0, 2)
     .map(word => word[0]?.toUpperCase() || "")
-    .join("") || "SU";
+    .join("") || "IL";
 }
 
 function setAvatar(el, avatarUrl, fallback) {
@@ -2602,8 +2705,7 @@ function getBadgeClass(type) {
   if (type === "lecture") return "badge-lecture";
   if (type === "practice") return "badge-practice";
   if (type === "lab") return "badge-lab";
-  if (type === "siw") return "badge-self";
-  return "badge-syllabus";
+  return "badge-lecture";
 }
 
 function getDisciplineTheme(seed = 0) {
@@ -2656,9 +2758,7 @@ function getTypeLabel(type) {
   const labels = {
     lecture: roleText("Дәріс", "Лекция", "Lecture"),
     practice: roleText("Практика", "Практика", "Practice"),
-    lab: roleText("Зертхана", "Лаборатория", "Lab"),
-    siw: roleText("СӨЖ", "СРС", "SIW"),
-    syllabus: roleText("Силлабус", "Силлабус", "Syllabus")
+    lab: roleText("Зертхана", "Лаборатория", "Lab")
   };
 
   return labels[type] || t("material");
@@ -2754,13 +2854,14 @@ function renderMaterialManagerPanel() {
 function renderProfile() {
   applyRoleProfileState();
 
-  const initials = getInitials(profileState.fullName);
+  const displayName = profileState.fullName || profileState.username || profileState.email || getRoleLabel();
+  const initials = getInitials(displayName);
 
-  dropdownName.textContent = profileState.fullName;
+  dropdownName.textContent = displayName;
   dropdownRole.textContent = profileState.roleShort;
   dropdownEmail.textContent = profileState.email;
 
-  profileModalNameText.textContent = profileState.fullName;
+  profileModalNameText.textContent = displayName;
   profileModalRoleText.textContent = profileState.roleShort;
   profileUsernameInput.value = profileState.username;
   profileEmailInput.value = profileState.email;
@@ -2778,14 +2879,9 @@ function syncProfileWithDriveConnection() {
     const googleName = String(driveConnection.google_name || "").trim();
     const googleEmail = String(driveConnection.google_email || "").trim();
 
-    if (googleName) {
-      profileState.fullName = googleName;
-    }
-
-    if (googleEmail) {
-      profileState.email = googleEmail;
-      profileState.username = googleEmail.split("@")[0] || DEFAULT_PROFILE_STATE.username;
-    }
+    profileState.fullName = googleName;
+    profileState.email = googleEmail;
+    profileState.username = googleEmail ? googleEmail.split("@")[0] || DEFAULT_PROFILE_STATE.username : DEFAULT_PROFILE_STATE.username;
 
     profileState.avatarUrl = "";
 
@@ -2823,21 +2919,7 @@ function renderAuthState() {
     authOpenBtn.textContent = t("authLogin");
   }
 
-  if (authModalTitle) {
-    authModalTitle.textContent = t("authModalTitle");
-  }
-
-  if (authModalText) {
-    authModalText.textContent = t("authModalText");
-  }
-
-  if (authModalNote) {
-    authModalNote.textContent = t("authModalNote");
-  }
-
-  if (authGoogleBtnText) {
-    authGoogleBtnText.textContent = isAuthSubmitting ? t("authGooglePending") : t("authGoogle");
-  }
+  renderAuthModal();
 
   if (authGoogleBtn) {
     authGoogleBtn.disabled = isAuthSubmitting;
@@ -2851,7 +2933,7 @@ function openAuthModal() {
 
 function updateBrandRoleLabel() {
   if (!brandRoleTitle) return;
-  brandRoleTitle.textContent = ROLE_MENU_LABELS[selectedRole] || t("roleLabel");
+  brandRoleTitle.textContent = getRoleLabel();
 }
 
 function renderDisciplinePreviewCard() {
@@ -3124,7 +3206,7 @@ async function restoreTeacherAppState() {
   activeSubjectPanel = savedState.activeSubjectPanel || "materials";
   await openCourseDisciplines(Number(savedState.selectedCourseNumber), savedState.selectedSubjectId || null);
 
-  if (savedState.activeType) {
+  if (savedState.activeType && isSupportedMaterialType(savedState.activeType)) {
     activeType = savedState.activeType;
     populateMaterialTypeSelect();
   }
@@ -3221,12 +3303,17 @@ async function loadCoursesFromApi() {
   try {
     coursesData = await fetchJSON(`${API_BASE}/courses/`);
     renderCourseCards();
-    if (driveConnection.connected) {
-      await restoreTeacherAppState();
-    }
   } catch (error) {
     console.error("Courses load error:", error);
     courseGrid.innerHTML = `<div class="empty-state">${t("coursesLoadError")}</div>`;
+    return;
+  }
+
+  try {
+    await restoreTeacherAppState();
+  } catch (error) {
+    console.error("App state restore error:", error);
+    appStateRestoreDone = true;
   }
 }
 
@@ -3507,6 +3594,7 @@ function showHome() {
 
 function getTypeMaterials() {
   if (!selectedSubject) return [];
+  if (!isSupportedMaterialType(activeType)) return [];
   return selectedSubject.materials.filter(m => m.type === activeType);
 }
 
@@ -3540,13 +3628,15 @@ function getAssistantMaterialSnapshots() {
     return [];
   }
 
-  return selectedSubject.materials.map(item => ({
-    id: Number(item.id),
-    title: item.title,
-    type: item.type,
-    subject_id: Number(selectedSubject.id || 0),
-    course_number: Number(selectedSubject.courseNumber || selectedCourseNumber || 0),
-  }));
+  return selectedSubject.materials
+    .filter(item => isSupportedMaterialType(item.type))
+    .map(item => ({
+      id: Number(item.id),
+      title: item.title,
+      type: item.type,
+      subject_id: Number(selectedSubject.id || 0),
+      course_number: Number(selectedSubject.courseNumber || selectedCourseNumber || 0),
+    }));
 }
 
 function buildAssistantContext() {
@@ -3653,11 +3743,13 @@ async function syncAssistantMaterialSelection({
   }
 
   const normalizedMaterialType = typeof materialType === "string" ? materialType.trim().toLowerCase() : "";
-  if (normalizedMaterialType) {
+  if (normalizedMaterialType && isSupportedMaterialType(normalizedMaterialType)) {
     activeType = normalizedMaterialType;
   }
 
-  const subjectMaterials = Array.isArray(selectedSubject.materials) ? selectedSubject.materials : [];
+  const subjectMaterials = Array.isArray(selectedSubject.materials)
+    ? selectedSubject.materials.filter(item => isSupportedMaterialType(item.type))
+    : [];
   const matchedMaterial = subjectMaterials.find(item => Number(item.id) === Number(materialId));
 
   if (matchedMaterial) {
@@ -3795,6 +3887,9 @@ function populateMaterialTypeSelect() {
   materialTypeSelect.disabled = false;
 
   const existingTypes = typeOrder;
+  if (!isSupportedMaterialType(activeType)) {
+    activeType = "lecture";
+  }
 
   materialTypeSelect.innerHTML = existingTypes.map(type => `
     <option value="${type.key}" ${type.key === activeType ? "selected" : ""}>${getTypeLabel(type.key)}</option>
@@ -4187,7 +4282,7 @@ function updateActionButtonsState() {
 }
 
 function buildInlineQrUrl(value) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value || "Lektor")}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value || "iLector")}`;
 }
 
 function convertGoogleSheetToEmbed(url) {
@@ -4995,12 +5090,6 @@ const LOCAL_ASSISTANT_MATERIAL_TYPE_ALIASES = [
   ["зертхананы", "lab"],
   ["лаборатория", "lab"],
   ["lab", "lab"],
-  ["сөж", "siw"],
-  ["срс", "siw"],
-  ["siw", "siw"],
-  ["sowj", "siw"],
-  ["силлабус", "syllabus"],
-  ["syllabus", "syllabus"],
 ];
 const LOCAL_ASSISTANT_COURSE_PATTERNS = [
   /(\d{1,2})\s*(?:курс|курсты|курсқа|курса|course)\b/u,
@@ -5917,13 +6006,16 @@ async function handleAssistantAction(assistantData) {
 }
 
 function setVoiceState(state, text) {
-  voiceCore.classList.remove("listening");
-  if (state === "listening") {
-    voiceCore.classList.add("listening");
+  const isVoiceListening = state === "listening";
+
+  if (voiceCore) {
+    voiceCore.classList.toggle("listening", isVoiceListening);
   }
 
   const normalizedText = ["Дайын", "Готово"].includes(text) ? t("voiceReady") : text;
-  voiceStatus.textContent = normalizedText;
+  if (voiceStatus) {
+    voiceStatus.textContent = normalizedText;
+  }
 }
 
 function sanitizeSpeechText(text) {
@@ -6355,7 +6447,9 @@ function initSpeechRecognition() {
 
   recognition.onend = async () => {
     isListening = false;
-    voiceCore.classList.remove("listening");
+    if (voiceCore) {
+      voiceCore.classList.remove("listening");
+    }
     const completeTranscript = String(voiceRecognitionLastTranscript || "").trim();
     const shouldSubmitTranscript = !isVoiceCaptureCancelled && completeTranscript;
     resetVoiceRecognitionSession();

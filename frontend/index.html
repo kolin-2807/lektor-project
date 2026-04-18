@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lektor</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260416-100" />
+  <title>iLector</title>
+  <link rel="stylesheet" href="./css/style.css?v=20260418-119" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -60,7 +60,7 @@
             <div class="role-menu hidden" id="roleMenu">
               <button class="role-menu-item active" data-role-value="kaz" type="button">Оқытушы</button>
               <button class="role-menu-item" data-role-value="rus" type="button">Лектор</button>
-              <button class="role-menu-item" data-role-value="eng" type="button">Lektor</button>
+              <button class="role-menu-item" data-role-value="eng" type="button">Lector</button>
             </div>
           </div>
         </div>
@@ -72,16 +72,16 @@
 
           <div class="profile-shell hidden" id="profileShell">
             <button class="profile-avatar-btn" id="profileBtn" type="button" aria-label="profile">
-              <div class="avatar" id="topAvatar">КЕ</div>
+              <div class="avatar" id="topAvatar"></div>
             </button>
 
             <div class="profile-dropdown" id="profileDropdown">
               <div class="profile-card-top">
-                <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
+                <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;"></div>
                 <div class="profile-main">
-                  <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
-                  <span id="dropdownRole">оқытушы</span>
-                  <span id="dropdownEmail">kalaman@university.kz</span>
+                  <strong id="dropdownName"></strong>
+                  <span id="dropdownRole"></span>
+                  <span id="dropdownEmail"></span>
                 </div>
               </div>
 
@@ -173,8 +173,6 @@
                 <option value="lecture">Дәріс</option>
                 <option value="lab">Зертхана</option>
                 <option value="practice">Практика</option>
-                <option value="siw">СӨЖ</option>
-                <option value="syllabus">Силлабус</option>
               </select>
             </div>
 
@@ -492,9 +490,17 @@
         <button class="auth-modal-close" data-close-modal="authModal" type="button" aria-label="Жабу">×</button>
 
         <div class="auth-modal-copy">
-          <p class="auth-modal-eyebrow">Lektor</p>
-          <h2 id="authModalTitle">Жүйеге кіру</h2>
-          <p id="authModalText">Материалдарды жүктеу мен профильді сақтау үшін Google арқылы кіріңіз.</p>
+          <div class="auth-modal-brand">
+            <img class="auth-modal-logo" src="./assets/images/Satabayev_University_logo.png?v=20260408-01" alt="Satbayev University logo" />
+            <strong>iLector</strong>
+          </div>
+          <h2 id="authModalTitle">Авторизациялану</h2>
+          <div class="auth-modal-text" id="authModalText">
+            <p class="auth-modal-line is-lead">Құрметті ОҚЫТУШЫ сізді “iLector” веб-қосымшасын таңдағаныңыз үшін алғыс білдіреміз !</p>
+            <p class="auth-modal-line"><strong>Кіру:</strong> Қосымшаға кіру үшін тек Google аккаунттың болуы, егер болмаса тіркелу автоматты түрде Google талаптары бойынша жүреді.</p>
+            <p class="auth-modal-line"><strong>Мүмкіншілігі:</strong> қосымшаға дайын дәріс материалын жүктеу арқылы, сіз автоматты түрде «дауыстық көмекші», «презентация», «тест», «тест нәтижесі» сияқты ыңғайлы әдістерге қол жеткізесіз.</p>
+            <p class="auth-modal-line"><strong>Артықшылығы:</strong> Тест сұрақтарын жариялау QR арқылы. Қолайлы интерфейс. Киберқауіпсіз орта. Ақпараттарыңыз өз Google Drive-та сақталады.</p>
+          </div>
         </div>
 
         <button class="auth-provider-btn" id="authGoogleBtn" type="button">
@@ -502,9 +508,7 @@
           <span id="authGoogleBtnText">Google арқылы жалғастыру</span>
         </button>
 
-        <p class="auth-modal-note" id="authModalNote">
-          Google аккаунты бар болса кіресіз, жаңа болса тіркелу автоматты жүреді.
-        </p>
+        <p class="auth-modal-note" id="authModalNote"><a href="https://sso.satbayev.university" target="_blank" rel="noopener noreferrer">sso.satbayev.university</a><br />Copyright © 2026 <a href="https://official.satbayev.university/kk/information-telecommunication-technologies/kafedra-informatsionnykh-sistem" target="_blank" rel="noopener noreferrer">"Ақпараттық жүйелер" кафедрасы</a><br />IP: 10.7.0.40</p>
       </div>
     </div>
 
@@ -516,11 +520,11 @@
         </div>
 
         <div class="profile-modal-head">
-          <div class="avatar-edit" id="avatarEditPreview">КЕ</div>
+          <div class="avatar-edit" id="avatarEditPreview"></div>
 
           <div class="profile-head-copy">
-            <h4 id="profileModalNameText">Каламан Ерболат Тлеуханұлы</h4>
-            <p id="profileModalRoleText">оқытушы</p>
+            <h4 id="profileModalNameText"></h4>
+            <p id="profileModalRoleText"></p>
           </div>
         </div>
 
@@ -529,7 +533,7 @@
         <div class="edit-grid">
           <div class="edit-field">
             <label for="profileUsernameInput">Username</label>
-            <input id="profileUsernameInput" type="text" value="kalaman_erbolat" />
+            <input id="profileUsernameInput" type="text" value="" />
           </div>
 
           <div class="edit-field">
@@ -621,6 +625,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260416-100"></script>
+  <script src="./js/app.js?v=20260418-119"></script>
 </body>
 </html>

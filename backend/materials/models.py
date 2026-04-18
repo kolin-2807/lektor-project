@@ -7,8 +7,6 @@ class Material(models.Model):
         ("lecture", "Дәріс"),
         ("practice", "Практикалық жұмыс"),
         ("lab", "Зертханалық жұмыс"),
-        ("sowj", "СОӨЖ"),
-        ("syllabus", "Силлабус"),
     ]
 
     discipline = models.ForeignKey(

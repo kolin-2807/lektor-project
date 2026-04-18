@@ -31,7 +31,7 @@ ALLOWED_ACTIONS = {
     "unknown",
 }
 
-MATERIAL_TYPES = {"lecture", "practice", "lab", "siw", "syllabus"}
+MATERIAL_TYPES = {"lecture", "practice", "lab"}
 
 KK_ORDINAL_COURSES = {
     "бірінші": 1,
@@ -76,12 +76,6 @@ MATERIAL_TYPE_ALIASES = {
     "зертханалық": "lab",
     "лаборатория": "lab",
     "lab": "lab",
-    "сөж": "siw",
-    "срс": "siw",
-    "siw": "siw",
-    "sowj": "siw",
-    "syllabus": "syllabus",
-    "силлабус": "syllabus",
 }
 
 HELP_PHRASES = (
