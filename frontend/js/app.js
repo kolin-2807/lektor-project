@@ -709,6 +709,7 @@ const subjectCourse = document.getElementById("subjectCourse");
 const subjectCourseCardCover = document.getElementById("subjectCourseCardCover");
 const subjectCourseIllustration = document.getElementById("subjectCourseIllustration");
 const toggleMaterialManagerBtn = document.getElementById("toggleMaterialManagerBtn");
+const subjectControlPanel = document.getElementById("subjectControlPanel");
 const changeCoverBtn = document.getElementById("changeCoverBtn");
 
 const materialsPane = document.getElementById("materialsPane");
@@ -725,7 +726,6 @@ const generateTestBtn = document.getElementById("generateTestBtn");
 const openQrBtn = document.getElementById("openQrBtn");
 const openResultsBtn = document.getElementById("openResultsBtn");
 const controlActionsRow = document.getElementById("controlActionsRow");
-const materialControlFamily = document.getElementById("materialControlFamily");
 const presentationGroupTitle = document.getElementById("presentationGroupTitle");
 const testGroupTitle = document.getElementById("testGroupTitle");
 
@@ -2593,7 +2593,7 @@ async function disconnectGoogleDrive() {
 }
 
 async function uploadMaterialFiles(fileList) {
-  const files = Array.from(fileList || []).filter(file => file && file.size >= 0);
+  const files = sortFilesNaturally(Array.from(fileList || []).filter(file => file && file.size >= 0));
 
   if (!selectedSubject || !files.length) return;
 
@@ -2901,6 +2901,8 @@ function renderMaterialManagerPanel() {
     toggleMaterialManagerBtn.disabled = !selectedCourseNumber;
   }
 
+  subjectControlPanel?.classList.toggle("is-upload-mode", isManagerOpen);
+
   if (materialManagerPanel) {
     materialManagerPanel.classList.toggle("is-open", isManagerOpen);
     materialManagerPanel.setAttribute("aria-hidden", String(!isManagerOpen));
@@ -2908,10 +2910,6 @@ function renderMaterialManagerPanel() {
 
   if (controlActionsRow) {
     controlActionsRow.classList.toggle("is-hidden", isManagerOpen);
-  }
-
-  if (materialControlFamily) {
-    materialControlFamily.classList.toggle("is-hidden", isManagerOpen);
   }
 
   renderUploadMenu();
@@ -3595,10 +3593,35 @@ function mapMaterialFromApi(item) {
   };
 }
 
+const naturalMaterialCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function getFileSortName(file) {
+  return String(file?.webkitRelativePath || file?.name || "");
+}
+
+function sortFilesNaturally(files = []) {
+  return [...files].sort((a, b) => naturalMaterialCollator.compare(getFileSortName(a), getFileSortName(b)));
+}
+
+function getMaterialSortName(material) {
+  return String(material?.originalFilename || material?.title || "");
+}
+
+function sortMaterialsNaturally(materials = []) {
+  return [...materials].sort((a, b) => {
+    const typeDiff = typeOrder.findIndex(item => item.key === a.type) - typeOrder.findIndex(item => item.key === b.type);
+    if (typeDiff) return typeDiff;
+    return naturalMaterialCollator.compare(getMaterialSortName(a), getMaterialSortName(b));
+  });
+}
+
 async function loadMaterialsForSubject(subjectId) {
   try {
     const materials = await fetchJSON(`${API_BASE}/materials/?discipline_id=${subjectId}`);
-    return materials.map(mapMaterialFromApi);
+    return sortMaterialsNaturally(materials.map(mapMaterialFromApi));
   } catch (error) {
     console.error("Materials load error:", error);
     return [];

@@ -1376,6 +1376,10 @@ body.public-test-mode .modal-backdrop {
   background: linear-gradient(180deg, rgba(222, 234, 244, 0.86), rgba(235, 243, 249, 0.78));
 }
 
+.subject-control-panel.is-upload-mode .material-control-family {
+  grid-template-columns: minmax(160px, 1fr) minmax(118px, 0.56fr) minmax(190px, 0.92fr);
+}
+
 .control-select-card {
   display: grid;
   gap: 5px;
@@ -1449,6 +1453,10 @@ body.public-test-mode .modal-backdrop {
 
 .material-action-group {
   padding-top: 17px;
+}
+
+.subject-control-panel.is-upload-mode .material-action-group {
+  display: none;
 }
 
 .presentation-action-group {
@@ -1583,10 +1591,6 @@ body.public-test-mode .modal-backdrop {
 }
 
 .control-actions-row.is-hidden {
-  display: none;
-}
-
-.material-control-family.is-hidden {
   display: none;
 }
 
@@ -1764,10 +1768,10 @@ body.public-test-mode .modal-backdrop {
 }
 
 .material-manager-panel {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   grid-row: 1;
   display: none;
-  align-self: end;
+  align-self: center;
   justify-self: stretch;
   min-width: 0;
   width: 100%;
@@ -1782,14 +1786,15 @@ body.public-test-mode .modal-backdrop {
 
 .material-manager-panel.is-open {
   display: flex;
+  align-items: center;
 }
 
 .material-manager-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: stretch;
-  justify-content: stretch;
-  gap: 6px;
+  grid-template-columns: repeat(4, minmax(112px, 158px));
+  align-items: center;
+  justify-content: end;
+  gap: 7px;
   width: 100%;
 }
 
@@ -1807,9 +1812,12 @@ body.public-test-mode .modal-backdrop {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  padding: 0 10px;
-  font-size: 12px;
+  min-height: 34px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 11px;
   white-space: nowrap;
+  box-shadow: none;
 }
 
 .upload-menu-wrap {
@@ -3430,7 +3438,8 @@ body.auth-gate-mode:not(.public-test-mode) #authModal .auth-modal-close {
   }
 
   .material-manager-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+    justify-content: stretch;
   }
 
   .public-test-actions {
