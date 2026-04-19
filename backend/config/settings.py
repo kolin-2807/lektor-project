@@ -9,7 +9,10 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+import base64
+import json
 import os
+import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -85,7 +88,35 @@ def _prefer_existing_dotenv_google_credentials():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = dotenv_credentials_path
 
 
+def _configure_google_credentials_from_env():
+    current_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    if current_credentials and Path(current_credentials).expanduser().is_file():
+        return
+
+    credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip()
+    credentials_b64 = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_B64", "").strip()
+
+    if not credentials_json and credentials_b64:
+        try:
+            credentials_json = base64.b64decode(credentials_b64).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            credentials_json = ""
+
+    if not credentials_json:
+        return
+
+    try:
+        parsed_credentials = json.loads(credentials_json)
+    except json.JSONDecodeError:
+        return
+
+    credentials_path = Path(tempfile.gettempdir()) / "lektor-google-application-credentials.json"
+    credentials_path.write_text(json.dumps(parsed_credentials), encoding="utf-8")
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credentials_path)
+
+
 _prefer_existing_dotenv_google_credentials()
+_configure_google_credentials_from_env()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/

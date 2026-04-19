@@ -81,8 +81,8 @@ const UI_TEXT = {
     materialType: "Материал түрі",
     topic: "Тақырып",
     material: "Материал",
-    generateTest: "Тест",
-    testQr: "Тест (QR)",
+    generateTest: "Жасау",
+    testQr: "Жариялау (QR)",
     results: "Нәтижелер",
     fullscreen: "Толық экран",
     openTest: "Тестті ашу",
@@ -223,8 +223,8 @@ const UI_TEXT = {
     materialType: "Тип материала",
     topic: "Тема",
     material: "Материал",
-    generateTest: "Тест",
-    testQr: "Тест (QR)",
+    generateTest: "Создать",
+    testQr: "Опубликовать (QR)",
     results: "Результаты",
     fullscreen: "Полный экран",
     openTest: "Открыть тест",
@@ -457,8 +457,8 @@ UI_TEXT.eng = {
   materialType: "Material type",
   topic: "Topic",
   material: "Material",
-  generateTest: "Test",
-  testQr: "Test (QR)",
+  generateTest: "Create",
+  testQr: "Publish (QR)",
   results: "Results",
   fullscreen: "Fullscreen",
   openTest: "Open test",
@@ -725,6 +725,9 @@ const generateTestBtn = document.getElementById("generateTestBtn");
 const openQrBtn = document.getElementById("openQrBtn");
 const openResultsBtn = document.getElementById("openResultsBtn");
 const controlActionsRow = document.getElementById("controlActionsRow");
+const materialControlFamily = document.getElementById("materialControlFamily");
+const presentationGroupTitle = document.getElementById("presentationGroupTitle");
+const testGroupTitle = document.getElementById("testGroupTitle");
 
 const materialPreview = document.getElementById("materialPreview");
 const materialFooterType = document.getElementById("materialFooterType");
@@ -1188,6 +1191,8 @@ function applyStaticTranslations() {
   setActionButtonLabel(generateTestBtn, t("generateTest"));
   setActionButtonLabel(openQrBtn, t("testQr"));
   setActionButtonLabel(openResultsBtn, t("results"));
+  if (presentationGroupTitle) presentationGroupTitle.textContent = roleText("Презентация", "Презентация", "Presentation");
+  if (testGroupTitle) testGroupTitle.textContent = roleText("Тест", "Тест", "Test");
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
   if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
   if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
@@ -2903,6 +2908,10 @@ function renderMaterialManagerPanel() {
 
   if (controlActionsRow) {
     controlActionsRow.classList.toggle("is-hidden", isManagerOpen);
+  }
+
+  if (materialControlFamily) {
+    materialControlFamily.classList.toggle("is-hidden", isManagerOpen);
   }
 
   renderUploadMenu();
