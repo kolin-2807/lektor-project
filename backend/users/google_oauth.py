@@ -31,6 +31,7 @@ OAUTH_SCOPES = [
 SESSION_CONNECTION_KEY = "google_drive_connection_id"
 SESSION_OAUTH_STATE_KEY = "google_drive_oauth_state"
 SESSION_OAUTH_CODE_VERIFIER_KEY = "google_drive_oauth_code_verifier"
+SESSION_FRONTEND_SUCCESS_URL_KEY = "google_drive_frontend_success_url"
 BROKEN_LOCAL_PROXY_MARKERS = ("127.0.0.1:9", "localhost:9")
 
 
@@ -63,6 +64,55 @@ def _get_request_origin(request=None):
 
 def _is_local_hostname(hostname: str | None) -> bool:
     return (hostname or "").strip().lower() in {"127.0.0.1", "localhost"}
+
+
+def _normalize_origin(raw_value: str) -> str:
+    parsed = urlparse(str(raw_value or "").strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _origin_hostname(origin: str) -> str:
+    return (urlparse(origin).hostname or "").strip().lower()
+
+
+def _is_allowed_frontend_origin(origin: str, request=None) -> bool:
+    normalized_origin = _normalize_origin(origin)
+    if not normalized_origin:
+        return False
+
+    if settings.DEBUG and _is_local_hostname(_origin_hostname(normalized_origin)):
+        return True
+
+    allowed_origins = {
+        _normalize_origin(item)
+        for item in [
+            getattr(settings, "PUBLIC_APP_ORIGIN", ""),
+            os.getenv("GOOGLE_OAUTH_FRONTEND_SUCCESS_URL", ""),
+            _get_request_origin(request),
+            *getattr(settings, "CORS_ALLOWED_ORIGINS", []),
+            *getattr(settings, "CSRF_TRUSTED_ORIGINS", []),
+        ]
+        if item
+    }
+
+    return normalized_origin in allowed_origins
+
+
+def _get_request_frontend_origin(request=None) -> str:
+    if request is None:
+        return ""
+
+    origin = _normalize_origin(request.headers.get("Origin", ""))
+    if origin and _is_allowed_frontend_origin(origin, request):
+        return origin
+
+    referer = _normalize_origin(request.headers.get("Referer", ""))
+    if referer and _is_allowed_frontend_origin(referer, request):
+        return referer
+
+    return ""
 
 
 def _load_web_client_config(request=None):
@@ -100,6 +150,8 @@ def get_oauth_redirect_uri(request=None):
         request_host = urlparse(request_origin).hostname if request_origin else ""
         if request_origin and not _is_local_hostname(request_host) and _is_local_hostname(configured_host):
             return f"{request_origin}/api/users/drive/callback/"
+        if request_origin and _is_local_hostname(request_host) and configured_host and not _is_local_hostname(configured_host):
+            return f"{request_origin}/api/users/drive/callback/"
         return configured_uri
 
     if request_origin:
@@ -109,6 +161,16 @@ def get_oauth_redirect_uri(request=None):
 
 
 def get_frontend_success_url(request=None):
+    session_url = ""
+    if request is not None:
+        session_url = _normalize_origin(getattr(request, "session", {}).get(SESSION_FRONTEND_SUCCESS_URL_KEY, ""))
+        if session_url and _is_allowed_frontend_origin(session_url, request):
+            return f"{session_url}/"
+
+    frontend_origin = _get_request_frontend_origin(request)
+    if frontend_origin:
+        return f"{frontend_origin}/"
+
     configured_url = os.getenv("GOOGLE_OAUTH_FRONTEND_SUCCESS_URL", "").strip()
     request_origin = _get_request_origin(request)
 
@@ -116,6 +178,8 @@ def get_frontend_success_url(request=None):
         configured_host = urlparse(configured_url).hostname
         request_host = urlparse(request_origin).hostname if request_origin else ""
         if request_origin and not _is_local_hostname(request_host) and _is_local_hostname(configured_host):
+            return f"{request_origin}/"
+        if request_origin and _is_local_hostname(request_host) and configured_host and not _is_local_hostname(configured_host):
             return f"{request_origin}/"
         return configured_url
 

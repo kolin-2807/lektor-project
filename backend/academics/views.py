@@ -19,6 +19,10 @@ def _require_google_session(request):
 
 @api_view(["GET"])
 def course_list(request):
+    auth_error = _require_google_session(request)
+    if auth_error:
+        return auth_error
+
     courses = Course.objects.all().order_by("number")
     serializer = CourseSerializer(courses, many=True)
     return Response(serializer.data)

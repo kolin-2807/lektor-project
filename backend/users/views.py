@@ -9,6 +9,7 @@ from rest_framework.response import Response
 
 from .google_oauth import (
     SESSION_CONNECTION_KEY,
+    SESSION_FRONTEND_SUCCESS_URL_KEY,
     SESSION_OAUTH_CODE_VERIFIER_KEY,
     SESSION_OAUTH_STATE_KEY,
     build_frontend_redirect_url,
@@ -16,6 +17,7 @@ from .google_oauth import (
     credentials_to_dict,
     exchange_google_oauth_code,
     fetch_google_userinfo,
+    get_frontend_success_url,
     is_google_drive_oauth_ready,
     is_local_oauth_redirect,
 )
@@ -62,6 +64,7 @@ def drive_connect(request):
 
     request.session[SESSION_OAUTH_STATE_KEY] = state
     request.session[SESSION_OAUTH_CODE_VERIFIER_KEY] = getattr(flow, "code_verifier", "")
+    request.session[SESSION_FRONTEND_SUCCESS_URL_KEY] = get_frontend_success_url(request)
     request.session.modified = True
 
     return Response({"authorization_url": authorization_url})
@@ -135,17 +138,17 @@ def drive_callback(request):
     )
 
     request.session[SESSION_CONNECTION_KEY] = connection.id
+    redirect_url = build_frontend_redirect_url(
+        request,
+        drive="connected",
+        email=connection.google_email,
+    )
     request.session.pop(SESSION_OAUTH_STATE_KEY, None)
     request.session.pop(SESSION_OAUTH_CODE_VERIFIER_KEY, None)
+    request.session.pop(SESSION_FRONTEND_SUCCESS_URL_KEY, None)
     request.session.modified = True
 
-    return HttpResponseRedirect(
-        build_frontend_redirect_url(
-            request,
-            drive="connected",
-            email=connection.google_email,
-        )
-    )
+    return HttpResponseRedirect(redirect_url)
 
 
 @api_view(["POST"])
@@ -153,5 +156,6 @@ def drive_disconnect(request):
     request.session.pop(SESSION_CONNECTION_KEY, None)
     request.session.pop(SESSION_OAUTH_STATE_KEY, None)
     request.session.pop(SESSION_OAUTH_CODE_VERIFIER_KEY, None)
+    request.session.pop(SESSION_FRONTEND_SUCCESS_URL_KEY, None)
     request.session.modified = True
     return Response({"success": True})

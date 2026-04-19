@@ -20,6 +20,11 @@ const ROLE_HTML_LANG = Object.freeze({
   rus: "ru",
   eng: "en",
 });
+const AUTH_LANGUAGE_LABELS = Object.freeze({
+  kaz: "Қазақша",
+  rus: "Русский",
+  eng: "English",
+});
 const PORTAL_URL = "https://sso.satbayev.university";
 const DEPARTMENT_URLS = Object.freeze({
   kaz: "https://official.satbayev.university/kk/information-telecommunication-technologies/kafedra-informatsionnykh-sistem",
@@ -722,7 +727,11 @@ const openResultsBtn = document.getElementById("openResultsBtn");
 const controlActionsRow = document.getElementById("controlActionsRow");
 
 const materialPreview = document.getElementById("materialPreview");
+const materialFooterType = document.getElementById("materialFooterType");
+const materialFooterTitle = document.getElementById("materialFooterTitle");
 const slidesPreview = document.getElementById("slidesPreview");
+const slidesFooterType = document.getElementById("slidesFooterType");
+const slidesFooterTitle = document.getElementById("slidesFooterTitle");
 const slidesStatusText = document.getElementById("slidesStatusText");
 const materialManagerPanel = document.getElementById("materialManagerPanel");
 const materialManagerActions = document.getElementById("materialManagerActions");
@@ -774,6 +783,8 @@ const testQrCaptionText = document.getElementById("testQrCaptionText");
 
 const resultsInfoText = document.getElementById("resultsInfoText") || { textContent: "" };
 const resultsSheetFrame = document.getElementById("resultsSheetFrame");
+const resultsFooterType = document.getElementById("resultsFooterType");
+const resultsFooterTitle = document.getElementById("resultsFooterTitle");
 const openResultsSheetBtn = document.getElementById("openResultsSheetBtn") || {
   disabled: true,
   addEventListener() {}
@@ -803,6 +814,7 @@ const voiceInput = document.getElementById("voiceInput");
 const voiceSendBtn = document.getElementById("voiceSendBtn");
 
 const authModal = document.getElementById("authModal");
+const authLanguageSwitch = document.getElementById("authLanguageSwitch");
 const authModalTitle = document.getElementById("authModalTitle");
 const authModalText = document.getElementById("authModalText");
 const authModalNote = document.getElementById("authModalNote");
@@ -1016,6 +1028,11 @@ function getPreferredSubject(preferredSubjectId = null) {
 }
 
 function navigateToMainPage() {
+  if (!driveConnection.connected) {
+    openAuthModal();
+    return;
+  }
+
   showHome();
   showCourseStage();
   renderCourseCards();
@@ -1104,7 +1121,19 @@ function renderAuthModalFooterLine(line) {
   return `<span>${escapeHtml(cleanLine)}</span>`;
 }
 
+function renderAuthLanguageSwitch() {
+  if (!authLanguageSwitch) return;
+
+  authLanguageSwitch.innerHTML = SUPPORTED_ROLES.map(role => `
+    <option value="${role}" ${role === selectedRole ? "selected" : ""}>
+      ${escapeHtml(AUTH_LANGUAGE_LABELS[role] || getRoleLabel(role))}
+    </option>
+  `).join("");
+  authLanguageSwitch.value = selectedRole;
+}
+
 function renderAuthModal() {
+  renderAuthLanguageSwitch();
   if (authModalTitle) authModalTitle.textContent = t("authModalTitle");
   renderAuthModalText();
   renderAuthModalFooter();
@@ -2194,6 +2223,22 @@ function getAuthRequiredWorkspaceMessage() {
   return t("authRequiredDisciplines");
 }
 
+function shouldShowAuthGate() {
+  return !publicTestSessionToken && !driveConnection.connected;
+}
+
+function applyAuthGateState() {
+  const isAuthGateOpen = shouldShowAuthGate();
+  document.body.classList.toggle("auth-gate-mode", isAuthGateOpen);
+
+  if (isAuthGateOpen) {
+    openModal(authModal);
+    return;
+  }
+
+  closeModal(authModal);
+}
+
 function promptGoogleLogin() {
   window.alert(t("authRequiredAction"));
   openAuthModal();
@@ -2233,7 +2278,7 @@ function resetProtectedAppData() {
 
   if (subjectSelect) subjectSelect.innerHTML = `<option value="">${t("subjectPlaceholder")}</option>`;
   if (topicSelect) topicSelect.innerHTML = `<option value="">${t("topicPlaceholder")}</option>`;
-  if (resultsInfoText) resultsInfoText.textContent = "";
+  setResultsStatus("");
   if (resultsSheetFrame) {
     resultsSheetFrame.src = "about:blank";
     resultsSheetFrame.srcdoc = "";
@@ -2245,7 +2290,12 @@ function resetProtectedAppData() {
   renderResultsBlock();
   showHome();
   showCourseStage();
-  renderCourseCards();
+
+  if (driveConnection.connected) {
+    renderCourseCards();
+  } else if (courseGrid) {
+    courseGrid.innerHTML = "";
+  }
 }
 
 function handleUnauthorizedAccess({ openLoginModal = false } = {}) {
@@ -2740,6 +2790,10 @@ function openModal(modal) {
 }
 
 function closeModal(modal) {
+  if (modal === authModal && shouldShowAuthGate()) {
+    return;
+  }
+
   if (modal) modal.classList.remove("show");
 }
 
@@ -2927,6 +2981,8 @@ function renderAuthState() {
   if (authGoogleBtn) {
     authGoogleBtn.disabled = isAuthSubmitting;
   }
+
+  applyAuthGateState();
 }
 
 function openAuthModal() {
@@ -3240,6 +3296,11 @@ function getDisciplineLang(discipline) {
 }
 
 async function openCourseDisciplines(courseNumber, preferredSubjectId = null) {
+  if (!driveConnection.connected) {
+    openAuthModal();
+    return;
+  }
+
   selectedCourseNumber = courseNumber;
   isDisciplineAccessLocked = false;
   disciplineStage.classList.add("hidden");
@@ -3303,6 +3364,13 @@ function switchSubjectPanel(panelName) {
 }
 
 async function loadCoursesFromApi() {
+  if (!driveConnection.connected) {
+    coursesData = [];
+    if (courseGrid) courseGrid.innerHTML = "";
+    appStateRestoreDone = true;
+    return;
+  }
+
   try {
     coursesData = await fetchJSON(`${API_BASE}/courses/`);
     renderCourseCards();
@@ -3969,13 +4037,34 @@ function upsertSelectedSubjectMaterial(materialPayload) {
 }
 
 function clearMaterialPreview() {
+  updateMaterialFooter(null);
   materialPreview.innerHTML = `
     <div class="empty-state">${t("materialsEmpty")}</div>
   `;
 }
 
+function updateMaterialFooter(item = getSelectedMaterial()) {
+  if (materialFooterType) {
+    materialFooterType.textContent = item?.typeLabel || "";
+    materialFooterType.className = "content-footer-type";
+    if (item?.type) {
+      materialFooterType.classList.add(getBadgeClass(item.type));
+    }
+  }
+
+  if (materialFooterTitle) {
+    materialFooterTitle.textContent = item?.title || "";
+  }
+
+  if (openMaterialFullscreenBtn) {
+    openMaterialFullscreenBtn.disabled = !item;
+    openMaterialFullscreenBtn.classList.toggle("hidden", !item);
+  }
+}
+
 function renderMaterialPreview() {
   if (!selectedSubject) {
+    updateMaterialFooter(null);
     materialPreview.innerHTML = `<div class="empty-state">${escapeHtml(isDisciplineAccessLocked ? getAuthRequiredWorkspaceMessage() : t("subjectSelectFirst"))}</div>`;
     return;
   }
@@ -3983,9 +4072,12 @@ function renderMaterialPreview() {
   const item = getSelectedMaterial();
 
   if (!item) {
+    updateMaterialFooter(null);
     materialPreview.innerHTML = `<div class="empty-state">${t("materialSelectPrompt")}</div>`;
     return;
   }
+
+  updateMaterialFooter(item);
 
   let previewInner = selectedSubject?.coverImage
     ? `<img src="${selectedSubject.coverImage}" alt="preview" />`
@@ -4015,10 +4107,6 @@ function renderMaterialPreview() {
     <div class="preview-box">
       ${previewInner}
     </div>
-
-    <div class="preview-type ${getBadgeClass(item.type)}">${item.typeLabel}</div>
-    <div class="preview-title">${escapeHtml(item.title)}</div>
-    <div class="preview-actions"></div>
   `;
 }
 
@@ -4057,6 +4145,38 @@ function setSlidesStatus(message = "", state = "neutral") {
   if (!slidesStatusText) return;
   slidesStatusText.textContent = message || "";
   slidesStatusText.classList.toggle("is-error", state === "error");
+  slidesStatusText.classList.toggle("hidden", !message);
+}
+
+function setResultsStatus(message = "") {
+  if (!resultsInfoText) return;
+  resultsInfoText.textContent = message || "";
+  resultsInfoText.classList.toggle("hidden", !message);
+}
+
+function updateSlidesFooter(material = getSelectedMaterial(), hasSlides = false) {
+  if (slidesFooterType) {
+    slidesFooterType.textContent = hasSlides ? roleText("Слайд", "Слайд", "Slide") : "";
+    slidesFooterType.className = "content-footer-type";
+    if (hasSlides) {
+      slidesFooterType.classList.add("badge-practice");
+    }
+  }
+
+  if (slidesFooterTitle) {
+    slidesFooterTitle.textContent = hasSlides ? (material?.title || "") : "";
+  }
+}
+
+function updateResultsFooter(material = getSelectedMaterial(), session = currentTestSession) {
+  if (resultsFooterType) {
+    resultsFooterType.textContent = t("results");
+    resultsFooterType.className = "content-footer-type badge-practice";
+  }
+
+  if (resultsFooterTitle) {
+    resultsFooterTitle.textContent = session?.title || material?.title || "";
+  }
 }
 
 function buildSlidesEmptyCard(title, text, extraClass = "") {
@@ -4072,7 +4192,7 @@ function buildSlidesEmptyCard(title, text, extraClass = "") {
   `;
 }
 
-function buildSlidesSettingsCard(material) {
+function buildSlidesSettingsCard() {
   return `
     <div class="slides-preview-shell">
       <div class="test-settings-panel slides-settings-panel">
@@ -4119,10 +4239,6 @@ function buildSlidesSettingsCard(material) {
               </div>
             </div>
 
-            <div class="slides-settings-material">
-              <strong>${escapeHtml(material?.title || "")}</strong>
-              <span>${escapeHtml(selectedSubject?.title || "")}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -4131,6 +4247,8 @@ function buildSlidesSettingsCard(material) {
 }
 
 function syncSlidesActionButtons(material, hasSlides) {
+  updateSlidesFooter(material, hasSlides);
+
   if (openSlidesFullscreenBtn) {
     openSlidesFullscreenBtn.disabled = !hasSlides || isSlidesBusy();
     openSlidesFullscreenBtn.classList.toggle("hidden", !hasSlides);
@@ -4199,7 +4317,7 @@ function renderSlidesPreview() {
 
   if (!hasSlides) {
     setSlidesStatus(slidesErrorMessage || "", slidesErrorMessage ? "error" : "neutral");
-    slidesPreview.innerHTML = buildSlidesSettingsCard(material);
+    slidesPreview.innerHTML = buildSlidesSettingsCard();
     bindSlidesSettingsInput();
 
     const buildSlidesBtn = document.getElementById("buildSlidesBtn");
@@ -4213,19 +4331,9 @@ function renderSlidesPreview() {
   }
 
   slidesErrorMessage = "";
-  setSlidesStatus(t("slidesReady", { title: material.title }));
+  setSlidesStatus("");
   slidesPreview.innerHTML = `
     <div class="slides-preview-shell">
-      <div class="slides-embed-meta">
-        <div>
-          <strong>${escapeHtml(material.title)}</strong>
-          <span>${escapeHtml(t("slidesReadyMeta", {
-            count: material.slidesCount || slidesConfig.slideCount,
-            subject: selectedSubject?.title || "",
-          }))}</span>
-        </div>
-      </div>
-
       <div class="slides-embed-shell">
         <iframe
           src="${material.slidesEmbedUrl || material.slidesUrl}"
@@ -4320,25 +4428,55 @@ function buildGoogleSheetDownloadUrl(url, format = "xlsx") {
 
 function buildResultsSummaryDoc(title, responses = [], options = {}) {
   const labels = {
-    participants: roleText("Тапсырғандар", "Участников", "Participants"),
-    average: roleText("Орташа пайыз", "Средний процент", "Average percentage"),
-    best: roleText("Үздік балл", "Лучший балл", "Best score"),
+    highestStudent: roleText("Ең жоғары нәтиже", "Лучший результат", "Highest result"),
+    lowestStudent: roleText("Ең төмен нәтиже", "Самый низкий результат", "Lowest result"),
+    latestStudent: roleText("Соңғы тапсырған", "Последняя сдача", "Latest submission"),
     percent: roleText("Пайыз", "Процент", "Percent"),
     noData: roleText("Нәтиже табылмады", "Результаты не найдены", "No results found"),
   };
 
   const normalizedResponses = Array.isArray(responses) ? responses : [];
   const scoringReady = options.scoringReady !== false;
-  const averagePercent = scoringReady && normalizedResponses.length
-    ? Math.round(normalizedResponses.reduce((sum, item) => sum + (Number(item.percentage) || 0), 0) / normalizedResponses.length)
-    : 0;
-  const bestScoreLabel = scoringReady && normalizedResponses.length
+  const formatSubmittedAt = (value) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString(getRoleLocale());
+  };
+  const bestResponse = scoringReady && normalizedResponses.length
     ? normalizedResponses.reduce((best, item) => {
-        const current = Number(item.score) || 0;
-        const bestValue = Number(best.score) || 0;
-        return current > bestValue ? item : best;
-      }, normalizedResponses[0]).score_label || "-"
+        const currentPercent = Number(item.percentage) || 0;
+        const bestPercent = Number(best.percentage) || 0;
+        const currentScore = Number(item.score) || 0;
+        const bestScore = Number(best.score) || 0;
+        return currentPercent > bestPercent || (currentPercent === bestPercent && currentScore > bestScore) ? item : best;
+      }, normalizedResponses[0])
+    : null;
+  const latestResponse = normalizedResponses.length
+    ? normalizedResponses.reduce((latest, item) => {
+        const currentTime = new Date(item.submitted_at || 0).getTime() || 0;
+        const latestTime = new Date(latest.submitted_at || 0).getTime() || 0;
+        return currentTime > latestTime ? item : latest;
+      }, normalizedResponses[0])
+    : null;
+  const lowestResponse = scoringReady && normalizedResponses.length
+    ? normalizedResponses.reduce((lowest, item) => {
+        const currentPercent = Number(item.percentage) || 0;
+        const lowestPercent = Number(lowest.percentage) || 0;
+        const currentScore = Number(item.score) || 0;
+        const lowestScore = Number(lowest.score) || 0;
+        return currentPercent < lowestPercent || (currentPercent === lowestPercent && currentScore < lowestScore) ? item : lowest;
+      }, normalizedResponses[0])
+    : null;
+  const bestName = bestResponse?.student_name || t("nameMissing");
+  const bestDetail = bestResponse
+    ? `${bestResponse.score_label || "-"} · ${Number(bestResponse.percentage) || 0}%`
     : t("resultsScoreUnavailable");
+  const lowestName = lowestResponse?.student_name || t("nameMissing");
+  const lowestDetail = lowestResponse
+    ? `${lowestResponse.score_label || "-"} · ${Number(lowestResponse.percentage) || 0}%`
+    : t("resultsScoreUnavailable");
+  const latestName = latestResponse?.student_name || t("nameMissing");
+  const latestDetail = latestResponse ? formatSubmittedAt(latestResponse.submitted_at) : "-";
 
   const summaryNote = !scoringReady
     ? `
@@ -4350,11 +4488,9 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
     : "";
 
   const rowsHtml = normalizedResponses.map((response, index) => {
-    const submittedAt = response.submitted_at
-      ? new Date(response.submitted_at).toLocaleString(getRoleLocale())
-      : "-";
+    const submittedAt = formatSubmittedAt(response.submitted_at);
     const scoreLabel = scoringReady ? escapeHtml(response.score_label || "-") : escapeHtml(t("resultsScoreUnavailable"));
-    const percentLabel = scoringReady ? `${Number(response.percentage) || 0}%` : "вЂ”";
+    const percentLabel = scoringReady ? `${Number(response.percentage) || 0}%` : "-";
 
     return `
       <tr>
@@ -4380,17 +4516,20 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
           ${summaryNote}
 
           <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
-            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.participants}</div>
-              <div style="font-size:28px;font-weight:800;color:#0f172a;">${normalizedResponses.length}</div>
+            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.highestStudent}</div>
+              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(bestName)}</div>
+              <div style="margin-top:8px;font-size:13px;color:#1d4ed8;font-weight:800;">${escapeHtml(bestDetail)}</div>
             </div>
-            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.average}</div>
-              <div style="font-size:28px;font-weight:800;color:#0f172a;">${scoringReady ? `${averagePercent}%` : "вЂ”"}</div>
+            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.lowestStudent}</div>
+              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(lowestName)}</div>
+              <div style="margin-top:8px;font-size:13px;color:#64748b;font-weight:800;">${escapeHtml(lowestDetail)}</div>
             </div>
-            <div style="padding:18px;border-radius:18px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.best}</div>
-              <div style="font-size:28px;font-weight:800;color:#0f172a;">${escapeHtml(bestScoreLabel)}</div>
+            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
+              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.latestStudent}</div>
+              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(latestName)}</div>
+              <div style="margin-top:8px;font-size:13px;color:#64748b;font-weight:700;">${escapeHtml(latestDetail)}</div>
             </div>
           </div>
 
@@ -4543,16 +4682,17 @@ async function renderResultsBlock() {
 
   resultsSheetFrame.src = "about:blank";
   resultsSheetFrame.srcdoc = "";
+  updateResultsFooter(material, currentTestSession);
 
   if (!material) {
-    resultsInfoText.textContent = "";
+    setResultsStatus("");
     openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
     downloadResultsBtn.disabled = !(currentTestSession?.results_sheet_url);
     updateActionButtonsState();
     return;
   }
 
-  resultsInfoText.textContent = t("resultsLoading");
+  setResultsStatus(t("resultsLoading"));
   openResultsSheetBtn.disabled = true;
   downloadResultsBtn.disabled = true;
   updateActionButtonsState();
@@ -4561,7 +4701,8 @@ async function renderResultsBlock() {
     latestSession = await getLatestSessionForSelectedMaterial();
 
     if (!latestSession) {
-      resultsInfoText.textContent = "";
+      setResultsStatus("");
+      updateResultsFooter(material, null);
       openResultsSheetBtn.disabled = true;
       downloadResultsBtn.disabled = true;
       updateActionButtonsState();
@@ -4577,9 +4718,10 @@ async function renderResultsBlock() {
       ...data,
       id: latestSession.id
     };
+    updateResultsFooter(material, currentTestSession);
 
     if (!responses.length) {
-      resultsInfoText.textContent = "";
+      setResultsStatus("");
       resultsSheetFrame.srcdoc = `
         <html>
           <body style="font-family: Arial, sans-serif; padding: 20px;">
@@ -4594,7 +4736,7 @@ async function renderResultsBlock() {
       return;
     }
 
-    resultsInfoText.textContent = "";
+    setResultsStatus("");
     resultsSheetFrame.src = "about:blank";
     resultsSheetFrame.srcdoc = buildResultsSummaryDoc(data.title, responses, { scoringReady });
 
@@ -4609,7 +4751,7 @@ async function renderResultsBlock() {
       "";
 
     if (fallbackSheetUrl) {
-      resultsInfoText.textContent = "";
+      setResultsStatus("");
       resultsSheetFrame.src = "about:blank";
       resultsSheetFrame.srcdoc = `
         <html>
@@ -4627,7 +4769,7 @@ async function renderResultsBlock() {
       return;
     }
 
-    resultsInfoText.textContent = "";
+    setResultsStatus("");
     resultsSheetFrame.src = "about:blank";
     resultsSheetFrame.srcdoc = "";
     openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
@@ -4678,7 +4820,7 @@ async function openResultsSheetDirect() {
       return;
     }
 
-    resultsInfoText.textContent = "";
+    setResultsStatus("");
     window.open(sheetUrl, "_blank", "noopener");
     openResultsSheetBtn.disabled = false;
     downloadResultsBtn.disabled = false;
@@ -6534,6 +6676,16 @@ if (authOpenBtn) {
   });
 }
 
+if (authLanguageSwitch) {
+  authLanguageSwitch.addEventListener("change", async () => {
+    const nextRole = SUPPORTED_ROLES.includes(authLanguageSwitch.value) ? authLanguageSwitch.value : "kaz";
+    if (nextRole === selectedRole) return;
+
+    selectedRole = nextRole;
+    await refreshInterfaceLanguage({ roleChanged: true });
+  });
+}
+
 if (authGoogleBtn) {
   authGoogleBtn.addEventListener("click", async () => {
     if (isAuthSubmitting) return;
@@ -6848,7 +7000,7 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
     });
 
     upsertSelectedSubjectMaterial(updatedMaterial);
-    setSlidesStatus(t("slidesReady", { title: updatedMaterial.title || currentMaterial.title }));
+    setSlidesStatus("");
     renderSlidesPreview();
     saveTeacherAppState();
   } catch (error) {
@@ -6897,7 +7049,7 @@ async function resetSlidesForSelectedMaterial() {
     updateActionButtonsState();
     renderSlidesPreview();
     if (resetCompleted) {
-      setSlidesStatus(t("slidesSettingsReady"));
+      setSlidesStatus("");
     }
   }
 }
@@ -7982,6 +8134,7 @@ document.querySelectorAll("[data-close-modal]").forEach((btn) => {
 [authModal, profileModal, disciplineModal, testModal, qrModal, playerDetailModal].forEach(modal => {
   if (!modal) return;
   modal.addEventListener("click", (e) => {
+    if (modal === authModal && shouldShowAuthGate()) return;
     if (e.target === modal) closeModal(modal);
   });
 });
@@ -8022,7 +8175,14 @@ async function bootstrapApp() {
   }
 
   handleDriveReturnParams();
-  await loadDriveStatus();
+  const status = await loadDriveStatus();
+
+  if (!status.connected) {
+    coursesData = [];
+    if (courseGrid) courseGrid.innerHTML = "";
+    return;
+  }
+
   await loadCoursesFromApi();
   initSpeechRecognition();
   setVoiceState("idle", t("voiceReady"));

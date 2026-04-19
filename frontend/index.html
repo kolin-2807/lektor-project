@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>iLector</title>
-  <link rel="stylesheet" href="./css/style.css?v=20260418-124" />
+  <link rel="stylesheet" href="./css/style.css?v=20260419-027" />
 </head>
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
@@ -121,7 +121,10 @@
           <!-- ЖОҒАРЫҒА КӨТЕРІЛГЕН SUBJECT HEADER -->
           <div class="subject-cover-top" id="subjectCoverTop">
             <div class="subject-cover-head">
-              <button class="cover-back-btn" id="backBtn" type="button">Артқа</button>
+              <div class="subject-cover-left">
+                <button class="cover-back-btn" id="backBtn" type="button">Артқа</button>
+                <div class="subject-course-banner-badge" id="subjectCourseBannerBadge">3 курс</div>
+              </div>
 
               <button class="subject-manage-toggle" id="toggleMaterialManagerBtn" type="button">Материал жүктеу</button>
             </div>
@@ -132,9 +135,6 @@
                 <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration"></div>
               </div>
             </div>
-
-            <div class="subject-course-banner-badge" id="subjectCourseBannerBadge">3 курс</div>
-
             <div class="subject-cover-copy">
               <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
               <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
@@ -254,16 +254,16 @@
 
               <!-- MATERIAL VIEW -->
               <div class="content-view active" id="materialsPane">
-                <div class="content-view-head">
-                  <div></div>
+                <div class="material-preview-wrap">
+                  <div class="material-preview" id="materialPreview"></div>
+                </div>
 
+                <div class="content-footer-bar">
+                  <div class="content-footer-type" id="materialFooterType"></div>
+                  <div class="content-footer-title" id="materialFooterTitle"></div>
                   <div class="content-view-actions">
                     <button class="small-btn" id="openMaterialFullscreenBtn" type="button">Толық экран</button>
                   </div>
-                </div>
-
-                <div class="material-preview-wrap">
-                  <div class="material-preview" id="materialPreview"></div>
                 </div>
 
                 <input class="hidden-file" id="singleMaterialUploadInput" type="file" />
@@ -271,11 +271,11 @@
               </div>
 
               <div class="content-view hidden" id="slidesPane">
-                <div class="content-view-head slides-view-head">
-                  <div class="slides-view-copy">
-                    <p class="slides-view-status" id="slidesStatusText"></p>
-                  </div>
+                <div class="slides-preview-wrap" id="slidesPreview"></div>
 
+                <div class="content-footer-bar">
+                  <div class="content-footer-type" id="slidesFooterType"></div>
+                  <div class="content-footer-title" id="slidesFooterTitle"></div>
                   <div class="content-view-actions">
                     <button class="small-btn" id="openSlidesFullscreenBtn" type="button">Толық экран</button>
                     <button class="small-btn primary" id="downloadSlidesBtn" type="button">Жүктеп алу</button>
@@ -283,7 +283,7 @@
                   </div>
                 </div>
 
-                <div class="slides-preview-wrap" id="slidesPreview"></div>
+                <p class="slides-view-status" id="slidesStatusText"></p>
               </div>
 
               <!-- TEST VIEW -->
@@ -384,24 +384,24 @@
 
               <!-- RESULTS VIEW -->
               <div class="content-view hidden" id="resultsPane">
-                <div class="content-view-head">
-                  <div>
-                    <p class="results-view-status" id="resultsInfoText"></p>
-                  </div>
-
-                  <div class="content-view-actions">
-                    <button class="small-btn" id="openResultsSheetBtn" type="button">Google Sheets-та ашу</button>
-                    <button class="small-btn primary" id="downloadResultsBtn" type="button">Жүктеп алу</button>
-                  </div>
-                </div>
+                <p class="results-view-status hidden" id="resultsInfoText"></p>
 
                 <div class="results-sheet-wrap">
                   <iframe
                     id="resultsSheetFrame"
                     title="Test results sheet"
                     src=""
-                    style="width:100%;min-height:720px;border:0;border-radius:24px;background:#fff;"
+                    style="width:100%;min-height:720px;border:0;border-radius:10px;background:#fff;"
                   ></iframe>
+                </div>
+
+                <div class="content-footer-bar">
+                  <div class="content-footer-type" id="resultsFooterType">Нәтижелер</div>
+                  <div class="content-footer-title" id="resultsFooterTitle"></div>
+                  <div class="content-view-actions">
+                    <button class="small-btn" id="openResultsSheetBtn" type="button">Google Sheets-та ашу</button>
+                    <button class="small-btn primary" id="downloadResultsBtn" type="button">Жүктеп алу</button>
+                  </div>
                 </div>
               </div>
 
@@ -490,9 +490,12 @@
         <button class="auth-modal-close" data-close-modal="authModal" type="button" aria-label="Жабу">×</button>
 
         <div class="auth-modal-copy">
-          <div class="auth-modal-brand">
-            <img class="auth-modal-logo" src="./assets/images/Satabayev_University_logo.png?v=20260408-01" alt="Satbayev University logo" />
-            <strong>iLector</strong>
+          <div class="auth-modal-head">
+            <div class="auth-modal-brand">
+              <img class="auth-modal-logo" src="./assets/images/Satabayev_University_logo.png?v=20260408-01" alt="Satbayev University logo" />
+              <strong>iLector</strong>
+            </div>
+            <select class="auth-language-switch" id="authLanguageSwitch" aria-label="Тіл таңдау"></select>
           </div>
           <h2 id="authModalTitle">Авторизациялану</h2>
           <div class="auth-modal-text" id="authModalText">
@@ -625,6 +628,6 @@
     </div>
   </div>
 
-  <script src="./js/app.js?v=20260418-120"></script>
+    <script src="./js/app.js?v=20260419-027"></script>
 </body>
 </html>
