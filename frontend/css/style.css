@@ -6026,6 +6026,17 @@ body::after {
     word-break: keep-all;
   }
 
+  .role-title-btn,
+  .role-title-btn *,
+  #brandRoleTitle {
+    min-width: max-content !important;
+    max-width: none !important;
+    overflow-wrap: normal !important;
+    text-align: left !important;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+  }
+
   .topbar-right {
     flex: 0 0 auto;
     width: auto;
