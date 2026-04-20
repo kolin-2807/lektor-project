@@ -5990,9 +5990,14 @@ body::after {
   }
 
   .brand {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: max-content;
     gap: 6px;
+  }
+
+  .brand-text {
+    flex: 0 0 auto;
+    min-width: max-content;
   }
 
   .brand-logo {
@@ -6002,16 +6007,23 @@ body::after {
 
   .role-title-btn {
     min-height: 34px;
+    min-width: max-content;
     max-width: 100%;
+    flex: 0 0 auto;
     gap: 4px;
     font-size: 17px;
     line-height: 1;
+    overflow-wrap: normal;
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   #brandRoleTitle {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    overflow-wrap: normal;
+    text-overflow: clip;
     white-space: nowrap;
+    word-break: keep-all;
   }
 
   .topbar-right {
@@ -6189,6 +6201,24 @@ body::after {
 
   .voice-toolbar {
     gap: 8px;
+  }
+
+  .voice-windows {
+    position: fixed;
+    right: 116px;
+    bottom: 12px;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 6px;
+    max-width: calc(100vw - 128px);
+    max-height: min(246px, calc(100dvh - 120px));
+    pointer-events: none;
+  }
+
+  .voice-panel,
+  .voice-help-panel {
+    pointer-events: auto;
   }
 
   .voice-dock,
