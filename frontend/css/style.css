@@ -6436,6 +6436,13 @@ body::after {
   body:has(#subjectView:not(.hidden)) .topbar-inner {
     min-height: 52px;
     padding: 5px 12px;
+    gap: 8px;
+  }
+
+  body:has(#subjectView:not(.hidden)) .brand,
+  body:has(#subjectView:not(.hidden)) .brand-text {
+    flex: 0 0 auto;
+    min-width: max-content;
   }
 
   body:has(#subjectView:not(.hidden)) .brand-logo {
@@ -6445,7 +6452,37 @@ body::after {
 
   body:has(#subjectView:not(.hidden)) .role-title-btn {
     min-height: 30px;
-    font-size: 15px;
+    min-width: max-content;
+    max-width: none;
+    flex: 0 0 auto;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+
+  body:has(#subjectView:not(.hidden)) #brandRoleTitle {
+    overflow: visible;
+    overflow-wrap: normal;
+    text-overflow: clip;
+    white-space: nowrap;
+    word-break: keep-all;
+  }
+
+  body:has(#subjectView:not(.hidden)) .role-menu {
+    min-width: 118px;
+  }
+
+  body:has(#subjectView:not(.hidden)) .role-menu-item {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 12px;
+    line-height: 1;
+    overflow-wrap: normal;
+    text-align: left;
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   body:has(#subjectView:not(.hidden)) .profile-avatar-btn {
@@ -6512,7 +6549,8 @@ body::after {
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .material-control-family {
-    gap: 5px;
+    grid-template-columns: minmax(58px, 0.72fr) minmax(54px, 0.58fr) minmax(0, 1fr) minmax(74px, 0.68fr);
+    gap: 4px;
     padding: 5px;
     border-radius: 8px;
   }
@@ -6571,13 +6609,13 @@ body::after {
 
   body:has(#subjectView:not(.hidden)) #subjectView .control-select-card select {
     height: 30px;
-    padding: 0 7px;
+    padding: 0 5px;
     border-radius: 7px;
-    font-size: 10.5px;
+    font-size: 10px;
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .control-actions-row {
-    grid-template-columns: minmax(0, 0.68fr) minmax(0, 1.32fr);
+    grid-template-columns: minmax(82px, 0.42fr) minmax(0, 1fr);
     gap: 10px;
   }
 
@@ -6592,7 +6630,9 @@ body::after {
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .test-action-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-rows: 10px 30px;
+    column-gap: 4px;
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .control-action-group-title {
@@ -6607,21 +6647,43 @@ body::after {
   body:has(#subjectView:not(.hidden)) #subjectView .material-control-family .action-btn,
   body:has(#subjectView:not(.hidden)) #subjectView .control-actions-row .action-btn {
     min-height: 30px;
-    padding: 0 6px;
+    padding: 0 4px;
     border-radius: 7px;
-    gap: 4px;
+    gap: 3px;
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .subject-control-panel .action-btn .action-btn-icon,
   body:has(#subjectView:not(.hidden)) #subjectView .subject-control-panel .action-btn .action-btn-icon svg {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .subject-control-panel .action-btn .action-btn-label,
   body:has(#subjectView:not(.hidden)) #subjectView #openQrBtn .action-btn-label,
   body:has(#subjectView:not(.hidden)) #subjectView #openResultsBtn .action-btn-label {
-    font-size: 9.5px;
+    font-size: 8.5px;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView .material-control-family .action-btn .action-btn-label,
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn .action-btn-label {
+    white-space: nowrap;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView .material-action-group {
+    min-width: 74px;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn {
+    min-width: 0;
+    padding: 0 5px;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn .action-btn-label {
+    font-size: 8.5px;
+    overflow: visible;
+    text-overflow: clip;
   }
 
   body:has(#subjectView:not(.hidden)) #subjectView .subject-content-board {
@@ -7393,14 +7455,10 @@ body::after {
     border-radius: 8px;
   }
 
-  #subjectView .material-action-group,
-  body:has(#subjectView:not(.hidden)) #subjectView .material-action-group {
-    grid-column: 1 / -1;
-  }
-
   #subjectView .control-actions-row,
   body:has(#subjectView:not(.hidden)) #subjectView .control-actions-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(82px, 0.42fr) minmax(0, 1fr);
+    gap: 10px;
   }
 
   #subjectView .presentation-action-group,
@@ -7413,11 +7471,30 @@ body::after {
 
   #subjectView .test-action-group,
   body:has(#subjectView:not(.hidden)) #subjectView .test-action-group {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 380px) {
+  body:has(#subjectView:not(.hidden)) #subjectView .material-action-group {
+    min-width: 68px;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn {
+    padding: 0 4px;
+    gap: 2px;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn .action-btn-icon,
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn .action-btn-icon svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  body:has(#subjectView:not(.hidden)) #subjectView #openMaterialBtn .action-btn-label {
+    font-size: 8px;
+  }
+
   .course-grid {
     gap: 10px;
   }
