@@ -163,6 +163,7 @@ def _clear_material_slides(material):
     material.slides_embed_url = ""
     material.slides_download_url = ""
     material.slides_count = 0
+    material.slides_template_id = "ilector-academic"
 
 
 def _is_not_found_drive_error(exc) -> bool:
@@ -472,11 +473,43 @@ def generate_material_slides(request, material_id):
         return Response({"detail": "Slides are available only for lecture materials."}, status=400)
 
     requested_total_slide_count = _parse_total_slide_count(request.data.get("slide_count"), default=7)
+    requested_template_id = str(request.data.get("template_id") or "ilector-academic").strip()
+    if requested_template_id not in {"ilector-academic", "ilector-minimal", "ilector-focus"}:
+        requested_template_id = "ilector-academic"
 
-    if material.slides_presentation_id and material.slides_url and material.slides_embed_url:
+    has_existing_slides = bool(material.slides_presentation_id and material.slides_url and material.slides_embed_url)
+    if has_existing_slides and material.slides_count == requested_total_slide_count:
+        should_update_template = (
+            material.slides_template_id != requested_template_id
+            or requested_template_id in {"ilector-academic", "ilector-focus", "ilector-minimal"}
+        )
+        if should_update_template:
+            try:
+                from .google_slides_service import update_presentation_template
+
+                language = _resolve_material_language(request, material)
+                update_presentation_template(
+                    connection=connection,
+                    presentation_id=material.slides_presentation_id,
+                    total_slide_count=requested_total_slide_count,
+                    template_id=requested_template_id,
+                    language=language,
+                )
+                material.slides_template_id = requested_template_id
+                material.save(update_fields=["slides_template_id"])
+            except Exception as exc:
+                return Response(
+                    {"detail": _format_google_api_error(exc, "Slide template update failed")},
+                    status=503,
+                )
+
+        return Response(MaterialSerializer(material).data)
+
+    if has_existing_slides:
         if not material.slides_count:
             material.slides_count = requested_total_slide_count
-            material.save(update_fields=["slides_count"])
+            material.slides_template_id = requested_template_id
+            material.save(update_fields=["slides_count", "slides_template_id"])
         return Response(MaterialSerializer(material).data)
 
     language = _resolve_material_language(request, material)
@@ -520,6 +553,7 @@ def generate_material_slides(request, material_id):
             slides=content_slides,
             folder_id=slides_folder_id,
             language=language,
+            template_id=requested_template_id,
         )
 
         material.slides_presentation_id = presentation_meta.get("presentation_id", "")
@@ -527,6 +561,7 @@ def generate_material_slides(request, material_id):
         material.slides_embed_url = presentation_meta.get("slides_embed_url", "")
         material.slides_download_url = presentation_meta.get("slides_download_url", "")
         material.slides_count = requested_total_slide_count
+        material.slides_template_id = requested_template_id
         material.save(
             update_fields=[
                 "slides_presentation_id",
@@ -534,6 +569,7 @@ def generate_material_slides(request, material_id):
                 "slides_embed_url",
                 "slides_download_url",
                 "slides_count",
+                "slides_template_id",
             ]
         )
     except GeminiServiceError as exc:
@@ -575,6 +611,7 @@ def reset_material_slides(request, material_id):
             "slides_embed_url",
             "slides_download_url",
             "slides_count",
+            "slides_template_id",
         ]
     )
     return Response(MaterialSerializer(material).data)

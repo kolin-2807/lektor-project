@@ -369,11 +369,17 @@ Object.assign(UI_TEXT.kaz, {
   slidesOpen: "Слайдты ашу",
   downloadSlides: "Жүктеп алу",
   regenerateSlides: "Қайта жасау",
+  updateSlides: "Жаңарту",
   buildSlides: "Презентация дайындау",
   slidesSettingsTitle: "Слайд параметрлері",
   slidesCountLabel: "Слайд саны",
   slidesCountHint: "Дайын презентациядағы жалпы слайд саны",
   slidesCountUnit: "слайд",
+  slidesTemplateLabel: "Шаблон",
+  slidesTemplateHint: "Презентацияның визуалды стилі",
+  slidesTemplateClassic: "Академиялық шаблон",
+  slidesTemplateMinimal: "Корпоративтік шаблон",
+  slidesTemplateFocus: "Минималистік шаблон",
   slidesReadyMeta: ({ count, subject }) => `${count} слайд · ${subject}`,
   slidesResetting: "Презентация өшіріліп жатыр...",
   slidesResettingTitle: "Презентация жаңартылуға дайындалып жатыр",
@@ -381,6 +387,7 @@ Object.assign(UI_TEXT.kaz, {
   slidesSettingsReady: "Слайд параметрлері ашылды.",
   slidesError: "Слайд жасау кезінде қате шықты.",
   slidesDownloadUnavailable: "Презентацияны жүктеу сілтемесі әлі дайын емес.",
+  slidesCountChangeUnavailable: "Дайын презентацияда әзірге тек шаблонды жаңартуға болады. Слайд санын өзгертсеңіз, презентацияны толық қайта жасау керек.",
 });
 
 Object.assign(UI_TEXT.rus, {
@@ -396,11 +403,17 @@ Object.assign(UI_TEXT.rus, {
   slidesOpen: "Открыть слайды",
   downloadSlides: "Скачать",
   regenerateSlides: "Пересоздать",
+  updateSlides: "Обновить",
   buildSlides: "Подготовить презентацию",
   slidesSettingsTitle: "Параметры слайдов",
   slidesCountLabel: "Количество слайдов",
   slidesCountHint: "Общее число слайдов в готовой презентации",
   slidesCountUnit: "слайдов",
+  slidesTemplateLabel: "Шаблон",
+  slidesTemplateHint: "Визуальный стиль презентации",
+  slidesTemplateClassic: "Академический шаблон",
+  slidesTemplateMinimal: "Корпоративный шаблон",
+  slidesTemplateFocus: "Минималистский шаблон",
   slidesReadyMeta: ({ count, subject }) => `${count} слайдов · ${subject}`,
   slidesResetting: "Презентация удаляется...",
   slidesResettingTitle: "Готовим презентацию к пересозданию",
@@ -408,6 +421,7 @@ Object.assign(UI_TEXT.rus, {
   slidesSettingsReady: "Параметры слайдов открыты.",
   slidesError: "Произошла ошибка при создании презентации.",
   slidesDownloadUnavailable: "Ссылка на скачивание презентации пока не готова.",
+  slidesCountChangeUnavailable: "Для готовой презентации пока можно обновить только шаблон. Изменение количества слайдов требует полного пересоздания.",
 });
 
 Object.assign(UI_TEXT.kaz, {
@@ -601,11 +615,17 @@ UI_TEXT.eng = {
   slidesOpen: "Open slides",
   downloadSlides: "Download",
   regenerateSlides: "Regenerate",
+  updateSlides: "Update",
   buildSlides: "Prepare presentation",
   slidesSettingsTitle: "Slide settings",
   slidesCountLabel: "Slide count",
   slidesCountHint: "Total number of slides in the final presentation",
   slidesCountUnit: "slides",
+  slidesTemplateLabel: "Template",
+  slidesTemplateHint: "Presentation visual style",
+  slidesTemplateClassic: "Academic template",
+  slidesTemplateMinimal: "Corporate template",
+  slidesTemplateFocus: "Minimalist template",
   slidesReadyMeta: ({ count, subject }) => `${count} slides · ${subject}`,
   slidesResetting: "Removing the presentation...",
   slidesResettingTitle: "Preparing to regenerate the presentation",
@@ -613,6 +633,7 @@ UI_TEXT.eng = {
   slidesSettingsReady: "Slide settings are open.",
   slidesError: "An error occurred while creating slides.",
   slidesDownloadUnavailable: "The presentation download link is not ready yet.",
+  slidesCountChangeUnavailable: "For an existing presentation, only the template can be updated for now. Changing slide count requires a full rebuild.",
   homeLogo: "Go to home page",
   voiceAssistantLabel: "Ayla",
   voiceHelpLabel: "Quick help",
@@ -883,6 +904,7 @@ const publicTestSubmitBtn = document.getElementById("publicTestSubmitBtn");
 const publicTestResultCard = document.getElementById("publicTestResultCard");
 
 const TEST_SAVE_FEEDBACK_WINDOW_MS = 2200;
+const SLIDE_TEMPLATE_IDS = ["ilector-academic", "ilector-minimal", "ilector-focus"];
 
 let recognition = null;
 let isListening = false;
@@ -905,10 +927,12 @@ let testConfig = {
 };
 let slidesConfig = {
   slideCount: 7,
+  templateId: "ilector-academic",
 };
 let isTestGenerating = false;
 let isSlidesGenerating = false;
 let isSlidesResetting = false;
+let isSlidesSettingsOpen = false;
 let slidesErrorMessage = "";
 let appStateRestoreDone = false;
 let publicTestSessionToken = new URLSearchParams(window.location.search).get("session");
@@ -1219,7 +1243,7 @@ function applyStaticTranslations() {
   if (openMaterialFullscreenBtn) openMaterialFullscreenBtn.textContent = t("fullscreen");
   if (openSlidesFullscreenBtn) openSlidesFullscreenBtn.textContent = t("fullscreen");
   if (downloadSlidesBtn) downloadSlidesBtn.textContent = t("downloadSlides");
-  if (regenerateSlidesBtn) regenerateSlidesBtn.textContent = t("regenerateSlides");
+  if (regenerateSlidesBtn) regenerateSlidesBtn.textContent = t("updateSlides");
   if (openResultsSheetBtn) openResultsSheetBtn.textContent = t("openResultsSheet");
   if (downloadResultsBtn) downloadResultsBtn.textContent = t("downloadResults");
   if (qrCodeLabel) qrCodeLabel.textContent = t("qrJoin");
@@ -1463,16 +1487,25 @@ function clampTestConfig(questionCount, durationMinutes) {
   };
 }
 
-function clampSlidesConfig(slideCount) {
-  const parsedSlideCount = Number.parseInt(String(slideCount ?? "").trim(), 10);
+function clampSlidesConfig(value) {
+  const source = typeof value === "object" && value !== null ? value : { slideCount: value };
+  const parsedSlideCount = Number.parseInt(String(source.slideCount ?? "").trim(), 10);
+  const templateId = SLIDE_TEMPLATE_IDS.includes(source.templateId) ? source.templateId : "ilector-academic";
+
   return {
     slideCount: Math.max(4, Math.min(Number.isFinite(parsedSlideCount) ? parsedSlideCount : 7, 12)),
+    templateId,
   };
 }
 
 function getDraftSlidesConfig() {
   const input = document.getElementById("slidesCountInput");
-  return clampSlidesConfig(input?.value ?? slidesConfig.slideCount);
+  const selectedTemplate = document.querySelector('input[name="slidesTemplate"]:checked')?.value || slidesConfig.templateId;
+
+  return clampSlidesConfig({
+    slideCount: input?.value ?? slidesConfig.slideCount,
+    templateId: selectedTemplate,
+  });
 }
 
 function syncSlidesConfigInput() {
@@ -1500,11 +1533,11 @@ function loadStoredSlidesConfig() {
     const raw = localStorage.getItem(SLIDES_CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      slidesConfig = clampSlidesConfig(parsed?.slideCount);
+      slidesConfig = clampSlidesConfig(parsed);
     }
   } catch (error) {
     console.error("Slides config restore error:", error);
-    slidesConfig = clampSlidesConfig(7);
+    slidesConfig = clampSlidesConfig({ slideCount: 7, templateId: "ilector-academic" });
   }
 
   syncSlidesConfigInput();
@@ -1512,6 +1545,18 @@ function loadStoredSlidesConfig() {
 
 function bindSlidesSettingsInput() {
   const slidesCountInput = document.getElementById("slidesCountInput");
+  const templateInputs = Array.from(document.querySelectorAll('input[name="slidesTemplate"]'));
+
+  templateInputs.forEach((input) => {
+    input.addEventListener("change", () => {
+      slidesConfig = getDraftSlidesConfig();
+      saveStoredSlidesConfig();
+      templateInputs.forEach((item) => {
+        item.closest(".slides-template-card")?.classList.toggle("is-selected", item.checked);
+      });
+    });
+  });
+
   if (!slidesCountInput) return;
 
   const normalizeValue = (value) => String(value ?? "").replace(/[^\d]/g, "").slice(0, 2);
@@ -3619,6 +3664,7 @@ function mapMaterialFromApi(item) {
     slidesDownloadUrl: item.slides_download_url || "",
     slidesPresentationId: item.slides_presentation_id || "",
     slidesCount: Number(item.slides_count) || 0,
+    slidesTemplateId: item.slides_template_id || "ilector-academic",
     createdAt: item.created_at || "",
     mimeType: item.mime_type || "",
     originalFilename: item.original_filename || "",
@@ -4258,6 +4304,55 @@ function buildSlidesEmptyCard(title, text, extraClass = "") {
 }
 
 function buildSlidesSettingsCard() {
+  const material = getSelectedMaterial();
+  const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
+  const actionLabel = hasSlides ? t("updateSlides") : t("buildSlides");
+  const templateOptions = [
+    { id: "ilector-academic", label: t("slidesTemplateClassic"), tone: "academic", previewTitle: "Presentation" },
+    { id: "ilector-minimal", label: t("slidesTemplateMinimal"), tone: "minimal", previewTitle: "Presentation" },
+    { id: "ilector-focus", label: t("slidesTemplateFocus"), tone: "focus", previewTitle: "Presentation" },
+  ];
+  const templateCards = templateOptions.map((template) => {
+    const isSelected = slidesConfig.templateId === template.id;
+    const isMinimalistCover = template.id === "ilector-focus";
+    const previewMarkup = isMinimalistCover
+      ? `
+        <span class="slides-template-preview slides-template-cover-preview" aria-hidden="true">
+          <span class="slides-template-cover-line"></span>
+          <strong>Presentation</strong>
+          <small>Presentation</small>
+          <em>iLector</em>
+        </span>
+      `
+      : `
+        <span class="slides-template-preview" aria-hidden="true">
+          <span class="slides-template-preview-top">
+            <span></span>
+          </span>
+          <span class="slides-template-preview-body">
+            <strong>${escapeHtml(template.previewTitle || "")}</strong>
+            <i></i>
+            <i></i>
+            <i></i>
+          </span>
+          <span class="slides-template-preview-footer">iLector</span>
+        </span>
+      `;
+
+    return `
+      <label class="slides-template-card slides-template-${template.tone} ${isSelected ? "is-selected" : ""}">
+        <input
+          type="radio"
+          name="slidesTemplate"
+          value="${escapeHtml(template.id)}"
+          ${isSelected ? "checked" : ""}
+        />
+        ${previewMarkup}
+        <span class="slides-template-name">${escapeHtml(template.label)}</span>
+      </label>
+    `;
+  }).join("");
+
   return `
     <div class="slides-preview-shell">
       <div class="test-settings-panel slides-settings-panel">
@@ -4300,10 +4395,20 @@ function buildSlidesSettingsCard() {
               </label>
 
               <div class="test-settings-cta slides-settings-cta">
-                <button class="small-btn primary" id="buildSlidesBtn" type="button">${escapeHtml(t("buildSlides"))}</button>
+                <button class="small-btn primary" id="buildSlidesBtn" type="button">${escapeHtml(actionLabel)}</button>
               </div>
             </div>
 
+            <div class="slides-template-section">
+              <div class="slides-template-copy">
+                <span class="test-settings-field-label">${escapeHtml(t("slidesTemplateLabel"))}</span>
+                <span class="test-settings-field-note">${escapeHtml(t("slidesTemplateHint"))}</span>
+              </div>
+
+              <div class="slides-template-list">
+                ${templateCards}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -4380,7 +4485,7 @@ function renderSlidesPreview() {
     return;
   }
 
-  if (!hasSlides) {
+  if (!hasSlides || isSlidesSettingsOpen) {
     setSlidesStatus(slidesErrorMessage || "", slidesErrorMessage ? "error" : "neutral");
     slidesPreview.innerHTML = buildSlidesSettingsCard();
     bindSlidesSettingsInput();
@@ -4389,7 +4494,7 @@ function renderSlidesPreview() {
     if (buildSlidesBtn) {
       buildSlidesBtn.disabled = isSlidesBusy();
       buildSlidesBtn.addEventListener("click", () => {
-        generateSlidesForSelectedMaterial();
+        generateSlidesForSelectedMaterial({ force: hasSlides });
       });
     }
     return;
@@ -7593,10 +7698,23 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
   }
 
   const nextSlidesConfig = slideCount != null
-    ? clampSlidesConfig(slideCount)
+    ? clampSlidesConfig({ ...slidesConfig, slideCount })
     : commitSlidesConfigFromInput({ persist: true });
   slidesConfig = nextSlidesConfig;
   saveStoredSlidesConfig();
+
+  if (
+    force &&
+    (currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl) &&
+    currentMaterial.slidesCount &&
+    currentMaterial.slidesCount !== slidesConfig.slideCount
+  ) {
+    slidesErrorMessage = t("slidesCountChangeUnavailable");
+    isSlidesSettingsOpen = true;
+    renderSlidesPreview();
+    return;
+  }
+
   slidesErrorMessage = "";
   isSlidesGenerating = true;
   updateActionButtonsState();
@@ -7611,10 +7729,12 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
       body: JSON.stringify({
         language: selectedRole,
         slide_count: slidesConfig.slideCount,
+        template_id: slidesConfig.templateId,
       })
     });
 
     upsertSelectedSubjectMaterial(updatedMaterial);
+    isSlidesSettingsOpen = false;
     setSlidesStatus("");
     renderSlidesPreview();
     saveTeacherAppState();
@@ -7630,7 +7750,6 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
 
 async function resetSlidesForSelectedMaterial() {
   const currentMaterial = getSelectedMaterial();
-  let resetCompleted = false;
 
   switchSubjectPanel("slides");
 
@@ -7640,33 +7759,13 @@ async function resetSlidesForSelectedMaterial() {
   }
 
   slidesErrorMessage = "";
-  isSlidesResetting = true;
+  slidesConfig = clampSlidesConfig({
+    slideCount: currentMaterial.slidesCount || slidesConfig.slideCount,
+    templateId: currentMaterial.slidesTemplateId || slidesConfig.templateId,
+  });
+  isSlidesSettingsOpen = true;
   updateActionButtonsState();
   renderSlidesPreview();
-
-  try {
-    const updatedMaterial = await fetchJSON(`${API_BASE}/materials/${currentMaterial.id}/reset-slides/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({}),
-    });
-
-    upsertSelectedSubjectMaterial(updatedMaterial);
-    resetCompleted = true;
-    saveTeacherAppState();
-  } catch (error) {
-    console.error("SLIDES RESET ERROR:", error);
-    slidesErrorMessage = error?.message || t("slidesError");
-  } finally {
-    isSlidesResetting = false;
-    updateActionButtonsState();
-    renderSlidesPreview();
-    if (resetCompleted) {
-      setSlidesStatus("");
-    }
-  }
 }
 
 function setTestPanelInfo(message = "", state = "neutral") {

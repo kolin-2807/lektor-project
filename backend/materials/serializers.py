@@ -23,6 +23,7 @@ class MaterialSerializer(serializers.ModelSerializer):
             "slides_embed_url",
             "slides_download_url",
             "slides_count",
+            "slides_template_id",
             "drive_file_id",
             "drive_folder_id",
             "mime_type",

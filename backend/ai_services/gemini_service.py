@@ -743,20 +743,60 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
     normalized_slides = []
 
     for item in raw_slides[:safe_slide_count]:
-        title = " ".join(str((item or {}).get("title") or "").split())
+        raw_item = item or {}
+        title = " ".join(str(raw_item.get("title") or "").split())
         bullets = [
             " ".join(str(bullet or "").split())[:240]
-            for bullet in ((item or {}).get("bullets") or [])
+            for bullet in (raw_item.get("bullets") or [])
             if str(bullet or "").strip()
         ]
+        layout_type = str(raw_item.get("layout_type") or "numbered_list").strip().lower()
+        if layout_type not in {"numbered_list", "roadmap", "table"}:
+            layout_type = "numbered_list"
+
+        table = raw_item.get("table") if isinstance(raw_item.get("table"), dict) else {}
+        table_columns = [
+            " ".join(str(column or "").split())[:80]
+            for column in (table.get("columns") or [])
+            if str(column or "").strip()
+        ][:4]
+        table_rows = []
+        for row in (table.get("rows") or [])[:5]:
+            if not isinstance(row, list):
+                continue
+            cells = [
+                " ".join(str(cell or "").split())[:120]
+                for cell in row
+                if str(cell or "").strip()
+            ][:4]
+            if cells:
+                table_rows.append(cells)
+
+        roadmap_items = [
+            " ".join(str(item_text or "").split())[:140]
+            for item_text in (raw_item.get("roadmap_items") or [])
+            if str(item_text or "").strip()
+        ][:4]
 
         if not title or len(bullets) < 3:
             raise ValueError("Each generated slide must have a title and at least 3 bullets.")
 
-        normalized_slides.append({
+        normalized_slide = {
             "title": title[:160],
             "bullets": bullets[:5],
-        })
+            "layout_type": layout_type,
+        }
+
+        if layout_type == "table" and len(table_columns) >= 2 and table_rows:
+            normalized_slide["table"] = {
+                "columns": table_columns,
+                "rows": table_rows,
+            }
+
+        if layout_type == "roadmap" and len(roadmap_items) >= 3:
+            normalized_slide["roadmap_items"] = roadmap_items
+
+        normalized_slides.append(normalized_slide)
 
     if len(normalized_slides) != safe_slide_count:
         raise ValueError("AI slide generator returned incomplete slides.")
@@ -826,14 +866,22 @@ Required JSON format:
 {{
   "presentation_title": "Presentation title",
   "presentation_subtitle": "Short subtitle",
-  "slides": [
+    "slides": [
     {{
       "title": "Slide title",
+      "layout_type": "numbered_list",
       "bullets": [
         "Bullet 1",
         "Bullet 2",
         "Bullet 3"
-      ]
+      ],
+      "roadmap_items": ["Phase 1", "Phase 2", "Phase 3", "Phase 4"],
+      "table": {{
+        "columns": ["Feature", "Option A", "Option B"],
+        "rows": [
+          ["Criterion 1", "Value", "Value"]
+        ]
+      }}
     }}
   ]
 }}
@@ -844,6 +892,13 @@ Rules:
 - Do not create a title slide, agenda slide, or thank-you slide inside the JSON
 - All titles and bullets must be in {target_language}
 - Each slide must have 3 to 5 concise but meaningful bullets
+- Choose one layout_type for every slide:
+  - "numbered_list" for definitions, problems, reasons, steps, or key points
+  - "roadmap" only when the material clearly describes phases, sequence, stages, workflow, timeline, or process
+  - "table" only when the material clearly compares categories, options, features, pros/cons, or metrics
+- For roadmap slides, include 3 to 4 roadmap_items. Also keep bullets.
+- For table slides, include 2 to 4 columns and 2 to 5 rows. Also keep bullets.
+- Do not force roadmap or table when the material does not clearly need them
 - Avoid generic filler, vague phrases, and repeated wording
 - Organize slides from concept introduction to key takeaways
 - Make each slide cover a distinct idea or section from the material
