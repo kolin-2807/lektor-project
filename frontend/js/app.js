@@ -161,7 +161,7 @@ const UI_TEXT = {
     bio: "Био",
     sheetFrameTitle: "Тест нәтижелері",
     authLogin: "Кіру",
-    authModalTitle: "Авторизациялану",
+    authModalTitle: "",
     authModalText: [
       {
         lead: true,
@@ -182,7 +182,7 @@ const UI_TEXT = {
     ],
     authGoogle: "Google арқылы жалғастыру",
     authGooglePending: "Google-ға өту...",
-    authModalNote: "sso.satbayev.university\nCopyright © 2026 \"Ақпараттық жүйелер\" кафедрасы\nIP: 10.7.0.40",
+    authModalNote: "sso.satbayev.university\nCopyright © 2026 \"Ақпараттық жүйелер\" кафедрасы",
     authRequiredHome: "Файлдар мен пәндерді көру үшін алдымен Google арқылы кіріңіз.",
     authRequiredDisciplines: "Пәндер мен материалдар кіргеннен кейін ашылады.",
     authRequiredAction: "Алдымен жүйеге Google арқылы кіріңіз.",
@@ -303,7 +303,7 @@ const UI_TEXT = {
     bio: "Био",
     sheetFrameTitle: "Результаты теста",
     authLogin: "Войти",
-    authModalTitle: "Авторизация",
+    authModalTitle: "",
     authModalText: [
       {
         lead: true,
@@ -324,7 +324,7 @@ const UI_TEXT = {
     ],
     authGoogle: "Продолжить с Google",
     authGooglePending: "Переход в Google...",
-    authModalNote: "sso.satbayev.university\nCopyright © 2026 кафедра \"Информационные системы\"\nIP: 10.7.0.40",
+    authModalNote: "sso.satbayev.university\nCopyright © 2026 кафедра \"Информационные системы\"",
     authRequiredHome: "Чтобы видеть файлы и дисциплины, сначала войдите через Google.",
     authRequiredDisciplines: "Дисциплины и материалы откроются после входа.",
     authRequiredAction: "Сначала войдите в систему через Google.",
@@ -537,7 +537,7 @@ UI_TEXT.eng = {
   bio: "Bio",
   sheetFrameTitle: "Test results",
   authLogin: "Sign in",
-  authModalTitle: "Authorization",
+  authModalTitle: "",
   authModalText: [
     {
       lead: true,
@@ -558,7 +558,7 @@ UI_TEXT.eng = {
   ],
   authGoogle: "Continue with Google",
   authGooglePending: "Opening Google...",
-  authModalNote: "sso.satbayev.university\nCopyright © 2026 Department of Information Systems\nIP: 10.7.0.40",
+  authModalNote: "sso.satbayev.university\nCopyright © 2026 Department of Information Systems",
   authRequiredHome: "Sign in with Google first to view files and subjects.",
   authRequiredDisciplines: "Subjects and materials open after sign-in.",
   authRequiredAction: "Sign in with Google first.",
@@ -801,6 +801,7 @@ const openVoiceBtn = document.getElementById("openVoiceBtn");
 const openVoiceHelpBtn = document.getElementById("openVoiceHelpBtn");
 const closeVoiceBtn = document.getElementById("closeVoiceBtn");
 const closeVoiceHelpBtn = document.getElementById("closeVoiceHelpBtn");
+const voiceAssistant = document.querySelector(".voice-assistant");
 const voicePanel = document.getElementById("voicePanel");
 const voiceHelpPanel = document.getElementById("voiceHelpPanel");
 const voiceCore = document.getElementById("voiceCore");
@@ -817,6 +818,7 @@ const voiceInput = document.getElementById("voiceInput");
 const voiceSendBtn = document.getElementById("voiceSendBtn");
 
 const authModal = document.getElementById("authModal");
+const authVoiceSlot = document.getElementById("authVoiceSlot");
 const authLanguageSwitch = document.getElementById("authLanguageSwitch");
 const authModalTitle = document.getElementById("authModalTitle");
 const authModalText = document.getElementById("authModalText");
@@ -2232,9 +2234,19 @@ function shouldShowAuthGate() {
   return !publicTestSessionToken && !driveConnection.connected;
 }
 
+function syncVoiceAssistantPlacement(isAuthGateOpen) {
+  if (!voiceAssistant) return;
+
+  const target = isAuthGateOpen && authVoiceSlot ? authVoiceSlot : document.body;
+  if (voiceAssistant.parentElement !== target) {
+    target.appendChild(voiceAssistant);
+  }
+}
+
 function applyAuthGateState() {
   const isAuthGateOpen = shouldShowAuthGate();
   document.body.classList.toggle("auth-gate-mode", isAuthGateOpen);
+  syncVoiceAssistantPlacement(isAuthGateOpen);
 
   if (isAuthGateOpen) {
     openModal(authModal);
@@ -4450,12 +4462,20 @@ function convertGoogleSheetToEmbed(url) {
 }
 
 function buildGoogleSheetDownloadUrl(url, format = "xlsx") {
-  if (!url) return "";
+  const safeUrl = normalizeGoogleSheetUrl(url);
+  if (!safeUrl) return "";
 
-  const matched = String(url).match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const matched = safeUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   if (!matched?.[1]) return "";
 
   return `https://docs.google.com/spreadsheets/d/${matched[1]}/export?format=${encodeURIComponent(format)}`;
+}
+
+function normalizeGoogleSheetUrl(url) {
+  const rawUrl = String(url || "").trim();
+  const matched = rawUrl.match(/https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!matched?.[1]) return "";
+  return `https://docs.google.com/spreadsheets/d/${matched[1]}/edit`;
 }
 
 function buildResultsSummaryDoc(title, responses = [], options = {}) {
@@ -4512,9 +4532,9 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
 
   const summaryNote = !scoringReady
     ? `
-      <div style="padding:16px 18px;border-radius:18px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;line-height:1.55;">
-        <div style="font-weight:800;margin-bottom:6px;">${escapeHtml(t("resultsScoringMissing"))}</div>
-        <div style="font-size:14px;">${escapeHtml(t("resultsRegenerateHint"))}</div>
+      <div class="summary-note">
+        <div class="summary-note-title">${escapeHtml(t("resultsScoringMissing"))}</div>
+        <div class="summary-note-text">${escapeHtml(t("resultsRegenerateHint"))}</div>
       </div>
     `
     : "";
@@ -4526,60 +4546,252 @@ function buildResultsSummaryDoc(title, responses = [], options = {}) {
 
     return `
       <tr>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#475569;">${index + 1}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:700;">${escapeHtml(response.student_name || t("nameMissing"))}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;">
-          <span style="display:inline-flex;align-items:center;justify-content:center;min-width:88px;height:34px;padding:0 14px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-weight:800;">${scoreLabel}</span>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(response.student_name || t("nameMissing"))}</td>
+        <td>
+          <span class="score-pill">${scoreLabel}</span>
         </td>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#0f172a;font-weight:700;">${percentLabel}</td>
-        <td style="padding:14px 16px;border-bottom:1px solid #e2e8f0;color:#475569;">${escapeHtml(submittedAt)}</td>
+        <td>${percentLabel}</td>
+        <td>${escapeHtml(submittedAt)}</td>
       </tr>
     `;
   }).join("");
 
   return `
     <html>
-      <body style="margin:0;padding:28px;background:#f8fafc;color:#0f172a;font-family:Arial,sans-serif;">
-        <div style="display:grid;gap:16px;">
+      <head>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 22px;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: Arial, sans-serif;
+          }
+          .results-doc { display: grid; gap: 14px; }
+          .results-title {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.15;
+            font-weight: 800;
+          }
+          .summary-note {
+            padding: 16px 18px;
+            border-radius: 14px;
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            color: #9a3412;
+            line-height: 1.55;
+          }
+          .summary-note-title { font-weight: 800; margin-bottom: 6px; }
+          .summary-note-text { font-size: 14px; }
+          .summary-row {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+          }
+          .summary-item {
+            min-width: 0;
+            padding: 16px;
+            border-radius: 10px;
+            background: #ffffff;
+            border: 1px solid #dbe3f0;
+          }
+          .summary-label {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 7px;
+          }
+          .summary-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.15;
+          }
+          .summary-detail {
+            margin-top: 7px;
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 800;
+          }
+          .summary-detail.best { color: #1d4ed8; }
+          .table-wrap {
+            width: 100%;
+            overflow: hidden;
+            border: 1px solid #dbe3f0;
+            border-radius: 16px;
+            background: #ffffff;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          th {
+            padding: 12px 14px;
+            text-align: left;
+            color: #1e3a8a;
+            font-size: 12px;
+            background: #eaf1ff;
+          }
+          td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 700;
+            overflow-wrap: anywhere;
+          }
+          td:first-child { width: 44px; color: #475569; }
+          .score-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 72px;
+            min-height: 30px;
+            padding: 0 12px;
+            border-radius: 999px;
+            background: #dbeafe;
+            color: #1d4ed8;
+            font-weight: 800;
+          }
+          .empty-cell {
+            padding: 24px 12px;
+            text-align: center;
+            color: #64748b;
+            font-weight: 700;
+          }
+          @media (max-width: 640px) {
+            html, body { min-height: 100%; }
+            body { padding: 0; background: #f8fafc; }
+            .results-doc {
+              min-height: 100vh;
+              display: grid;
+              grid-template-rows: 66px auto 1fr;
+              gap: 0;
+              padding: 0 10px 18px;
+            }
+            .results-doc > div:first-child {
+              display: flex;
+              align-items: center;
+              padding: 0;
+              border: 0;
+              background: transparent;
+            }
+            .results-title { font-size: 22px; line-height: 1.12; }
+            .summary-row {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+              gap: 6px;
+              align-self: start;
+              padding: 0 0 14px;
+            }
+            .summary-item {
+              padding: 9px 8px;
+              border-radius: 8px;
+            }
+            .summary-label {
+              margin-bottom: 4px;
+              font-size: 9.5px;
+              line-height: 1.2;
+            }
+            .summary-name {
+              font-size: 15px;
+              line-height: 1.05;
+            }
+            .summary-detail {
+              margin-top: 5px;
+              font-size: 9.5px;
+              line-height: 1.2;
+            }
+            .table-wrap {
+              min-height: 0;
+              align-self: stretch;
+              border-radius: 9px;
+              overflow-x: hidden;
+              padding: 0;
+              background: transparent;
+            }
+            .table-wrap table {
+              width: 100%;
+              overflow: hidden;
+              border: 1px solid #dbe3f0;
+              border-radius: 9px;
+              background: #ffffff;
+            }
+            th {
+              padding: 8px 6px;
+              font-size: 10px;
+            }
+            td {
+              padding: 8px 6px;
+              font-size: 10.5px;
+              line-height: 1.22;
+            }
+            th:nth-child(1), td:nth-child(1) { width: 36px; }
+            th:nth-child(2), td:nth-child(2) { width: 25%; }
+            th:nth-child(3), td:nth-child(3) { width: 27%; }
+            th:nth-child(4), td:nth-child(4) { width: 18%; }
+            th:nth-child(5), td:nth-child(5) { width: 30%; }
+            .score-pill {
+              min-width: 54px;
+              min-height: 24px;
+              padding: 0 8px;
+              font-size: 10px;
+            }
+            .summary-note {
+              padding: 9px 10px;
+              border-radius: 8px;
+              font-size: 10.5px;
+            }
+            .summary-note-text { font-size: 10px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="results-doc">
           <div>
-            <h2 style="margin:0 0 8px;font-size:28px;line-height:1.2;">${escapeHtml(title || t("results"))}</h2>
+            <h2 class="results-title">${escapeHtml(title || t("results"))}</h2>
           </div>
 
           ${summaryNote}
 
-          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
-            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.highestStudent}</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(bestName)}</div>
-              <div style="margin-top:8px;font-size:13px;color:#1d4ed8;font-weight:800;">${escapeHtml(bestDetail)}</div>
+          <div class="summary-row">
+            <div class="summary-item">
+              <div class="summary-label">${labels.highestStudent}</div>
+              <div class="summary-name">${escapeHtml(bestName)}</div>
+              <div class="summary-detail best">${escapeHtml(bestDetail)}</div>
             </div>
-            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.lowestStudent}</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(lowestName)}</div>
-              <div style="margin-top:8px;font-size:13px;color:#64748b;font-weight:800;">${escapeHtml(lowestDetail)}</div>
+            <div class="summary-item">
+              <div class="summary-label">${labels.lowestStudent}</div>
+              <div class="summary-name">${escapeHtml(lowestName)}</div>
+              <div class="summary-detail">${escapeHtml(lowestDetail)}</div>
             </div>
-            <div style="padding:18px;border-radius:12px;background:#ffffff;border:1px solid #dbe3f0;">
-              <div style="font-size:13px;color:#64748b;margin-bottom:8px;">${labels.latestStudent}</div>
-              <div style="font-size:22px;font-weight:800;color:#0f172a;line-height:1.2;">${escapeHtml(latestName)}</div>
-              <div style="margin-top:8px;font-size:13px;color:#64748b;font-weight:700;">${escapeHtml(latestDetail)}</div>
+            <div class="summary-item">
+              <div class="summary-label">${labels.latestStudent}</div>
+              <div class="summary-name">${escapeHtml(latestName)}</div>
+              <div class="summary-detail">${escapeHtml(latestDetail)}</div>
             </div>
           </div>
 
-          <div style="border-radius:22px;overflow:hidden;border:1px solid #dbe3f0;background:#ffffff;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead style="background:#eaf1ff;">
+          <div class="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableNumber")}</th>
-                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableName")}</th>
-                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableScore")}</th>
-                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${labels.percent}</th>
-                  <th style="padding:14px 16px;text-align:left;color:#1e3a8a;font-size:13px;">${t("tableTime")}</th>
+                  <th>${t("tableNumber")}</th>
+                  <th>${t("tableName")}</th>
+                  <th>${t("tableScore")}</th>
+                  <th>${labels.percent}</th>
+                  <th>${t("tableTime")}</th>
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml || `
                   <tr>
-                    <td colspan="5" style="padding:28px 16px;text-align:center;color:#64748b;">${labels.noData}</td>
+                    <td colspan="5" class="empty-cell">${labels.noData}</td>
                   </tr>
                 `}
               </tbody>
@@ -4718,8 +4930,8 @@ async function renderResultsBlock() {
 
   if (!material) {
     setResultsStatus("");
-    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
-    downloadResultsBtn.disabled = !(currentTestSession?.results_sheet_url);
+    openResultsSheetBtn.disabled = !normalizeGoogleSheetUrl(currentTestSession?.results_sheet_url);
+    downloadResultsBtn.disabled = !normalizeGoogleSheetUrl(currentTestSession?.results_sheet_url);
     updateActionButtonsState();
     return;
   }
@@ -4743,7 +4955,7 @@ async function renderResultsBlock() {
 
     const data = await fetchJSON(`${API_BASE}/results/test-sessions/${latestSession.id}/responses/`);
     const responses = data.responses || [];
-    const sheetUrl = data.results_sheet_url || latestSession.results_sheet_url || "";
+    const sheetUrl = normalizeGoogleSheetUrl(data.results_sheet_url || latestSession.results_sheet_url || "");
     const scoringReady = data.scoring_ready !== false;
     currentTestSession = {
       ...latestSession,
@@ -4777,10 +4989,11 @@ async function renderResultsBlock() {
     updateActionButtonsState();
   } catch (error) {
     console.error("RESULTS LOAD ERROR:", error);
-    const fallbackSheetUrl =
+    const fallbackSheetUrl = normalizeGoogleSheetUrl(
       latestSession?.results_sheet_url ||
       currentTestSession?.results_sheet_url ||
-      "";
+      ""
+    );
 
     if (fallbackSheetUrl) {
       setResultsStatus("");
@@ -4804,8 +5017,8 @@ async function renderResultsBlock() {
     setResultsStatus("");
     resultsSheetFrame.src = "about:blank";
     resultsSheetFrame.srcdoc = "";
-    openResultsSheetBtn.disabled = !(currentTestSession?.results_sheet_url);
-    downloadResultsBtn.disabled = !(currentTestSession?.results_sheet_url);
+    openResultsSheetBtn.disabled = !normalizeGoogleSheetUrl(currentTestSession?.results_sheet_url);
+    downloadResultsBtn.disabled = !normalizeGoogleSheetUrl(currentTestSession?.results_sheet_url);
     updateActionButtonsState();
   }
 }
@@ -4813,7 +5026,7 @@ async function renderResultsBlock() {
 async function syncResultsSheetSession() {
   const latestSession = await getLatestSessionForSelectedMaterial();
   const sessionId = latestSession?.id;
-  const sheetUrl = latestSession?.results_sheet_url || "";
+  const sheetUrl = normalizeGoogleSheetUrl(latestSession?.results_sheet_url || "");
 
   if (!sessionId || !sheetUrl) {
     return { latestSession, sheetUrl };
@@ -4837,7 +5050,7 @@ async function syncResultsSheetSession() {
 
   return {
     latestSession: currentTestSession,
-    sheetUrl: currentTestSession.results_sheet_url || sheetUrl
+    sheetUrl: normalizeGoogleSheetUrl(currentTestSession.results_sheet_url || sheetUrl)
   };
 }
 
