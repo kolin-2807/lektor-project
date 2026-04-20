@@ -203,6 +203,8 @@ const UI_TEXT = {
     voiceRequestError: "Дауыстық көмекшіге сұрау жіберу кезінде қате шықты.",
     voiceSorry: "Кешіріңіз, қазір сұрауды өңдей алмадым.",
     micDenied: "Микрофонға рұқсат берілмеді.",
+    micUnavailable: "Бұл браузер микрофонды қолдамайды.",
+    micSecureContext: "Микрофон жұмыс істеуі үшін сайт HTTPS арқылы ашылуы керек.",
     voiceUnavailable: "Дауыстық функция қолжетімсіз",
     errorLabel: ({ error }) => `Қате: ${error}`,
     logoutPlaceholder: "Шығу функциясы.",
@@ -345,6 +347,8 @@ const UI_TEXT = {
     voiceRequestError: "Произошла ошибка при обращении к голосовому помощнику.",
     voiceSorry: "Извините, сейчас не удалось обработать запрос.",
     micDenied: "Доступ к микрофону не предоставлен.",
+    micUnavailable: "Этот браузер не поддерживает микрофон.",
+    micSecureContext: "Для работы микрофона откройте сайт через HTTPS.",
     voiceUnavailable: "Голосовая функция недоступна",
     errorLabel: ({ error }) => `Ошибка: ${error}`,
     logoutPlaceholder: "Функция выхода.",
@@ -579,6 +583,8 @@ UI_TEXT.eng = {
   voiceRequestError: "An error occurred while contacting the voice assistant.",
   voiceSorry: "Sorry, I could not process the request right now.",
   micDenied: "Microphone access was denied.",
+  micUnavailable: "This browser does not support microphone input.",
+  micSecureContext: "Open the site over HTTPS to use the microphone.",
   voiceUnavailable: "Voice feature is unavailable",
   errorLabel: ({ error }) => `Error: ${error}`,
   logoutPlaceholder: "Logout function.",
@@ -958,6 +964,13 @@ let assistantSpeechObjectUrl = "";
 
 const VOICE_ACTIVITY_THRESHOLD = 0.035;
 const VOICE_SILENCE_STOP_MS = 2200;
+const VOICE_RECORDER_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+];
 
 function t(key, params = {}) {
   const dictionary = UI_TEXT[selectedRole] || UI_TEXT.kaz;
@@ -6011,9 +6024,9 @@ function resolveLocalAssistantCommand(transcript) {
   return null;
 }
 
-async function sendAudioToAssistant(audioBlob) {
+async function sendAudioToAssistant(audioBlob, filename = "voice.webm") {
   const formData = new FormData();
-  formData.append("audio", audioBlob, "voice.webm");
+  formData.append("audio", audioBlob, filename);
   formData.append("language", getSpeechLanguage());
 
   return fetchJSON(`${API_BASE}/assistant/transcribe/`, {
@@ -6095,6 +6108,78 @@ function resetVoiceRecognitionSession() {
   stopVoiceRecognitionSilenceTimer();
   voiceRecognitionLastTranscript = "";
   voiceRecognitionHasSpeech = false;
+}
+
+function stopMediaStream(stream) {
+  stream?.getTracks?.().forEach(track => track.stop());
+}
+
+function canUseMicrophoneApi() {
+  return Boolean(navigator.mediaDevices?.getUserMedia);
+}
+
+function isLikelyMobileBrowser() {
+  const userAgent = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent) || navigator.maxTouchPoints > 1;
+}
+
+function getSupportedVoiceRecorderMimeType() {
+  if (!window.MediaRecorder) {
+    return "";
+  }
+
+  if (typeof MediaRecorder.isTypeSupported !== "function") {
+    return "";
+  }
+
+  return VOICE_RECORDER_MIME_TYPES.find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function getVoiceRecorderFilename(mimeType) {
+  if (/mp4/i.test(mimeType)) return "voice.mp4";
+  if (/ogg/i.test(mimeType)) return "voice.ogg";
+  return "voice.webm";
+}
+
+function shouldPreferRecorderCapture() {
+  return Boolean(window.MediaRecorder && canUseMicrophoneApi() && isLikelyMobileBrowser());
+}
+
+function getVoiceMicrophoneErrorMessage(error) {
+  const errorName = error?.name || "";
+  const errorMessage = error?.message || "";
+
+  if (errorMessage === t("micSecureContext") || errorMessage === t("micUnavailable")) {
+    return errorMessage;
+  }
+
+  if (["NotAllowedError", "PermissionDeniedError", "SecurityError"].includes(errorName)) {
+    return t("micDenied");
+  }
+
+  if (["NotFoundError", "DevicesNotFoundError"].includes(errorName)) {
+    return t("micUnavailable");
+  }
+
+  return errorMessage || t("micDenied");
+}
+
+async function requestVoiceMicrophoneStream() {
+  if (!canUseMicrophoneApi()) {
+    throw new Error(t("micUnavailable"));
+  }
+
+  if (!window.isSecureContext) {
+    throw new Error(t("micSecureContext"));
+  }
+
+  return navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  });
 }
 
 function scheduleVoiceRecognitionStop() {
@@ -6621,11 +6706,20 @@ function cancelVoiceCapture() {
   return false;
 }
 
-async function startMediaRecorderCapture() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+async function startMediaRecorderCapture(existingStream = null) {
+  if (!window.MediaRecorder) {
+    throw new Error(t("voiceUnavailable"));
+  }
+
+  const stream = existingStream || await requestVoiceMicrophoneStream();
+  const mimeType = getSupportedVoiceRecorderMimeType();
+  const recorderOptions = mimeType ? { mimeType } : undefined;
+  const recordingFilename = getVoiceRecorderFilename(mimeType);
 
   recordedChunks = [];
-  mediaRecorder = new MediaRecorder(stream);
+  mediaRecorder = recorderOptions
+    ? new MediaRecorder(stream, recorderOptions)
+    : new MediaRecorder(stream);
   voiceSilenceStartedAt = 0;
   voiceHasDetectedSpeech = false;
 
@@ -6640,7 +6734,7 @@ async function startMediaRecorderCapture() {
   };
 
   mediaRecorder.onstop = async () => {
-    const audioBlob = new Blob(recordedChunks, { type: "audio/webm" });
+    const audioBlob = new Blob(recordedChunks, { type: mediaRecorder?.mimeType || mimeType || "audio/webm" });
 
     try {
       if (isVoiceCaptureCancelled) {
@@ -6648,7 +6742,7 @@ async function startMediaRecorderCapture() {
       }
 
       setVoiceState("idle", t("voiceTranscribing"));
-      const data = await sendAudioToAssistant(audioBlob);
+      const data = await sendAudioToAssistant(audioBlob, recordingFilename);
       const capturedText = data.text?.trim();
 
       if (!capturedText) return;
@@ -6666,7 +6760,7 @@ async function startMediaRecorderCapture() {
       speakAssistantReply(t("voiceSorry"));
     } finally {
       stopVoiceActivityMonitor();
-      stream.getTracks().forEach(track => track.stop());
+      stopMediaStream(stream);
       resetVoiceDraftSession();
       voiceInterimBaseText = "";
       isVoiceCaptureCancelled = false;
@@ -6698,22 +6792,37 @@ async function toggleListening(event) {
     voiceInput.value = "";
   }
 
+  let microphoneStream = null;
+
   try {
+    microphoneStream = await requestVoiceMicrophoneStream();
+
+    if (shouldPreferRecorderCapture()) {
+      await startMediaRecorderCapture(microphoneStream);
+      microphoneStream = null;
+      return;
+    }
+
     if (recognition) {
       try {
         recognition.start();
+        stopMediaStream(microphoneStream);
+        microphoneStream = null;
         return;
       } catch (recognitionError) {
         console.warn("Speech recognition start failed, falling back to recorder:", recognitionError);
       }
     }
 
-    await startMediaRecorderCapture();
+    await startMediaRecorderCapture(microphoneStream);
+    microphoneStream = null;
   } catch (error) {
     console.error("MIC ACCESS ERROR:", error);
-    setVoiceState("idle", t("micDenied"));
+    setVoiceState("idle", getVoiceMicrophoneErrorMessage(error));
     resetVoiceDraftSession();
     voiceInterimBaseText = "";
+  } finally {
+    stopMediaStream(microphoneStream);
   }
 }
 

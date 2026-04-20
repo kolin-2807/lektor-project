@@ -2933,14 +2933,41 @@ body.auth-gate-mode:not(.public-test-mode) .auth-voice-slot .voice-windows {
 
 .voice-close,
 .voice-help-close {
+  position: relative;
   width: 32px;
   height: 32px;
+  padding: 0;
   border-radius: 10px;
   border: 1px solid rgba(0, 93, 176, 0.12);
   background: rgba(232, 242, 252, 0.84);
   color: var(--text-soft);
   cursor: pointer;
-  font-size: 18px;
+  font-size: 0;
+}
+
+.voice-close::before,
+.voice-close::after,
+.voice-help-close::before,
+.voice-help-close::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transform-origin: center;
+}
+
+.voice-close::before,
+.voice-help-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.voice-close::after,
+.voice-help-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .voice-core-wrap {
@@ -3231,7 +3258,8 @@ body.auth-gate-mode:not(.public-test-mode) .auth-voice-slot .voice-windows {
 .voice-send-btn {
   position: absolute;
   right: 8px;
-  bottom: 7px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -3780,6 +3808,10 @@ body::after {
 .profile-modal-close,
 .voice-close,
 .voice-help-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   backdrop-filter: none;
 }
 
@@ -7134,7 +7166,14 @@ body::after {
     width: 28px;
     height: 28px;
     border-radius: 6px;
-    font-size: 15px;
+  }
+
+  body:has(#subjectView:not(.hidden)) .voice-close::before,
+  body:has(#subjectView:not(.hidden)) .voice-close::after,
+  body:has(#subjectView:not(.hidden)) .voice-help-close::before,
+  body:has(#subjectView:not(.hidden)) .voice-help-close::after {
+    width: 11px;
+    height: 2px;
   }
 
   body:has(#subjectView:not(.hidden)) .voice-rings {
@@ -7352,6 +7391,29 @@ body::after {
   #testModal .correct-radio-wrap {
     min-height: 32px;
     border-radius: 8px;
+  }
+
+  #subjectView .material-action-group,
+  body:has(#subjectView:not(.hidden)) #subjectView .material-action-group {
+    grid-column: 1 / -1;
+  }
+
+  #subjectView .control-actions-row,
+  body:has(#subjectView:not(.hidden)) #subjectView .control-actions-row {
+    grid-template-columns: 1fr;
+  }
+
+  #subjectView .presentation-action-group,
+  body:has(#subjectView:not(.hidden)) #subjectView .presentation-action-group,
+  #subjectView .test-action-group,
+  body:has(#subjectView:not(.hidden)) #subjectView .test-action-group {
+    grid-template-rows: auto;
+    row-gap: 6px;
+  }
+
+  #subjectView .test-action-group,
+  body:has(#subjectView:not(.hidden)) #subjectView .test-action-group {
+    grid-template-columns: 1fr;
   }
 }
 
