@@ -6826,8 +6826,21 @@ async function toggleListening(event) {
   }
 
   try {
+    let microphoneStream = null;
+    try {
+      microphoneStream = await requestVoiceMicrophoneStream();
+      setVoiceState("listening", t("voiceListening"));
+    } catch (permissionError) {
+      if (!recognition) {
+        throw permissionError;
+      }
+      console.warn("Microphone permission preflight failed, trying speech recognition:", permissionError);
+    }
+
     if (recognition) {
       try {
+        stopMediaStream(microphoneStream);
+        microphoneStream = null;
         recognition.start();
         return;
       } catch (recognitionError) {
@@ -6835,9 +6848,10 @@ async function toggleListening(event) {
       }
     }
 
-    let microphoneStream = null;
     try {
-      microphoneStream = await requestVoiceMicrophoneStream();
+      if (!microphoneStream) {
+        microphoneStream = await requestVoiceMicrophoneStream();
+      }
       await startMediaRecorderCapture(microphoneStream);
       microphoneStream = null;
     } finally {
@@ -8464,11 +8478,21 @@ if (closeVoiceHelpBtn) {
 }
 
 if (voiceCore) {
-  voiceCore.addEventListener("click", (event) => {
+  let lastVoiceCoreTouchAt = 0;
+  const handleVoiceCoreActivate = (event) => {
+    if (event.type === "touchend") {
+      lastVoiceCoreTouchAt = Date.now();
+    } else if (event.type === "click" && Date.now() - lastVoiceCoreTouchAt < 500) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     toggleListening(event);
-  });
+  };
+
+  voiceCore.addEventListener("click", handleVoiceCoreActivate);
+  voiceCore.addEventListener("touchend", handleVoiceCoreActivate, { passive: false });
 }
 
 if (voiceSendBtn) {

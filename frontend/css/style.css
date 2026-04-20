@@ -6880,8 +6880,8 @@ body::after {
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-bar {
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: minmax(58px, 0.6fr) minmax(0, 1fr) minmax(150px, 1.45fr);
-    min-height: 26px;
+    grid-template-columns: minmax(48px, 0.46fr) minmax(0, 0.72fr) minmax(0, 1.72fr);
+    min-height: 34px;
     margin-top: -28px;
     padding: 2px;
     gap: 3px;
@@ -6895,25 +6895,30 @@ body::after {
   }
 
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-type {
-    min-height: 22px;
+    min-height: 30px;
     width: 100%;
-    padding: 0 6px;
+    padding: 0 4px;
     border: 0;
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.62);
-    font-size: 9px;
+    font-size: 8px;
+    line-height: 1.05;
   }
 
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-title {
-    min-height: 22px;
+    min-height: 30px;
     width: 100%;
-    padding: 0 6px;
+    padding: 0 4px;
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.62);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10.5px;
+    font-size: 8.5px;
+    line-height: 1.05;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-bar .content-view-actions {
@@ -6925,14 +6930,18 @@ body::after {
 
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-bar .small-btn {
     width: 100%;
-    min-height: 22px;
-    padding: 0 5px;
+    min-height: 30px;
+    padding: 0 4px;
     border: 0;
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.62);
     box-shadow: none;
     color: #17466f;
-    font-size: 8.5px;
+    font-size: 7.8px;
+    line-height: 1.08;
+    overflow: hidden;
+    white-space: normal;
+    word-break: keep-all;
   }
 
   body:has(#subjectView:not(.hidden)) #resultsPane .content-footer-bar .small-btn.primary {
