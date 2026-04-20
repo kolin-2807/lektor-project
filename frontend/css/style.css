@@ -6691,7 +6691,7 @@ body::after {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 5px 7px 62px;
+    padding: 4px 6px 86px;
     overflow: hidden;
     border-radius: 0 !important;
   }
@@ -7191,19 +7191,19 @@ body::after {
   }
 
   body:has(#subjectView:not(.hidden)) .voice-assistant {
-    right: 8px;
-    bottom: 8px;
+    right: 12px;
+    bottom: 12px;
   }
 
   body:has(#subjectView:not(.hidden)) .voice-windows {
     position: fixed;
-    right: 82px;
-    bottom: 8px;
+    right: 116px;
+    bottom: 12px;
     flex-direction: row;
     align-items: flex-end;
     justify-content: flex-end;
     gap: 6px;
-    max-width: calc(100vw - 96px);
+    max-width: calc(100vw - 128px);
     max-height: min(246px, calc(100dvh - 120px));
     pointer-events: none;
   }
@@ -7309,20 +7309,20 @@ body::after {
 
   body:has(#subjectView:not(.hidden)) .voice-dock,
   body:has(#subjectView:not(.hidden)) .voice-help-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 6px;
-    box-shadow: 0 8px 18px rgba(0, 73, 140, 0.2);
+    width: 48px;
+    height: 48px;
+    border-radius: 7px;
+    box-shadow: 0 12px 24px rgba(0, 73, 140, 0.2);
   }
 
   body:has(#subjectView:not(.hidden)) .voice-toolbar {
-    gap: 5px;
+    gap: 8px;
   }
 
   body:has(#subjectView:not(.hidden)) .voice-dock svg,
   body:has(#subjectView:not(.hidden)) .voice-help-btn svg {
-    width: 17px;
-    height: 17px;
+    width: 24px;
+    height: 24px;
   }
 
   #testModal {

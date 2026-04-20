@@ -955,6 +955,8 @@ let voiceActivityAudioContext = null;
 let voiceActivityAnimationFrameId = null;
 let voiceSilenceStartedAt = 0;
 let voiceHasDetectedSpeech = false;
+let voiceCaptureMaxTimerId = 0;
+let voiceCaptureNoSpeechTimerId = 0;
 let voiceRecognitionSilenceTimerId = 0;
 let voiceRecognitionLastTranscript = "";
 let voiceRecognitionHasSpeech = false;
@@ -965,8 +967,10 @@ let assistantSpeechAbortController = null;
 let assistantSpeechObjectUrl = "";
 let isAssistantSpeechAudioUnlocked = false;
 
-const VOICE_ACTIVITY_THRESHOLD = 0.035;
+const VOICE_ACTIVITY_THRESHOLD = 0.018;
 const VOICE_SILENCE_STOP_MS = 2200;
+const VOICE_INITIAL_NO_SPEECH_STOP_MS = 6000;
+const VOICE_CAPTURE_MAX_MS = 12000;
 const SILENT_AUDIO_DATA_URI = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAA";
 const VOICE_RECORDER_MIME_TYPES = [
   "audio/webm;codecs=opus",
@@ -5452,11 +5456,18 @@ function selectLocalizedAssistantReply(language, kazakhText, russianText, englis
   return kazakhText;
 }
 
+function getAssistantLanguageName(role = selectedRole) {
+  if (role === "rus") return roleText("орыс тілі", "русский язык", "Russian");
+  if (role === "eng") return roleText("ағылшын тілі", "английский язык", "English");
+  return roleText("қазақ тілі", "казахский язык", "Kazakh");
+}
+
 const LOCAL_ASSISTANT_OPEN_WORDS = ["аш", "көрсет", "открой", "покажи", "перейди", "open", "show"];
-const LOCAL_ASSISTANT_HELP_PHRASES = ["көмек", "команда", "командалар", "не істей аласың", "что ты умеешь", "help"];
+const LOCAL_ASSISTANT_HELP_PHRASES = ["көмек", "анықтама", "справочник", "справочникті", "справшник", "справшникті", "команда", "командалар", "не істей аласың", "что ты умеешь", "справка", "помощь", "help", "commands"];
 const LOCAL_ASSISTANT_HOME_PHRASES = ["басты бет", "главная", "главную", "үйге", "домой", "home"];
 const LOCAL_ASSISTANT_BACK_PHRASES = ["артқа", "қайтар", "назад", "go back"];
 const LOCAL_ASSISTANT_MATERIALS_PHRASES = ["материал", "материалдар", "материалды", "материалы", "конспект"];
+const LOCAL_ASSISTANT_UPLOAD_PHRASES = ["материал жүктеу", "жүктеуді аш", "жүктеу батырмасы", "жүктеу кнопка", "загрузка материала", "открой загрузку", "кнопку загрузки", "загрузить материал", "upload material", "open upload", "upload button"];
 const LOCAL_ASSISTANT_TEST_PANEL_PHRASES = ["тестті аш", "тест аш", "тест бөлімі", "открой тест", "перейди в тест", "test"];
 const LOCAL_ASSISTANT_RESULTS_PHRASES = ["нәтиже", "нәтижелер", "результат", "результаты", "балл", "оценка", "results"];
 const LOCAL_ASSISTANT_RESULTS_SHEET_PHRASES = ["google sheets", "гугл шит", "гугл таблиц", "sheets", "sheet", "таблица", "таблицу"];
@@ -5465,6 +5476,7 @@ const LOCAL_ASSISTANT_GENERATE_TEST_PHRASES = ["тест жаса", "тест д
 const LOCAL_ASSISTANT_GENERATE_SLIDES_PHRASES = ["слайд жаса", "слайд дайында", "презентация жаса", "создай слайды", "создай презентацию", "generate slides"];
 const LOCAL_ASSISTANT_OPEN_QR_PHRASES = ["qr", "qr код", "кьюар", "куар"];
 const LOCAL_ASSISTANT_START_TEST_PHRASES = ["тестті баста", "тест баста", "начни тест", "запусти тест", "start test"];
+const LOCAL_ASSISTANT_CLARIFY_PHRASES = ["түсінбедім", "тусинбедим", "не түсінікті", "не понял", "не понимаю", "непонятно", "i do not understand", "i don't understand", "unclear"];
 const LOCAL_ASSISTANT_STOP_TOKENS = new Set([
   "аш",
   "көрсет",
@@ -5566,6 +5578,26 @@ function extractLocalAssistantDurationMinutes(text) {
   return null;
 }
 
+function extractLocalAssistantTargetRole(rawText, normalizedText) {
+  const raw = String(rawText || "").trim();
+  const lowerRaw = raw.toLowerCase();
+  const text = normalizedText || normalizeVoiceText(rawText);
+
+  if (/[аa]ғылшын|агылшын|английск|english|lector\b/i.test(lowerRaw)) {
+    return "eng";
+  }
+
+  if (/орыс|русск|russian|лектор/i.test(lowerRaw)) {
+    return "rus";
+  }
+
+  if (/қазақ|казах|kazakh|оқытушы|окытушы/i.test(lowerRaw) || text.includes("қазақша") || text.includes("казакша")) {
+    return "kaz";
+  }
+
+  return "";
+}
+
 function tokenizeLocalAssistantTitle(value) {
   return normalizeVoiceText(value)
     .split(" ")
@@ -5636,7 +5668,8 @@ function pickFirstLocalAssistantMaterialByType(context, materialType = "") {
 }
 
 function buildLocalAssistantActionReply(action, language, payload = {}) {
-  const isRussian = language === "rus";
+  const localReply = (kazakhText, russianText, englishText = russianText) =>
+    selectLocalizedAssistantReply(language, kazakhText, russianText, englishText);
   const subjectTitle = String(payload.subject_title || payload.subject?.title || "").trim();
   const materialTitle = String(payload.material_title || payload.material?.title || "").trim();
   const courseNumber = Number(payload.course_number ?? payload.subject?.course_number ?? payload.material?.course_number ?? 0) || 0;
@@ -5644,19 +5677,31 @@ function buildLocalAssistantActionReply(action, language, payload = {}) {
   const durationMinutes = Number(payload.duration_minutes) || 0;
 
   if (action === "open_course" && courseNumber) {
-    return isRussian ? `Хорошо, открою ${courseNumber} курс.` : `Жарайды, ${courseNumber}-курсты ашамын.`;
+    return localReply(
+      `Жарайды, ${courseNumber}-курсты ашамын.`,
+      `Хорошо, открою ${courseNumber} курс.`,
+      `Okay, I will open course ${courseNumber}.`,
+    );
   }
 
   if (action === "open_subject" && subjectTitle) {
-    return isRussian ? `Хорошо, открою дисциплину ${subjectTitle}.` : `Жарайды, ${subjectTitle} пәнін ашамын.`;
+    return localReply(
+      `Жарайды, ${subjectTitle} пәнін ашамын.`,
+      `Хорошо, открою дисциплину ${subjectTitle}.`,
+      `Okay, I will open ${subjectTitle}.`,
+    );
   }
 
   if (action === "select_material" && materialTitle) {
-    return isRussian ? `Хорошо, открою материал ${materialTitle}.` : `Жарайды, ${materialTitle} материалын ашамын.`;
+    return localReply(
+      `Жарайды, ${materialTitle} материалын ашамын.`,
+      `Хорошо, открою материал ${materialTitle}.`,
+      `Okay, I will open ${materialTitle}.`,
+    );
   }
 
   if (action === "generate_test") {
-    if (isRussian) {
+    if (language === "rus") {
       if (questionCount && durationMinutes) {
         return `Хорошо, подготовлю тест на ${questionCount} вопросов и ${durationMinutes} минут.`;
       }
@@ -5664,6 +5709,16 @@ function buildLocalAssistantActionReply(action, language, payload = {}) {
         return `Хорошо, подготовлю тест на ${questionCount} вопросов.`;
       }
       return "Хорошо, начну подготовку теста.";
+    }
+
+    if (language === "eng") {
+      if (questionCount && durationMinutes) {
+        return `Okay, I will prepare a ${questionCount}-question test for ${durationMinutes} minutes.`;
+      }
+      if (questionCount) {
+        return `Okay, I will prepare a ${questionCount}-question test.`;
+      }
+      return "Okay, I will start preparing the test.";
     }
 
     if (questionCount && durationMinutes) {
@@ -5676,17 +5731,28 @@ function buildLocalAssistantActionReply(action, language, payload = {}) {
   }
 
   const replyMap = {
-    show_help: isRussian ? "Хорошо, открою панель помощи." : "Жарайды, көмек панелін ашамын.",
-    go_home: isRussian ? "Хорошо, перейду на главную страницу." : "Жарайды, басты бетке өтемін.",
-    go_back: isRussian ? "Хорошо, верну на предыдущий экран." : "Жарайды, алдыңғы бетке қайтарамын.",
-    open_materials: isRussian ? "Хорошо, открою раздел материалов." : "Жарайды, материалдар бөлімін ашамын.",
-    open_test: isRussian ? "Хорошо, открою раздел теста." : "Жарайды, тест бөлімін ашамын.",
-    open_results: isRussian ? "Хорошо, открою результаты." : "Жарайды, нәтижелерді ашамын.",
-    open_results_sheet: isRussian ? "Хорошо, открою результаты в Google Sheets." : "Жарайды, нәтижелерді Google Sheets-та ашамын.",
-    open_slides: isRussian ? "Хорошо, открою раздел слайдов." : "Жарайды, слайд бөлімін ашамын.",
-    generate_slides: isRussian ? "Хорошо, начну подготовку слайдов." : "Жарайды, слайд дайындауды бастаймын.",
-    open_qr: isRussian ? "Хорошо, открою QR-код теста." : "Жарайды, тесттің QR кодын ашамын.",
-    start_test: isRussian ? "Хорошо, запущу тест." : "Жарайды, тестті іске қосамын.",
+    show_help: localReply("Жарайды, көмек панелін ашамын.", "Хорошо, открою панель помощи.", "Okay, I will open the help panel."),
+    go_home: localReply("Жарайды, басты бетке өтемін.", "Хорошо, перейду на главную страницу.", "Okay, I will go to the home page."),
+    go_back: localReply("Жарайды, алдыңғы бетке қайтарамын.", "Хорошо, верну на предыдущий экран.", "Okay, I will go back."),
+    open_materials: localReply("Жарайды, материалдар бөлімін ашамын.", "Хорошо, открою раздел материалов.", "Okay, I will open the materials section."),
+    open_upload: localReply("Жарайды, материал жүктеу бөлімін ашамын.", "Хорошо, открою загрузку материалов.", "Okay, I will open material upload."),
+    open_test: localReply("Жарайды, тест бөлімін ашамын.", "Хорошо, открою раздел теста.", "Okay, I will open the test section."),
+    open_results: localReply("Жарайды, нәтижелерді ашамын.", "Хорошо, открою результаты.", "Okay, I will open the results."),
+    open_results_sheet: localReply("Жарайды, нәтижелерді Google Sheets-та ашамын.", "Хорошо, открою результаты в Google Sheets.", "Okay, I will open the results in Google Sheets."),
+    open_slides: localReply("Жарайды, слайд бөлімін ашамын.", "Хорошо, открою раздел слайдов.", "Okay, I will open the slides section."),
+    generate_slides: localReply("Жарайды, слайд дайындауды бастаймын.", "Хорошо, начну подготовку слайдов.", "Okay, I will start preparing the slides."),
+    open_qr: localReply("Жарайды, тесттің QR кодын ашамын.", "Хорошо, открою QR-код теста.", "Okay, I will open the test QR code."),
+    start_test: localReply("Жарайды, тестті іске қосамын.", "Хорошо, запущу тест.", "Okay, I will start the test."),
+    switch_language: localReply(
+      `Жарайды, жүйе тілін ${getAssistantLanguageName(payload.target_role || selectedRole)} режиміне ауыстырамын.`,
+      `Хорошо, переключу систему на ${getAssistantLanguageName(payload.target_role || selectedRole)}.`,
+      `Okay, I will switch the system to ${getAssistantLanguageName(payload.target_role || selectedRole)}.`,
+    ),
+    clarify: localReply(
+      "Кешіріңіз, нақтылап айтыңызшы. Мысалы: «материалдарды аш», «тест жаса», «нәтижелерді көрсет» немесе «материал жүктеуді аш».",
+      "Пожалуйста, уточните команду. Например: «открой материалы», «создай тест», «покажи результаты» или «открой загрузку материалов».",
+      "Please clarify the command. For example: “open materials”, “create a test”, “show results”, or “open material upload”.",
+    ),
   };
 
   return replyMap[action] || "";
@@ -5712,6 +5778,7 @@ function buildLocalAssistantResponse(action, language, payload = {}) {
     material_type: String(payload.material_type || material?.type || "").trim(),
     question_count: payload.question_count ?? null,
     duration_minutes: payload.duration_minutes ?? null,
+    target_role: payload.target_role || "",
     local: true,
   };
 }
@@ -5729,6 +5796,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Сәлем! Мен материалдар, тесттер, слайдтар және нәтижелер бойынша көмектесе аламын.",
       "Здравствуйте! Я могу помочь с материалами, тестами, слайдами и результатами.",
+      "Hello! I can help with materials, tests, slides, and results.",
     );
   }
 
@@ -5737,6 +5805,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Әрқашан көмектесемін.",
       "Всегда рад помочь.",
+      "Always happy to help.",
     );
   }
 
@@ -5745,6 +5814,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Мен осы жүйедегі дауыстық көмекшімін. Қай бөлім керек болса, айтып жіберіңіз.",
       "Я голосовой помощник этой системы. Скажите, какой раздел вам нужен.",
+      "I am the voice assistant for this system. Tell me which section you need.",
     );
   }
 
@@ -5753,6 +5823,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Жақсымын. Сізге қалай көмектесейін?",
       "Все хорошо. Чем помочь?",
+      "I am doing well. How can I help?",
     );
   }
 
@@ -5761,6 +5832,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Тест бөліміне өту үшін «тестті аш» деңіз. Ал жаңа тест керек болса «тест жасап бер» деп айтыңыз.",
       "Чтобы перейти в тесты, скажите «открой тест». Если нужен новый тест, скажите «создай тест».",
+      "To open tests, say “open test”. To create a new one, say “create a test”.",
     );
   }
 
@@ -5769,6 +5841,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Материалдарды ашу үшін «материалдарды аш» деп айтыңыз.",
       "Чтобы открыть материалы, скажите «открой материалы».",
+      "To open materials, say “open materials”.",
     );
   }
 
@@ -5777,6 +5850,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Нәтижелерді көру үшін «нәтижелерді аш» деп айтыңыз.",
       "Чтобы посмотреть результаты, скажите «открой результаты».",
+      "To view results, say “open results”.",
     );
   }
 
@@ -5785,6 +5859,7 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
       language,
       "Слайдтарды ашу үшін «слайдтарды аш» деңіз. Ал жаңасын жасау үшін «слайд жасап бер» деп айтыңыз.",
       "Чтобы открыть слайды, скажите «открой слайды». Чтобы создать новые, скажите «создай слайды».",
+      "To open slides, say “open slides”. To create new ones, say “create slides”.",
     );
   }
 
@@ -5793,6 +5868,34 @@ function buildLocalAssistantSmalltalkReply(normalized, language) {
 
 function looksLikeLocalAssistantHelpRequest(text) {
   return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_HELP_PHRASES);
+}
+
+function looksLikeLocalAssistantClarifyRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_CLARIFY_PHRASES);
+}
+
+function looksLikeLocalAssistantUploadRequest(text) {
+  return containsAnyLocalAssistantPhrase(text, LOCAL_ASSISTANT_UPLOAD_PHRASES);
+}
+
+function looksLikeLocalAssistantLanguageSwitchRequest(text, rawText) {
+  if (!extractLocalAssistantTargetRole(rawText, text)) {
+    return false;
+  }
+
+  return containsAnyLocalAssistantPhrase(text, [
+    "тіл",
+    "тілін",
+    "ауыстыр",
+    "режим",
+    "язык",
+    "переключи",
+    "поменяй",
+    "смени",
+    "language",
+    "switch",
+    "change",
+  ]) || /оқытушы|окытушы|лектор|lector/i.test(String(rawText || ""));
 }
 
 function looksLikeLocalAssistantHomeRequest(text) {
@@ -5867,7 +5970,14 @@ function resolveLocalAssistantCommand(transcript) {
   const questionCount = extractLocalAssistantQuestionCount(normalized);
   const durationMinutes = extractLocalAssistantDurationMinutes(normalized);
   const targetMaterialFromType = pickFirstLocalAssistantMaterialByType(context, materialType || "");
+  const targetRole = extractLocalAssistantTargetRole(transcript, normalized);
   const smalltalkReply = buildLocalAssistantSmalltalkReply(normalized, language);
+
+  if (targetRole && looksLikeLocalAssistantLanguageSwitchRequest(normalized, transcript)) {
+    return buildLocalAssistantResponse("switch_language", language, {
+      target_role: targetRole,
+    });
+  }
 
   if (smalltalkReply) {
     return {
@@ -5876,8 +5986,19 @@ function resolveLocalAssistantCommand(transcript) {
     };
   }
 
+  if (looksLikeLocalAssistantClarifyRequest(normalized)) {
+    return buildLocalAssistantResponse("clarify", language);
+  }
+
   if (looksLikeLocalAssistantHelpRequest(normalized)) {
     return buildLocalAssistantResponse("show_help", language);
+  }
+
+  if (looksLikeLocalAssistantUploadRequest(normalized)) {
+    return buildLocalAssistantResponse("open_upload", language, {
+      subject: selectedSubjectSnapshot,
+      course_number: selectedSubjectSnapshot?.course_number || courseNumber || selectedCourseNumber || null,
+    });
   }
 
   if (looksLikeLocalAssistantHomeRequest(normalized)) {
@@ -6090,6 +6211,16 @@ function stopVoiceActivityMonitor() {
     voiceActivityAnimationFrameId = 0;
   }
 
+  if (voiceCaptureMaxTimerId) {
+    clearTimeout(voiceCaptureMaxTimerId);
+    voiceCaptureMaxTimerId = 0;
+  }
+
+  if (voiceCaptureNoSpeechTimerId) {
+    clearTimeout(voiceCaptureNoSpeechTimerId);
+    voiceCaptureNoSpeechTimerId = 0;
+  }
+
   if (voiceActivityAudioContext) {
     voiceActivityAudioContext.close().catch(() => {});
     voiceActivityAudioContext = null;
@@ -6117,6 +6248,15 @@ function resetVoiceRecognitionSession() {
 
 function stopMediaStream(stream) {
   stream?.getTracks?.().forEach(track => track.stop());
+}
+
+function isTouchVoiceDevice() {
+  const userAgent = navigator.userAgent || "";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent) || navigator.maxTouchPoints > 1;
+}
+
+function shouldUseRecorderFirstForVoice() {
+  return Boolean(window.MediaRecorder && canUseMicrophoneApi() && isTouchVoiceDevice());
 }
 
 function canUseMicrophoneApi() {
@@ -6301,6 +6441,36 @@ async function handleAssistantAction(assistantData) {
   if (assistantData.action === "show_help") {
     setVoicePanelOpen(true);
     setVoiceHelpOpen(true);
+    return;
+  }
+
+  if (assistantData.action === "clarify") {
+    setVoicePanelOpen(true);
+    return;
+  }
+
+  if (assistantData.action === "switch_language") {
+    const nextRole = SUPPORTED_ROLES.includes(assistantData.target_role) ? assistantData.target_role : "";
+    if (nextRole && nextRole !== selectedRole) {
+      selectedRole = nextRole;
+      roleMenu?.classList.add("hidden");
+      await refreshInterfaceLanguage({ roleChanged: true });
+    }
+    return;
+  }
+
+  if (assistantData.action === "open_upload") {
+    if (!selectedCourseNumber && assistantData.course_number) {
+      await openCourseDisciplines(Number(assistantData.course_number), assistantData.subject_id || null);
+    }
+    if (!selectedCourseNumber) {
+      return;
+    }
+    switchSubjectPanel("materials");
+    isMaterialManagerOpen = true;
+    isUploadMenuOpen = Boolean(selectedSubject) && !isMaterialUploading && !isMaterialDeleting;
+    renderMaterialManagerPanel();
+    renderMaterialPreview();
     return;
   }
 
@@ -6503,7 +6673,18 @@ function sanitizeSpeechText(text) {
 
 function buildAssistantSpeechReply(assistantData, fallbackText = "") {
   const fallback = sanitizeSpeechText(fallbackText);
-  if (!assistantData || selectedRole !== "kaz") {
+  if (!assistantData) {
+    return fallback;
+  }
+
+  if (assistantData.action && assistantData.action !== "unknown") {
+    const localActionReply = buildLocalAssistantActionReply(assistantData.action, selectedRole, assistantData);
+    if (localActionReply) {
+      return sanitizeSpeechText(localActionReply);
+    }
+  }
+
+  if (selectedRole !== "kaz") {
     return fallback;
   }
 
@@ -6757,6 +6938,20 @@ async function startMediaRecorderCapture(existingStream = null) {
 
   mediaRecorder.onstart = () => {
     setVoiceState("listening", t("voiceListening"));
+
+    voiceCaptureNoSpeechTimerId = window.setTimeout(() => {
+      voiceCaptureNoSpeechTimerId = 0;
+      if (mediaRecorder && mediaRecorder.state === "recording" && !voiceHasDetectedSpeech) {
+        stopVoiceCapture();
+      }
+    }, VOICE_INITIAL_NO_SPEECH_STOP_MS);
+
+    voiceCaptureMaxTimerId = window.setTimeout(() => {
+      voiceCaptureMaxTimerId = 0;
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        stopVoiceCapture();
+      }
+    }, VOICE_CAPTURE_MAX_MS);
   };
 
   mediaRecorder.ondataavailable = (eventData) => {
@@ -6837,6 +7032,12 @@ async function toggleListening(event) {
       console.warn("Microphone permission preflight failed, trying speech recognition:", permissionError);
     }
 
+    if (microphoneStream && shouldUseRecorderFirstForVoice()) {
+      await startMediaRecorderCapture(microphoneStream);
+      microphoneStream = null;
+      return;
+    }
+
     if (recognition) {
       try {
         stopMediaStream(microphoneStream);
@@ -6914,7 +7115,7 @@ async function handleAssistantCommand(transcript, options = {}) {
 
     const data = await sendTextToAssistant(cleanTranscript, abortController.signal);
     const spokenReply = buildAssistantSpeechReply(data, data.reply || "");
-    const visibleReply = data.reply || spokenReply;
+    const visibleReply = data.action && data.action !== "unknown" ? spokenReply : (data.reply || spokenReply);
 
     if (visibleReply) {
       setVoiceState("idle", visibleReply);
