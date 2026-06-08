@@ -12,6 +12,7 @@ from .google_oauth import (
     SESSION_FRONTEND_SUCCESS_URL_KEY,
     SESSION_OAUTH_CODE_VERIFIER_KEY,
     SESSION_OAUTH_STATE_KEY,
+    _is_allowed_frontend_url,
     build_frontend_redirect_url,
     build_google_drive_flow,
     credentials_to_dict,
@@ -25,6 +26,7 @@ from .models import GoogleDriveConnection, get_active_google_drive_connection
 
 
 logger = logging.getLogger(__name__)
+SESSION_EXPECTED_GOOGLE_EMAIL_KEY = "google_drive_expected_email"
 
 
 def _get_session_connection(request):
@@ -56,15 +58,27 @@ def drive_connect(request):
         )
 
     flow = build_google_drive_flow(request=request)
-    authorization_url, state = flow.authorization_url(
-        access_type="offline",
-        # Always reopen Google's account picker so users can switch accounts.
-        prompt="select_account consent",
-    )
+    login_hint = request.GET.get("login_hint", "").strip()
+    expected_email = request.GET.get("expected_email", "").strip().lower()
+    return_to = request.GET.get("return_to", "").strip()
+    auth_params = {
+        "access_type": "offline",
+    }
+    if login_hint:
+        auth_params["login_hint"] = login_hint
+
+    authorization_url, state = flow.authorization_url(**auth_params)
 
     request.session[SESSION_OAUTH_STATE_KEY] = state
     request.session[SESSION_OAUTH_CODE_VERIFIER_KEY] = getattr(flow, "code_verifier", "")
-    request.session[SESSION_FRONTEND_SUCCESS_URL_KEY] = get_frontend_success_url(request)
+    if return_to and _is_allowed_frontend_url(return_to, request):
+        request.session[SESSION_FRONTEND_SUCCESS_URL_KEY] = return_to
+    else:
+        request.session[SESSION_FRONTEND_SUCCESS_URL_KEY] = get_frontend_success_url(request)
+    if expected_email:
+        request.session[SESSION_EXPECTED_GOOGLE_EMAIL_KEY] = expected_email
+    else:
+        request.session.pop(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, None)
     request.session.modified = True
 
     return Response({"authorization_url": authorization_url})
@@ -119,6 +133,7 @@ def drive_callback(request):
     credentials = flow.credentials
     userinfo = fetch_google_userinfo(credentials)
     email = userinfo.get("email", "").strip()
+    expected_email = request.session.get(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, "").strip().lower()
 
     if not email:
         return HttpResponseRedirect(
@@ -126,6 +141,20 @@ def drive_callback(request):
                 request,
                 drive="error",
                 message="google_email_not_received",
+            )
+        )
+
+    if expected_email and email.lower() != expected_email:
+        request.session.pop(SESSION_OAUTH_STATE_KEY, None)
+        request.session.pop(SESSION_OAUTH_CODE_VERIFIER_KEY, None)
+        request.session.pop(SESSION_FRONTEND_SUCCESS_URL_KEY, None)
+        request.session.pop(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, None)
+        request.session.modified = True
+        return HttpResponseRedirect(
+            build_frontend_redirect_url(
+                request,
+                drive="error",
+                message="Google аккаунты сәйкес келмеді. Өрістегі email-мен қайта кіріп көріңіз.",
             )
         )
 
@@ -146,6 +175,7 @@ def drive_callback(request):
     request.session.pop(SESSION_OAUTH_STATE_KEY, None)
     request.session.pop(SESSION_OAUTH_CODE_VERIFIER_KEY, None)
     request.session.pop(SESSION_FRONTEND_SUCCESS_URL_KEY, None)
+    request.session.pop(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, None)
     request.session.modified = True
 
     return HttpResponseRedirect(redirect_url)
@@ -157,5 +187,6 @@ def drive_disconnect(request):
     request.session.pop(SESSION_OAUTH_STATE_KEY, None)
     request.session.pop(SESSION_OAUTH_CODE_VERIFIER_KEY, None)
     request.session.pop(SESSION_FRONTEND_SUCCESS_URL_KEY, None)
+    request.session.pop(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, None)
     request.session.modified = True
     return Response({"success": True})

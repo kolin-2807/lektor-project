@@ -5,13 +5,12 @@ from rest_framework.test import APIClient
 
 from users.models import GoogleDriveConnection
 
-from .models import Course
+from .models import Course, DEFAULT_COURSE_NUMBERS
 
 
 class CourseListAuthTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.course = Course.objects.create(number=1)
 
     def test_course_list_requires_google_session(self):
         response = self.client.get(reverse("course-list"))
@@ -32,4 +31,8 @@ class CourseListAuthTests(TestCase):
         response = self.client.get(reverse("course-list"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json(), [{"id": self.course.id, "number": 1}])
+        self.assertEqual(
+            [item["number"] for item in response.json()],
+            list(DEFAULT_COURSE_NUMBERS),
+        )
+        self.assertEqual(Course.objects.count(), len(DEFAULT_COURSE_NUMBERS))

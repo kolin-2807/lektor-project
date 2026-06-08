@@ -73,6 +73,18 @@ def _normalize_origin(raw_value: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _normalize_frontend_url(raw_value: str) -> str:
+    parsed = urlparse(str(raw_value or "").strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+
+    path = parsed.path or "/"
+    normalized = f"{parsed.scheme}://{parsed.netloc}{path}"
+    if parsed.query:
+        normalized = f"{normalized}?{parsed.query}"
+    return normalized
+
+
 def _origin_hostname(origin: str) -> str:
     return (urlparse(origin).hostname or "").strip().lower()
 
@@ -98,6 +110,14 @@ def _is_allowed_frontend_origin(origin: str, request=None) -> bool:
     }
 
     return normalized_origin in allowed_origins
+
+
+def _is_allowed_frontend_url(url: str, request=None) -> bool:
+    normalized_url = _normalize_frontend_url(url)
+    if not normalized_url:
+        return False
+
+    return _is_allowed_frontend_origin(_normalize_origin(normalized_url), request)
 
 
 def _get_request_frontend_origin(request=None) -> str:
@@ -163,9 +183,9 @@ def get_oauth_redirect_uri(request=None):
 def get_frontend_success_url(request=None):
     session_url = ""
     if request is not None:
-        session_url = _normalize_origin(getattr(request, "session", {}).get(SESSION_FRONTEND_SUCCESS_URL_KEY, ""))
-        if session_url and _is_allowed_frontend_origin(session_url, request):
-            return f"{session_url}/"
+        session_url = _normalize_frontend_url(getattr(request, "session", {}).get(SESSION_FRONTEND_SUCCESS_URL_KEY, ""))
+        if session_url and _is_allowed_frontend_url(session_url, request):
+            return session_url
 
     frontend_origin = _get_request_frontend_origin(request)
     if frontend_origin:

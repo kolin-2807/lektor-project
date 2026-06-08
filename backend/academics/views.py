@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .models import Course, Discipline
+from .models import Course, Discipline, ensure_default_courses
 from .serializers import CourseSerializer, DisciplineSerializer
 from users.models import get_active_google_drive_connection
 
@@ -23,6 +23,7 @@ def course_list(request):
     if auth_error:
         return auth_error
 
+    ensure_default_courses()
     courses = Course.objects.all().order_by("number")
     serializer = CourseSerializer(courses, many=True)
     return Response(serializer.data)

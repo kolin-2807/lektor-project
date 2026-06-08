@@ -352,6 +352,7 @@ body.public-test-mode .modal-backdrop {
   margin: 0;
   padding: 12px clamp(14px, 1.4vw, 22px);
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -360,6 +361,7 @@ body.public-test-mode .modal-backdrop {
 .brand {
   position: relative;
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 7px;
   min-width: 0;
@@ -408,6 +410,7 @@ body.public-test-mode .modal-backdrop {
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  white-space: nowrap;
 }
 
 .role-title-btn {
@@ -417,11 +420,23 @@ body.public-test-mode .modal-backdrop {
   background: transparent;
   color: var(--text);
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   font-size: 20px;
   font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
+#brandRoleTitle {
+  display: inline-block;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  line-height: 1;
 }
 
 .role-title-arrow {
@@ -3900,11 +3915,24 @@ body.auth-gate-mode:not(.public-test-mode) .auth-voice-slot .voice-windows {
   }
 
   .topbar-inner {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand,
+  .brand-text,
+  .role-title-btn,
+  #brandRoleTitle {
+    min-width: max-content;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: keep-all;
   }
 
   .topbar-right {
+    flex: 0 0 auto;
     justify-content: flex-end;
   }
 }
@@ -6490,8 +6518,7 @@ body::after {
   .course-card-title,
   .summary-name,
   .profile-main strong,
-  .profile-main span,
-  #brandRoleTitle {
+  .profile-main span {
     overflow: visible;
     text-overflow: clip;
     white-space: normal;

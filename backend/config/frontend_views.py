@@ -29,6 +29,15 @@ def frontend_index(_request):
     return response
 
 
+def frontend_landing(_request):
+    landing_path = _resolve_frontend_path("landing.html")
+    response = FileResponse(landing_path.open("rb"), content_type="text/html")
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+
 def frontend_asset(_request, asset_kind: str, asset_path: str):
     file_path = _resolve_frontend_path(f"{asset_kind}/{asset_path}")
     content_type, _ = mimetypes.guess_type(file_path.name)

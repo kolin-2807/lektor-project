@@ -2634,7 +2634,10 @@ function renderDriveStatus() {
 
 async function connectGoogleDrive() {
   try {
-    const payload = await fetchJSON(`${API_BASE}/users/drive/connect/`, {
+    const requestUrl = new URL(`${API_BASE}/users/drive/connect/`);
+    requestUrl.searchParams.set("return_to", `${window.location.origin}${window.location.pathname}`);
+
+    const payload = await fetchJSON(requestUrl.toString(), {
       credentials: "include"
     });
 
@@ -7469,6 +7472,22 @@ function handleDriveReturnParams() {
   }
 }
 
+function consumeLandingAuthParam() {
+  const params = new URLSearchParams(window.location.search);
+  const shouldOpenAuth = params.get("auth") === "open";
+
+  if (!shouldOpenAuth) {
+    return false;
+  }
+
+  params.delete("auth");
+  const nextQuery = params.toString();
+  const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+  window.history.replaceState({}, "", nextUrl);
+
+  return true;
+}
+
 if (addDisciplineBtn) {
   addDisciplineBtn.addEventListener("click", openDisciplineModal);
 }
@@ -8894,6 +8913,7 @@ async function bootstrapApp() {
   applyStaticTranslations();
   renderProfile();
   renderAuthState();
+  const shouldOpenLandingAuth = consumeLandingAuthParam();
 
   if (await initPublicTestMode()) {
     return;
@@ -8903,6 +8923,9 @@ async function bootstrapApp() {
   const status = await loadDriveStatus();
 
   if (!status.connected) {
+    if (shouldOpenLandingAuth) {
+      openAuthModal();
+    }
     coursesData = [];
     if (courseGrid) courseGrid.innerHTML = "";
     return;

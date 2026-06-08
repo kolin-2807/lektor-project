@@ -382,7 +382,7 @@ class GeminiTestNormalizationTests(SimpleTestCase):
 class SlideGenerationFlowTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.course = Course.objects.create(number=3)
+        self.course, _ = Course.objects.get_or_create(number=3)
         self.discipline = Discipline.objects.create(
             course=self.course,
             title="Geometry",

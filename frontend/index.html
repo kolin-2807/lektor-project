@@ -6,6 +6,7 @@
   <title>iLector</title>
   <link rel="stylesheet" href="./css/style.css?v=20260421-018" />
 </head>
+
 <body>
   <section class="public-test-shell hidden" id="publicTestView">
     <div class="public-test-box">
@@ -72,16 +73,16 @@
 
           <div class="profile-shell hidden" id="profileShell">
             <button class="profile-avatar-btn" id="profileBtn" type="button" aria-label="profile">
-              <div class="avatar" id="topAvatar"></div>
+              <div class="avatar" id="topAvatar">КЕ</div>
             </button>
 
             <div class="profile-dropdown" id="profileDropdown">
               <div class="profile-card-top">
-                <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;"></div>
+                <div class="avatar" id="dropdownAvatar" style="width:52px;height:52px;font-size:16px;">КЕ</div>
                 <div class="profile-main">
-                  <strong id="dropdownName"></strong>
-                  <span id="dropdownRole"></span>
-                  <span id="dropdownEmail"></span>
+                  <strong id="dropdownName">Каламан Ерболат Тлеуханұлы</strong>
+                  <span id="dropdownRole">оқытушы</span>
+                  <span id="dropdownEmail">kalaman@university.kz</span>
                 </div>
               </div>
 
@@ -130,14 +131,15 @@
             </div>
 
             <div class="subject-cover-main">
-            <div class="subject-course-card" aria-hidden="true">
-              <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
-                <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration"></div>
+              <div class="subject-course-card" aria-hidden="true">
+                <div class="course-card-cover subject-course-card-cover" id="subjectCourseCardCover">
+                  <div class="course-card-illustration subject-course-illustration" id="subjectCourseIllustration"></div>
+                </div>
               </div>
-            </div>
-            <div class="subject-cover-copy">
-              <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
-              <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
+
+              <div class="subject-cover-copy">
+                <h2 id="subjectTitle">Желілік қауіпсіздік</h2>
+                <input class="subject-title-input hidden" id="subjectTitleInput" type="text" maxlength="255" />
                 <p id="subjectCourse">3 курс</p>
               </div>
             </div>
@@ -174,6 +176,8 @@
                   <option value="lecture">Дәріс</option>
                   <option value="lab">Зертхана</option>
                   <option value="practice">Практика</option>
+                  <option value="siw">СӨЖ</option>
+                  <option value="syllabus">Силлабус</option>
                 </select>
               </div>
 
@@ -536,11 +540,11 @@
         </div>
 
         <div class="profile-modal-head">
-          <div class="avatar-edit" id="avatarEditPreview"></div>
+          <div class="avatar-edit" id="avatarEditPreview">КЕ</div>
 
           <div class="profile-head-copy">
-            <h4 id="profileModalNameText"></h4>
-            <p id="profileModalRoleText"></p>
+            <h4 id="profileModalNameText">Каламан Ерболат Тлеуханұлы</h4>
+            <p id="profileModalRoleText">оқытушы</p>
           </div>
         </div>
 
@@ -549,7 +553,7 @@
         <div class="edit-grid">
           <div class="edit-field">
             <label for="profileUsernameInput">Username</label>
-            <input id="profileUsernameInput" type="text" value="" />
+            <input id="profileUsernameInput" type="text" value="kalaman_erbolat" />
           </div>
 
           <div class="edit-field">
@@ -641,6 +645,6 @@
     </div>
   </div>
 
-    <script src="./js/app.js?v=20260421-011"></script>
+  <script src="./js/app.js?v=20260608-02"></script>
 </body>
 </html>
