@@ -7,12 +7,14 @@ from .views import (
     material_list,
     preview_material,
     reset_material_slides,
+    slide_template_catalog,
     speak_assistant_reply,
     transcribe_voice,
     upload_material,
 )
 
 urlpatterns = [
+    path("materials/slide-templates/", slide_template_catalog, name="slide-template-catalog"),
     path("materials/", material_list, name="material-list"),
     path("materials/upload/", upload_material, name="material-upload"),
     path("materials/<int:material_id>/preview/", preview_material, name="material-preview"),

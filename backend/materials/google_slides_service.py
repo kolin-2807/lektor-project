@@ -3,7 +3,15 @@ import re
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-from users.google_oauth import bypass_broken_local_proxy, credentials_from_dict, credentials_to_dict
+from users.google_oauth import (
+    GOOGLE_DRIVE_FULL_SCOPE,
+    bypass_broken_local_proxy,
+    credentials_from_dict,
+    credentials_to_dict,
+    ensure_google_credentials_ready,
+    has_google_scope,
+)
+from .slide_templates import get_slide_template_definition, is_master_slide_template
 
 
 def _refresh_connection_credentials(connection):
@@ -14,6 +22,8 @@ def _refresh_connection_credentials(connection):
             credentials.refresh(Request())
         connection.credentials_json = credentials_to_dict(credentials)
         connection.save(update_fields=["credentials_json", "updated_at"])
+
+    ensure_google_credentials_ready(credentials)
 
     return credentials
 
@@ -77,6 +87,26 @@ TEMPLATE_THEMES = {
         "mark": {"red": 0.03, "green": 0.03, "blue": 0.03},
     },
 }
+
+MASTER_TEMPLATE_PLACEHOLDERS = {
+    "presentation_title": "{{PRESENTATION_TITLE}}",
+    "presentation_subtitle": "{{PRESENTATION_SUBTITLE}}",
+    "slide_title": "{{SLIDE_TITLE}}",
+    "slide_body": "{{SLIDE_BODY}}",
+    "slide_number": "{{SLIDE_NUMBER}}",
+}
+
+MASTER_TEMPLATE_TEXT_STYLE_FIELDS = [
+    "bold",
+    "italic",
+    "fontSize",
+    "foregroundColor",
+    "weightedFontFamily",
+]
+MASTER_TEMPLATE_PARAGRAPH_STYLE_FIELDS = [
+    "alignment",
+    "lineSpacing",
+]
 
 
 def _template_theme(template_id: str) -> dict:
@@ -255,7 +285,11 @@ def _move_file_to_folder(drive_service, file_id: str, folder_id: str):
         return
 
     with bypass_broken_local_proxy():
-        meta = drive_service.files().get(fileId=file_id, fields="parents").execute()
+        meta = drive_service.files().get(
+            fileId=file_id,
+            fields="parents",
+            supportsAllDrives=True,
+        ).execute()
 
     existing_parents = ",".join(meta.get("parents", []))
     update_kwargs = {
@@ -280,7 +314,7 @@ def _collect_presentation_object_ids(presentation: dict) -> tuple[set[str], set[
         if page_id:
             page_ids.add(page_id)
 
-        for element in slide.get("pageElements", []) or []:
+        for element in _iter_page_elements(slide.get("pageElements", []) or []):
             element_id = element.get("objectId")
             if element_id:
                 element_ids.add(element_id)
@@ -300,12 +334,28 @@ def _presentation_element_ids(presentation: dict) -> list[str]:
     ids = []
 
     for slide in presentation.get("slides", []) or []:
-        for element in slide.get("pageElements", []) or []:
+        for element in _iter_page_elements(slide.get("pageElements", []) or []):
             element_id = element.get("objectId")
             if element_id:
                 ids.append(element_id)
 
     return ids
+
+
+def _iter_page_elements(page_elements: list[dict]) -> list[dict]:
+    elements = []
+
+    for element in page_elements or []:
+        if not isinstance(element, dict):
+            continue
+
+        elements.append(element)
+        group = element.get("elementGroup") or {}
+        children = group.get("children") or []
+        if children:
+            elements.extend(_iter_page_elements(children))
+
+    return elements
 
 
 def _text_from_shape(element: dict) -> str:
@@ -319,9 +369,234 @@ def _text_from_shape(element: dict) -> str:
     return "".join(text_parts).strip()
 
 
+def _normalize_placeholder_fragment(value: str) -> str:
+    return re.sub(r"[\s_\-]+", "", str(value or ""))
+
+
+def _extract_master_text_style(shape: dict) -> tuple[dict, str]:
+    style = {}
+
+    for text_element in shape.get("text", {}).get("textElements", []) or []:
+        text_run = text_element.get("textRun") or {}
+        text_style = text_run.get("style") or {}
+
+        for field_name in MASTER_TEMPLATE_TEXT_STYLE_FIELDS:
+            if field_name in text_style and field_name not in style:
+                style[field_name] = text_style[field_name]
+
+        if style:
+            break
+
+    fields = ",".join(field_name for field_name in MASTER_TEMPLATE_TEXT_STYLE_FIELDS if field_name in style)
+    return style, fields
+
+
+def _extract_master_paragraph_style(shape: dict) -> tuple[dict, str]:
+    style = {}
+
+    for text_element in shape.get("text", {}).get("textElements", []) or []:
+        paragraph_marker = text_element.get("paragraphMarker") or {}
+        paragraph_style = paragraph_marker.get("style") or {}
+
+        for field_name in MASTER_TEMPLATE_PARAGRAPH_STYLE_FIELDS:
+            if field_name in paragraph_style and field_name not in style:
+                style[field_name] = paragraph_style[field_name]
+
+        if style:
+            break
+
+    fields = ",".join(field_name for field_name in MASTER_TEMPLATE_PARAGRAPH_STYLE_FIELDS if field_name in style)
+    return style, fields
+
+
+def _find_master_placeholder_slide_elements(slide: dict, placeholder: str) -> list[dict]:
+    placeholder_text = str(placeholder or "")
+    normalized_placeholder = _normalize_placeholder_fragment(placeholder_text)
+    placeholder_core = placeholder_text.replace("{", "").replace("}", "")
+    normalized_core = _normalize_placeholder_fragment(placeholder_core)
+    page_elements = _iter_page_elements(slide.get("pageElements", []) or [])
+
+    full_matches = []
+    core_matches = []
+    brace_matches = []
+
+    for element in page_elements:
+        shape = element.get("shape") or {}
+        if not shape:
+            continue
+
+        shape_text = _text_from_shape(element)
+        normalized_shape_text = _normalize_placeholder_fragment(shape_text)
+        if not normalized_shape_text:
+            continue
+
+        if normalized_placeholder and normalized_placeholder in normalized_shape_text:
+            full_matches.append(element)
+            continue
+
+        if normalized_core and normalized_core in normalized_shape_text:
+            core_matches.append(element)
+            continue
+
+        if normalized_shape_text in {"{{", "}}", "{", "}"}:
+            brace_matches.append(element)
+
+    if full_matches:
+        return full_matches
+
+    if core_matches:
+        return [*core_matches, *brace_matches]
+
+    return []
+
+
+def _anchor_master_placeholder_element(elements: list[dict]) -> dict | None:
+    if not elements:
+        return None
+
+    return max(
+        elements,
+        key=lambda item: len(_normalize_placeholder_fragment(_text_from_shape(item))),
+    )
+
+
+def _extract_master_placeholder_style_blueprint(slide: dict) -> dict:
+    blueprint = {}
+
+    for placeholder in MASTER_TEMPLATE_PLACEHOLDERS.values():
+        matching_elements = _find_master_placeholder_slide_elements(slide, placeholder)
+        anchor_element = _anchor_master_placeholder_element(matching_elements)
+        if not anchor_element:
+            continue
+
+        shape = anchor_element.get("shape") or {}
+        if not shape:
+            continue
+
+        text_style, text_fields = _extract_master_text_style(shape)
+        paragraph_style, paragraph_fields = _extract_master_paragraph_style(shape)
+        blueprint[placeholder] = {
+            "text_style": text_style,
+            "text_fields": text_fields,
+            "paragraph_style": paragraph_style,
+            "paragraph_fields": paragraph_fields,
+        }
+
+    return blueprint
+
+
+def _adapt_master_placeholder_text_style(style: dict, placeholder: str, replacement_text: str) -> dict:
+    normalized_text = " ".join(str(replacement_text or "").split())
+    if not normalized_text:
+        return style
+
+    font_size = ((style or {}).get("fontSize") or {}).get("magnitude")
+    if not font_size:
+        return style
+
+    visible_length = len(re.sub(r"\s+", "", normalized_text))
+    scale = 1.0
+
+    if placeholder == MASTER_TEMPLATE_PLACEHOLDERS["presentation_title"]:
+        if visible_length >= 68:
+            scale = 0.66
+        elif visible_length >= 54:
+            scale = 0.76
+        elif visible_length >= 42:
+            scale = 0.86
+    elif placeholder == MASTER_TEMPLATE_PLACEHOLDERS["slide_title"]:
+        if visible_length >= 56:
+            scale = 0.72
+        elif visible_length >= 42:
+            scale = 0.82
+
+    if scale >= 0.999:
+        return style
+
+    adapted_style = dict(style)
+    adapted_style["fontSize"] = {
+        **dict(adapted_style.get("fontSize") or {}),
+        "magnitude": max(round(float(font_size) * scale, 2), 14.0),
+    }
+    return adapted_style
+
+
+def _collect_master_placeholder_style_requests(
+    presentation: dict,
+    placeholder_blueprint: dict | None = None,
+    slide_ids: list[str] | None = None,
+    placeholder_text_map: dict[str, str] | None = None,
+) -> list[dict]:
+    requests: list[dict] = []
+    allowed_slide_ids = set(slide_ids or [])
+
+    for slide in presentation.get("slides", []) or []:
+        slide_id = slide.get("objectId")
+        if allowed_slide_ids and slide_id not in allowed_slide_ids:
+            continue
+
+        for matched_placeholder in MASTER_TEMPLATE_PLACEHOLDERS.values():
+            if placeholder_text_map is not None:
+                replacement_text = placeholder_text_map.get(matched_placeholder)
+                if replacement_text is None or replacement_text == "":
+                    continue
+
+            matching_elements = _find_master_placeholder_slide_elements(slide, matched_placeholder)
+            anchor_element = _anchor_master_placeholder_element(matching_elements)
+            if not anchor_element:
+                continue
+
+            object_id = anchor_element.get("objectId")
+            shape = anchor_element.get("shape") or {}
+            if not object_id or not shape:
+                continue
+
+            if placeholder_blueprint and matched_placeholder in placeholder_blueprint:
+                text_style = placeholder_blueprint[matched_placeholder].get("text_style") or {}
+                text_fields = placeholder_blueprint[matched_placeholder].get("text_fields") or ""
+                paragraph_style = placeholder_blueprint[matched_placeholder].get("paragraph_style") or {}
+                paragraph_fields = placeholder_blueprint[matched_placeholder].get("paragraph_fields") or ""
+            else:
+                text_style, text_fields = _extract_master_text_style(shape)
+                paragraph_style, paragraph_fields = _extract_master_paragraph_style(shape)
+
+            if placeholder_text_map is not None and matched_placeholder in placeholder_text_map:
+                text_style = _adapt_master_placeholder_text_style(
+                    text_style,
+                    matched_placeholder,
+                    placeholder_text_map.get(matched_placeholder) or "",
+                )
+
+            if text_style and text_fields:
+                requests.append(
+                    {
+                        "updateTextStyle": {
+                            "objectId": object_id,
+                            "textRange": {"type": "ALL"},
+                            "style": text_style,
+                            "fields": text_fields,
+                        }
+                    }
+                )
+
+            if paragraph_style and paragraph_fields:
+                requests.append(
+                    {
+                        "updateParagraphStyle": {
+                            "objectId": object_id,
+                            "textRange": {"type": "ALL"},
+                            "style": paragraph_style,
+                            "fields": paragraph_fields,
+                        }
+                    }
+                )
+
+    return requests
+
+
 def _presentation_text_by_object_id(presentation: dict, object_id: str) -> str:
     for slide in presentation.get("slides", []) or []:
-        for element in slide.get("pageElements", []) or []:
+        for element in _iter_page_elements(slide.get("pageElements", []) or []):
             if element.get("objectId") == object_id:
                 return _text_from_shape(element)
 
@@ -404,6 +679,288 @@ def _extract_outline_from_presentation(presentation: dict, total_slide_count: in
     return title, subtitle, slides
 
 
+def extract_presentation_outline(connection, presentation_id: str, total_slide_count: int) -> dict:
+    if not presentation_id:
+        raise ValueError("presentation_id is required.")
+
+    slides_service, _ = _build_services(connection)
+    with bypass_broken_local_proxy():
+        presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+
+    title, subtitle, slides = _extract_outline_from_presentation(presentation, total_slide_count)
+    return {
+        "presentation_title": title,
+        "presentation_subtitle": subtitle,
+        "slides": slides,
+    }
+
+
+def _copy_presentation_template(drive_service, source_presentation_id: str, new_title: str) -> str:
+    with bypass_broken_local_proxy():
+        created_file = drive_service.files().copy(
+            fileId=source_presentation_id,
+            body={"name": new_title},
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+
+    return str(created_file.get("id") or "").strip()
+
+
+def _replace_all_text_request(match_text: str, replace_text: str, page_ids: list[str] | None = None) -> dict:
+    request = {
+        "replaceAllText": {
+            "containsText": {
+                "text": match_text,
+                "matchCase": True,
+            },
+            "replaceText": replace_text,
+        }
+    }
+    if page_ids:
+        request["replaceAllText"]["pageObjectIds"] = page_ids
+    return request
+
+
+def _replace_shape_text_requests(object_id: str, text: str) -> list[dict]:
+    return [
+        {
+            "deleteText": {
+                "objectId": object_id,
+                "textRange": {"type": "ALL"},
+            }
+        },
+        {
+            "insertText": {
+                "objectId": object_id,
+                "insertionIndex": 0,
+                "text": text,
+            }
+        },
+    ]
+
+
+def _collect_master_placeholder_content_requests(
+    presentation: dict,
+    replacement_map: dict[str, str],
+    slide_ids: list[str] | None = None,
+) -> list[dict]:
+    requests: list[dict] = []
+    allowed_slide_ids = set(slide_ids or [])
+
+    for slide in presentation.get("slides", []) or []:
+        slide_id = slide.get("objectId")
+        if allowed_slide_ids and slide_id not in allowed_slide_ids:
+            continue
+
+        for placeholder, replacement_text in replacement_map.items():
+            matching_elements = _find_master_placeholder_slide_elements(slide, placeholder)
+            anchor_element = _anchor_master_placeholder_element(matching_elements)
+            if not anchor_element:
+                continue
+
+            anchor_object_id = anchor_element.get("objectId")
+            if not anchor_object_id:
+                continue
+
+            requests.extend(
+                _replace_shape_text_requests(
+                    object_id=anchor_object_id,
+                    text=replacement_text,
+                )
+            )
+
+            for element in matching_elements:
+                object_id = element.get("objectId")
+                if object_id and object_id != anchor_object_id:
+                    requests.append({"deleteObject": {"objectId": object_id}})
+
+    return requests
+
+
+def _master_template_requests(
+    presentation: dict,
+    slides: list[dict],
+) -> list[dict]:
+    page_ids = _presentation_page_ids(presentation)
+    if len(page_ids) < 3:
+        raise ValueError(
+            "Google Slides master template must contain at least 3 slides: cover, content, and closing."
+        )
+
+    content_template_slide_ids = page_ids[1:-1]
+    content_slide_total = max(len(slides), 1)
+    requests: list[dict] = []
+
+    if len(content_template_slide_ids) > content_slide_total:
+        for extra_slide_id in content_template_slide_ids[content_slide_total:]:
+            requests.append({"deleteObject": {"objectId": extra_slide_id}})
+
+    if not content_template_slide_ids:
+        raise ValueError(
+            "Google Slides master template must contain at least one content slide between cover and closing."
+        )
+
+    additional_content_slides = max(content_slide_total - len(content_template_slide_ids), 0)
+    for index in range(additional_content_slides):
+        requests.append(
+            {
+                "duplicateObject": {
+                    "objectId": content_template_slide_ids[index % len(content_template_slide_ids)],
+                }
+            }
+        )
+
+    return requests
+
+
+def _fill_master_template_content(
+    slides_service,
+    presentation_id: str,
+    safe_title: str,
+    safe_subtitle: str,
+    slides: list[dict],
+    template_definition: dict | None = None,
+) -> None:
+    with bypass_broken_local_proxy():
+        presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+
+    template_options = (template_definition or {}).get("options") or {}
+    show_closing_subtitle = bool(template_options.get("show_closing_subtitle", True))
+    initial_slides = presentation.get("slides", []) or []
+    cover_style_blueprint = _extract_master_placeholder_style_blueprint(initial_slides[0]) if len(initial_slides) >= 1 else {}
+    closing_style_blueprint = _extract_master_placeholder_style_blueprint(initial_slides[-1]) if len(initial_slides) >= 3 else {}
+
+    initial_requests = _master_template_requests(
+        presentation=presentation,
+        slides=slides,
+    )
+    if initial_requests:
+        with bypass_broken_local_proxy():
+            slides_service.presentations().batchUpdate(
+                presentationId=presentation_id,
+                body={"requests": initial_requests},
+            ).execute()
+
+        with bypass_broken_local_proxy():
+            presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+
+    current_page_ids = _presentation_page_ids(presentation)
+    cover_slide_id = current_page_ids[0] if current_page_ids else ""
+    closing_slide_id = current_page_ids[-1] if current_page_ids else ""
+    style_requests: list[dict] = []
+    if cover_slide_id and cover_style_blueprint:
+        style_requests.extend(
+            _collect_master_placeholder_style_requests(
+                presentation,
+                placeholder_blueprint=cover_style_blueprint,
+                slide_ids=[cover_slide_id],
+                placeholder_text_map={
+                    MASTER_TEMPLATE_PLACEHOLDERS["presentation_title"]: safe_title,
+                    MASTER_TEMPLATE_PLACEHOLDERS["presentation_subtitle"]: safe_subtitle or safe_title,
+                },
+            )
+        )
+    if closing_slide_id and closing_style_blueprint:
+        closing_subtitle_text = safe_subtitle or safe_title if show_closing_subtitle else ""
+        style_requests.extend(
+            _collect_master_placeholder_style_requests(
+                presentation,
+                placeholder_blueprint=closing_style_blueprint,
+                slide_ids=[closing_slide_id],
+                placeholder_text_map={
+                    MASTER_TEMPLATE_PLACEHOLDERS["presentation_title"]: safe_title,
+                    MASTER_TEMPLATE_PLACEHOLDERS["presentation_subtitle"]: closing_subtitle_text,
+                },
+            )
+        )
+
+    global_requests = _collect_master_placeholder_content_requests(
+        presentation,
+        replacement_map={MASTER_TEMPLATE_PLACEHOLDERS["presentation_title"]: safe_title},
+        slide_ids=current_page_ids,
+    )
+    subtitle_slide_ids = current_page_ids if show_closing_subtitle or not closing_slide_id else [
+        page_id for page_id in current_page_ids if page_id != closing_slide_id
+    ]
+    subtitle_requests = _collect_master_placeholder_content_requests(
+        presentation,
+        replacement_map={
+            MASTER_TEMPLATE_PLACEHOLDERS["presentation_subtitle"]: safe_subtitle or safe_title,
+        },
+        slide_ids=subtitle_slide_ids,
+    )
+    if subtitle_requests:
+        global_requests.extend(subtitle_requests)
+    if closing_slide_id and not show_closing_subtitle:
+        global_requests.extend(
+            _collect_master_placeholder_content_requests(
+                presentation,
+                replacement_map={
+                    MASTER_TEMPLATE_PLACEHOLDERS["presentation_subtitle"]: "\u00A0",
+                },
+                slide_ids=[closing_slide_id],
+            )
+        )
+    if global_requests:
+        with bypass_broken_local_proxy():
+            slides_service.presentations().batchUpdate(
+                presentationId=presentation_id,
+                body={"requests": [*global_requests, *style_requests]},
+            ).execute()
+
+        with bypass_broken_local_proxy():
+            presentation = slides_service.presentations().get(presentationId=presentation_id).execute()
+
+    page_ids = _presentation_page_ids(presentation)
+    if len(page_ids) < 3:
+        raise ValueError("Copied master template does not contain enough slides after duplication.")
+
+    content_slide_ids = page_ids[1:-1]
+    if len(content_slide_ids) < len(slides):
+        raise ValueError("Copied master template does not have enough content slides.")
+
+    content_style_blueprints_by_slide_id = {
+        slide.get("objectId"): _extract_master_placeholder_style_blueprint(slide)
+        for slide in presentation.get("slides", []) or []
+        if slide.get("objectId") in content_slide_ids
+    }
+
+    content_requests: list[dict] = []
+    content_style_requests: list[dict] = []
+    for index, slide in enumerate(slides, start=1):
+        slide_id = content_slide_ids[index - 1]
+        slide_title = " ".join(str(slide.get("title") or "").split()) or f"Slide {index}"
+        body_text = "\n".join(_normalize_bullets(slide.get("bullets"))) or "\u00A0"
+        content_replacement_map = {
+            MASTER_TEMPLATE_PLACEHOLDERS["slide_number"]: f"{index:02}",
+            MASTER_TEMPLATE_PLACEHOLDERS["slide_title"]: slide_title,
+            MASTER_TEMPLATE_PLACEHOLDERS["slide_body"]: body_text,
+        }
+        content_requests.extend(
+            _collect_master_placeholder_content_requests(
+                presentation,
+                replacement_map=content_replacement_map,
+                slide_ids=[slide_id],
+            )
+        )
+        content_style_requests.extend(
+            _collect_master_placeholder_style_requests(
+                presentation,
+                placeholder_blueprint=content_style_blueprints_by_slide_id.get(slide_id) or {},
+                slide_ids=[slide_id],
+                placeholder_text_map=content_replacement_map,
+            )
+        )
+
+    if content_requests:
+        with bypass_broken_local_proxy():
+            slides_service.presentations().batchUpdate(
+                presentationId=presentation_id,
+                body={"requests": [*content_requests, *content_style_requests]},
+            ).execute()
+
+
 def _append_shape_style_if_present(
     requests: list[dict],
     object_ids: set[str],
@@ -451,6 +1008,8 @@ def update_presentation_template(
 ) -> None:
     if not presentation_id:
         return
+    if is_master_slide_template(template_id):
+        raise ValueError("Master slide templates must be regenerated instead of updated in place.")
 
     slides_service, _ = _build_services(connection)
     theme = _template_theme(template_id)
@@ -1328,7 +1887,41 @@ def create_presentation_from_outline(
     slides_service, drive_service = _build_services(connection)
     safe_title = " ".join((title or "").split()) or "AI Slides"
     safe_subtitle = " ".join((subtitle or "").split())
-    theme = _template_theme(template_id)
+    template_definition = get_slide_template_definition(template_id)
+    resolved_template_id = template_definition.get("id") or template_id
+    theme = _template_theme(resolved_template_id)
+
+    if is_master_slide_template(resolved_template_id):
+        if not has_google_scope(getattr(connection, "credentials_json", {}), GOOGLE_DRIVE_FULL_SCOPE):
+            raise RuntimeError(
+                "Google Drive connection uses old permissions. Reconnect Google Drive to grant full Drive access for master slide templates."
+            )
+
+        source_presentation_id = str(template_definition.get("source_presentation_id") or "").strip()
+        if not source_presentation_id:
+            raise ValueError("Google Slides master template source_presentation_id is not configured.")
+
+        presentation_id = _copy_presentation_template(drive_service, source_presentation_id, safe_title)
+        if not presentation_id:
+            raise ValueError("Google Slides template copy failed.")
+
+        _move_file_to_folder(drive_service, presentation_id, folder_id)
+        _fill_master_template_content(
+            slides_service=slides_service,
+            presentation_id=presentation_id,
+            safe_title=safe_title,
+            safe_subtitle=safe_subtitle,
+            slides=slides,
+            template_definition=template_definition,
+        )
+
+        base_url = f"https://docs.google.com/presentation/d/{presentation_id}"
+        return {
+            "presentation_id": presentation_id,
+            "slides_url": f"{base_url}/edit",
+            "slides_embed_url": f"{base_url}/embed?start=false&loop=false&delayms=4000",
+            "slides_download_url": f"{base_url}/export/pptx",
+        }
 
     with bypass_broken_local_proxy():
         presentation = slides_service.presentations().create(body={"title": safe_title}).execute()
@@ -1337,7 +1930,7 @@ def create_presentation_from_outline(
     default_slides = presentation.get("slides", [])
     default_slide_id = default_slides[0].get("objectId") if default_slides else ""
 
-    if template_id == "ilector-academic":
+    if resolved_template_id == "ilector-academic":
         requests = _academic_blue_presentation_requests(
             safe_title=safe_title,
             safe_subtitle=safe_subtitle,
@@ -1362,7 +1955,7 @@ def create_presentation_from_outline(
             "slides_download_url": f"{base_url}/export/pptx",
         }
 
-    if template_id == "ilector-minimal":
+    if resolved_template_id == "ilector-minimal":
         requests = _corporate_presentation_requests(
             safe_title=safe_title,
             safe_subtitle=safe_subtitle,
@@ -1387,7 +1980,7 @@ def create_presentation_from_outline(
             "slides_download_url": f"{base_url}/export/pptx",
         }
 
-    if template_id == "ilector-focus":
+    if resolved_template_id == "ilector-focus":
         requests = _minimalist_presentation_requests(
             safe_title=safe_title,
             safe_subtitle=safe_subtitle,

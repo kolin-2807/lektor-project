@@ -1,6 +1,7 @@
 import json
 import os
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode, urlparse
@@ -21,18 +22,27 @@ OAUTH_SCOPES = [
     "openid",
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
-    "https://www.googleapis.com/auth/drive.file",
+    # `drive.file` is too narrow for manually created Google Slides master templates.
+    # We need full Drive access so the authenticated user can copy a template they own.
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/forms.body",
     "https://www.googleapis.com/auth/forms.responses.readonly",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/presentations",
 ]
 
+DEFAULT_GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
+GOOGLE_DRIVE_FULL_SCOPE = "https://www.googleapis.com/auth/drive"
+
 SESSION_CONNECTION_KEY = "google_drive_connection_id"
 SESSION_OAUTH_STATE_KEY = "google_drive_oauth_state"
 SESSION_OAUTH_CODE_VERIFIER_KEY = "google_drive_oauth_code_verifier"
 SESSION_FRONTEND_SUCCESS_URL_KEY = "google_drive_frontend_success_url"
 BROKEN_LOCAL_PROXY_MARKERS = ("127.0.0.1:9", "localhost:9")
+
+
+class GoogleOAuthCredentialsError(RuntimeError):
+    """Raised when stored Google OAuth credentials can no longer be used safely."""
 
 
 @contextmanager
@@ -263,11 +273,88 @@ def credentials_to_dict(credentials: Any) -> dict:
     return json.loads(credentials.to_json())
 
 
+def _parse_google_expiry(raw_value: Any):
+    raw_text = str(raw_value or "").strip()
+    if not raw_text:
+        return None
+
+    normalized = raw_text.replace("Z", "+00:00")
+    try:
+        expiry = datetime.fromisoformat(normalized)
+        if expiry.tzinfo is not None:
+            expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
+        return expiry
+    except ValueError:
+        return None
+
+
+def _build_google_credentials(data: dict, granted_scopes: list[str]):
+    token = str(data.get("token") or "").strip()
+    client_id = str(data.get("client_id") or "").strip()
+    client_secret = str(data.get("client_secret") or "").strip()
+    token_uri = str(data.get("token_uri") or DEFAULT_GOOGLE_TOKEN_URI).strip() or DEFAULT_GOOGLE_TOKEN_URI
+
+    if not token or not client_id or not client_secret:
+        raise GoogleOAuthCredentialsError(
+            "Stored Google Drive connection is incomplete. Reconnect Google Drive and try again."
+        )
+
+    return Credentials(
+        token=token,
+        refresh_token=str(data.get("refresh_token") or "").strip() or None,
+        id_token=data.get("id_token"),
+        token_uri=token_uri,
+        client_id=client_id,
+        client_secret=client_secret,
+        scopes=granted_scopes,
+        expiry=_parse_google_expiry(data.get("expiry")),
+    )
+
+
 def credentials_from_dict(data: dict):
     if Credentials is None:
         raise RuntimeError("Google OAuth dependencies are not installed.")
+    if not isinstance(data, dict) or not data:
+        raise GoogleOAuthCredentialsError(
+            "Google Drive connection is missing. Reconnect Google Drive and try again."
+        )
+
     granted_scopes = data.get("scopes") or OAUTH_SCOPES
-    return Credentials.from_authorized_user_info(data, granted_scopes)
+    refresh_token = str(data.get("refresh_token") or "").strip()
+
+    if refresh_token:
+        try:
+            return Credentials.from_authorized_user_info(data, granted_scopes)
+        except ValueError:
+            pass
+
+    return _build_google_credentials(data, granted_scopes)
+
+
+def ensure_google_credentials_ready(credentials):
+    if credentials is None:
+        raise GoogleOAuthCredentialsError(
+            "Google Drive connection is missing. Reconnect Google Drive and try again."
+        )
+
+    if getattr(credentials, "expired", False) and not getattr(credentials, "refresh_token", None):
+        raise GoogleOAuthCredentialsError(
+            "Google Drive connection expired. Reconnect Google Drive and grant access again."
+        )
+
+    return credentials
+
+
+def has_google_scope(data: dict | None, required_scope: str) -> bool:
+    if not isinstance(data, dict):
+        return False
+
+    scopes = data.get("scopes") or []
+    if not isinstance(scopes, list):
+        return False
+
+    normalized_required_scope = str(required_scope or "").strip()
+    return normalized_required_scope in {str(scope or "").strip() for scope in scopes}
 
 
 def fetch_google_userinfo(credentials) -> dict:

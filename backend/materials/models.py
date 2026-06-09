@@ -26,6 +26,7 @@ class Material(models.Model):
     slides_download_url = models.URLField(blank=True)
     slides_count = models.PositiveSmallIntegerField(default=0)
     slides_template_id = models.CharField(max_length=64, default="ilector-academic")
+    slides_outline_json = models.JSONField(default=dict, blank=True)
     drive_file_id = models.CharField(max_length=255, blank=True)
     drive_folder_id = models.CharField(max_length=255, blank=True)
     mime_type = models.CharField(max_length=255, blank=True)

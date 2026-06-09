@@ -11,7 +11,12 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
-from users.google_oauth import bypass_broken_local_proxy, credentials_from_dict, credentials_to_dict
+from users.google_oauth import (
+    bypass_broken_local_proxy,
+    credentials_from_dict,
+    credentials_to_dict,
+    ensure_google_credentials_ready,
+)
 
 
 SUPPORTED_DRIVE_LANGUAGES = {"kaz", "rus", "eng"}
@@ -48,6 +53,8 @@ def get_drive_service(connection):
             credentials.refresh(Request())
         connection.credentials_json = credentials_to_dict(credentials)
         connection.save(update_fields=["credentials_json", "updated_at"])
+
+    ensure_google_credentials_ready(credentials)
 
     with bypass_broken_local_proxy():
         return build("drive", "v3", credentials=credentials)
@@ -261,7 +268,11 @@ def extract_material_text(content: bytes, mime_type: str = "", original_filename
     if normalized_mime.startswith("text/") or suffix in {".txt", ".md", ".csv", ".json", ".html", ".xml"}:
         return _decode_text_bytes(content)
 
-    if normalized_mime == "application/vnd.google-apps.document" or suffix == ".docx":
+    # Google Docs files are exported as plain text bytes in download_material_bytes().
+    if normalized_mime == "application/vnd.google-apps.document":
+        return _decode_text_bytes(content)
+
+    if suffix == ".docx":
         return _extract_docx_text(content)
 
     if suffix == ".pptx" or normalized_mime == "application/vnd.openxmlformats-officedocument.presentationml.presentation":

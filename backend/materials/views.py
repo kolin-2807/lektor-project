@@ -32,6 +32,13 @@ from users.models import get_active_google_drive_connection, resolve_google_driv
 
 from .models import Material
 from .serializers import MaterialSerializer
+from .slide_templates import (
+    get_default_slide_template_id,
+    get_slide_template_catalog,
+    get_slide_template_definition,
+    get_supported_slide_template_ids,
+    is_master_slide_template,
+)
 
 MAX_ASSISTANT_COMMAND_CHARS = 500
 MAX_ASSISTANT_AUDIO_BYTES = 15 * 1024 * 1024
@@ -62,6 +69,11 @@ def _resolve_material_language(request, material):
     if discipline_language in SUPPORTED_MATERIAL_LANGUAGES:
         return discipline_language
     return "kaz"
+
+
+@api_view(["GET"])
+def slide_template_catalog(_request):
+    return Response({"templates": get_slide_template_catalog()})
 
 
 def _build_material_source_text(material, language: str, connection=None) -> str:
@@ -112,6 +124,33 @@ def _build_material_source_text(material, language: str, connection=None) -> str
     """
 
 
+def _material_supports_text_extraction(material) -> bool:
+    suffix = Path(material.original_filename or material.title or "").suffix.lower()
+    normalized_mime = (material.mime_type or "").lower()
+
+    if normalized_mime.startswith("text/"):
+        return True
+
+    supported_suffixes = {
+        ".txt",
+        ".md",
+        ".csv",
+        ".json",
+        ".html",
+        ".xml",
+        ".docx",
+        ".pptx",
+        ".pdf",
+    }
+    supported_mimes = {
+        "application/vnd.google-apps.document",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/pdf",
+    }
+    return suffix in supported_suffixes or normalized_mime in supported_mimes
+
+
 def _has_sufficient_material_text(material, source_text: str) -> bool:
     normalized_source = " ".join(str(source_text or "").split())
     normalized_title = " ".join(str(material.title or "").split())
@@ -142,7 +181,21 @@ def _has_sufficient_material_text(material, source_text: str) -> bool:
             cleaned = cleaned.replace(fragment, " ")
 
     cleaned = " ".join(cleaned.split())
-    return len(cleaned) >= 180
+    word_count = len(re.findall(r"\w+", cleaned, flags=re.UNICODE))
+    metadata_fallback = " ".join(part for part in [normalized_discipline, normalized_title, normalized_description] if part)
+
+    if len(cleaned) >= 180:
+        return True
+
+    if len(cleaned) >= 90 and word_count >= 12:
+        return True
+
+    # Best-effort fallback: if the user uploaded a text-capable file, don't hard-block
+    # slide/test generation just because extraction returned a shorter excerpt.
+    if material.drive_file_id and _material_supports_text_extraction(material):
+        return len(cleaned) >= 35 or len(metadata_fallback) >= 18
+
+    return False
 
 
 def _parse_total_slide_count(raw_value, default: int = 7) -> int:
@@ -155,6 +208,75 @@ def _parse_total_slide_count(raw_value, default: int = 7) -> int:
 
 def _content_slide_count_from_total(total_slide_count: int) -> int:
     return max(2, min(int(total_slide_count or 7) - 2, 10))
+
+
+def _normalize_slide_outline_payload(raw_outline) -> dict | None:
+    if not isinstance(raw_outline, dict):
+        return None
+
+    presentation_title = " ".join(str(raw_outline.get("presentation_title") or "").split())
+    presentation_subtitle = " ".join(str(raw_outline.get("presentation_subtitle") or "").split())
+    raw_slides = raw_outline.get("slides")
+    if not isinstance(raw_slides, list):
+        return None
+
+    normalized_slides = []
+    for raw_slide in raw_slides:
+        if not isinstance(raw_slide, dict):
+            continue
+        slide_title = " ".join(str(raw_slide.get("title") or "").split())
+        raw_bullets = raw_slide.get("bullets") or []
+        if not isinstance(raw_bullets, list):
+            raw_bullets = []
+
+        bullets = [" ".join(str(item or "").split()) for item in raw_bullets if " ".join(str(item or "").split())]
+        if slide_title or bullets:
+            normalized_slides.append(
+                {
+                    "title": slide_title or f"Slide {len(normalized_slides) + 1}",
+                    "bullets": bullets,
+                }
+            )
+
+    if not normalized_slides:
+        return None
+
+    return {
+        "presentation_title": presentation_title,
+        "presentation_subtitle": presentation_subtitle,
+        "slides": normalized_slides,
+    }
+
+
+def _persist_material_slide_outline(material, outline_payload: dict):
+    normalized_outline = _normalize_slide_outline_payload(outline_payload)
+    if not normalized_outline:
+        return
+
+    material.slides_outline_json = normalized_outline
+
+
+def _resolve_material_slide_outline(material, connection, total_slide_count: int, current_template_is_master: bool) -> dict | None:
+    saved_outline = _normalize_slide_outline_payload(getattr(material, "slides_outline_json", None))
+    if saved_outline:
+        return saved_outline
+
+    if current_template_is_master or not material.slides_presentation_id:
+        return None
+
+    from .google_slides_service import extract_presentation_outline
+
+    extracted_outline = _normalize_slide_outline_payload(
+        extract_presentation_outline(
+            connection=connection,
+            presentation_id=material.slides_presentation_id,
+            total_slide_count=total_slide_count,
+        )
+    )
+    if extracted_outline:
+        material.slides_outline_json = extracted_outline
+        material.save(update_fields=["slides_outline_json"])
+    return extracted_outline
 
 
 def _clear_material_slides(material):
@@ -174,7 +296,13 @@ def _is_not_found_drive_error(exc) -> bool:
 
 def _format_google_api_error(exc, fallback_message: str) -> str:
     if not isinstance(exc, HttpError):
-        return str(exc) or fallback_message
+        error_text = str(exc) or fallback_message
+        if (
+            "Authorized user info was not in the expected format" in error_text
+            or "missing fields refresh_token" in error_text
+        ):
+            return "Google Drive connection expired. Reconnect Google Drive and grant access again."
+        return error_text
 
     error_text = str(exc)
 
@@ -473,21 +601,93 @@ def generate_material_slides(request, material_id):
         return Response({"detail": "Slides are available only for lecture materials."}, status=400)
 
     requested_total_slide_count = _parse_total_slide_count(request.data.get("slide_count"), default=7)
-    requested_template_id = str(request.data.get("template_id") or "ilector-academic").strip()
-    if requested_template_id not in {"ilector-academic", "ilector-minimal", "ilector-focus"}:
-        requested_template_id = "ilector-academic"
+    requested_template_input = str(request.data.get("template_id") or get_default_slide_template_id()).strip()
+    requested_template_id = get_slide_template_definition(requested_template_input).get("id", get_default_slide_template_id())
+    requested_template_is_master = is_master_slide_template(requested_template_id)
+    current_template_id = get_slide_template_definition(material.slides_template_id).get("id", get_default_slide_template_id())
+    current_template_is_master = is_master_slide_template(current_template_id)
+    language = _resolve_material_language(request, material)
 
     has_existing_slides = bool(material.slides_presentation_id and material.slides_url and material.slides_embed_url)
-    if has_existing_slides and material.slides_count == requested_total_slide_count:
+    should_rebuild_from_saved_outline = (
+        has_existing_slides
+        and material.slides_count == requested_total_slide_count
+        and (requested_template_is_master or current_template_is_master)
+        and (current_template_id != requested_template_id or requested_template_is_master)
+    )
+    if should_rebuild_from_saved_outline:
+        outline_payload = _resolve_material_slide_outline(
+            material=material,
+            connection=connection,
+            total_slide_count=requested_total_slide_count,
+            current_template_is_master=current_template_is_master,
+        )
+        if outline_payload:
+            try:
+                from .google_drive_service import delete_material_file, ensure_slide_output_folder
+                from .google_slides_service import create_presentation_from_outline
+
+                _, slides_folder_id = ensure_slide_output_folder(connection, material.discipline)
+                presentation_title = (
+                    outline_payload.get("presentation_title")
+                    or material.title
+                    or "AI Slides"
+                ).strip()
+                presentation_subtitle = (
+                    outline_payload.get("presentation_subtitle")
+                    or f"{material.discipline.title} - {material.title}"
+                ).strip()
+                content_slides = outline_payload.get("slides") or []
+
+                try:
+                    delete_material_file(connection, material.slides_presentation_id)
+                except Exception:
+                    pass
+
+                presentation_meta = create_presentation_from_outline(
+                    connection=connection,
+                    title=presentation_title,
+                    subtitle=presentation_subtitle,
+                    slides=content_slides,
+                    folder_id=slides_folder_id,
+                    language=language,
+                    template_id=requested_template_id,
+                )
+
+                material.slides_presentation_id = presentation_meta.get("presentation_id", "")
+                material.slides_url = presentation_meta.get("slides_url", "")
+                material.slides_embed_url = presentation_meta.get("slides_embed_url", "")
+                material.slides_download_url = presentation_meta.get("slides_download_url", "")
+                material.slides_count = requested_total_slide_count
+                material.slides_template_id = requested_template_id
+                _persist_material_slide_outline(material, outline_payload)
+                material.save(
+                    update_fields=[
+                        "slides_presentation_id",
+                        "slides_url",
+                        "slides_embed_url",
+                        "slides_download_url",
+                        "slides_count",
+                        "slides_template_id",
+                        "slides_outline_json",
+                    ]
+                )
+                return Response(MaterialSerializer(material).data)
+            except Exception as exc:
+                return Response(
+                    {"detail": _format_google_api_error(exc, "Slide template rebuild failed")},
+                    status=503,
+                )
+
+    if has_existing_slides and material.slides_count == requested_total_slide_count and not current_template_is_master and not requested_template_is_master:
         should_update_template = (
             material.slides_template_id != requested_template_id
-            or requested_template_id in {"ilector-academic", "ilector-focus", "ilector-minimal"}
+            or requested_template_id in get_supported_slide_template_ids()
         )
         if should_update_template:
             try:
                 from .google_slides_service import update_presentation_template
 
-                language = _resolve_material_language(request, material)
                 update_presentation_template(
                     connection=connection,
                     presentation_id=material.slides_presentation_id,
@@ -512,7 +712,6 @@ def generate_material_slides(request, material_id):
             material.save(update_fields=["slides_count", "slides_template_id"])
         return Response(MaterialSerializer(material).data)
 
-    language = _resolve_material_language(request, material)
     source_text = _build_material_source_text(material, language, connection=connection)
 
     if not _has_sufficient_material_text(material, source_text):
@@ -562,6 +761,14 @@ def generate_material_slides(request, material_id):
         material.slides_download_url = presentation_meta.get("slides_download_url", "")
         material.slides_count = requested_total_slide_count
         material.slides_template_id = requested_template_id
+        _persist_material_slide_outline(
+            material,
+            {
+                "presentation_title": presentation_title,
+                "presentation_subtitle": presentation_subtitle,
+                "slides": content_slides,
+            },
+        )
         material.save(
             update_fields=[
                 "slides_presentation_id",
@@ -570,6 +777,7 @@ def generate_material_slides(request, material_id):
                 "slides_download_url",
                 "slides_count",
                 "slides_template_id",
+                "slides_outline_json",
             ]
         )
     except GeminiServiceError as exc:

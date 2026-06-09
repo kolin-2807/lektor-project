@@ -26,7 +26,13 @@ from .serializers import ResultSerializer, TestSessionSerializer
 
 def _format_google_error(exc, fallback_message: str) -> str:
     if not isinstance(exc, HttpError):
-        return str(exc) or fallback_message
+        error_text = str(exc) or fallback_message
+        if (
+            "Authorized user info was not in the expected format" in error_text
+            or "missing fields refresh_token" in error_text
+        ):
+            return "Google Drive connection expired. Reconnect Google Drive and grant access again."
+        return error_text
 
     error_text = str(exc)
 

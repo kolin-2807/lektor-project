@@ -738,13 +738,69 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
     if not isinstance(raw_outline, dict):
         raise ValueError("AI slide response must be a JSON object.")
 
+    def _first_non_empty(*values) -> str:
+        for value in values:
+            normalized = " ".join(str(value or "").split())
+            if normalized:
+                return normalized
+        return ""
+
+    def _table_row_to_bullet(columns: list[str], row: list[str]) -> str:
+        pairs = []
+        for idx, cell in enumerate(row):
+            cell_text = " ".join(str(cell or "").split())
+            if not cell_text:
+                continue
+            column_name = columns[idx] if idx < len(columns) else ""
+            column_text = " ".join(str(column_name or "").split())
+            pairs.append(f"{column_text}: {cell_text}" if column_text else cell_text)
+        return " | ".join(pairs)[:240]
+
+    def _ensure_slide_bullets(
+        title: str,
+        bullets: list[str],
+        roadmap_items: list[str],
+        table_columns: list[str],
+        table_rows: list[list[str]],
+        slide_number: int,
+    ) -> list[str]:
+        normalized_bullets = []
+        seen = set()
+
+        def _push(value: str):
+            normalized = " ".join(str(value or "").split())[:240]
+            if normalized and normalized not in seen:
+                normalized_bullets.append(normalized)
+                seen.add(normalized)
+
+        for bullet in bullets:
+            _push(bullet)
+
+        for roadmap_item in roadmap_items:
+            _push(roadmap_item)
+
+        for row in table_rows:
+            _push(_table_row_to_bullet(table_columns, row))
+
+        seed_text = _first_non_empty(title, normalized_bullets[0] if normalized_bullets else "", f"Slide {slide_number}")
+        if not normalized_bullets:
+            _push(seed_text)
+
+        fallback_index = 1
+        while len(normalized_bullets) < 3:
+            _push(f"{seed_text} ({fallback_index})")
+            fallback_index += 1
+
+        return normalized_bullets[:5]
+
     safe_slide_count = max(2, min(int(slide_count or 5), 10))
     raw_slides = raw_outline.get("slides") or []
     normalized_slides = []
 
-    for item in raw_slides[:safe_slide_count]:
+    for slide_index in range(safe_slide_count):
+        item = raw_slides[slide_index] if slide_index < len(raw_slides) else {}
         raw_item = item or {}
-        title = " ".join(str(raw_item.get("title") or "").split())
+        raw_title = " ".join(str(raw_item.get("title") or "").split())
         bullets = [
             " ".join(str(bullet or "").split())[:240]
             for bullet in (raw_item.get("bullets") or [])
@@ -778,8 +834,21 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
             if str(item_text or "").strip()
         ][:4]
 
-        if not title or len(bullets) < 3:
-            raise ValueError("Each generated slide must have a title and at least 3 bullets.")
+        title = _first_non_empty(
+            raw_title[:160],
+            bullets[0] if bullets else "",
+            roadmap_items[0] if roadmap_items else "",
+            table_columns[0] if table_columns else "",
+            f"Slide {slide_index + 1}",
+        )[:160]
+        bullets = _ensure_slide_bullets(
+            title=title,
+            bullets=bullets,
+            roadmap_items=roadmap_items,
+            table_columns=table_columns,
+            table_rows=table_rows,
+            slide_number=slide_index + 1,
+        )
 
         normalized_slide = {
             "title": title[:160],
@@ -797,10 +866,6 @@ def _normalize_slide_outline(raw_outline, slide_count: int) -> dict:
             normalized_slide["roadmap_items"] = roadmap_items
 
         normalized_slides.append(normalized_slide)
-
-    if len(normalized_slides) != safe_slide_count:
-        raise ValueError("AI slide generator returned incomplete slides.")
-
     presentation_title = " ".join(str(raw_outline.get("presentation_title") or "").split()) or "Lecture Presentation"
     presentation_subtitle = " ".join(str(raw_outline.get("presentation_subtitle") or "").split()) or presentation_title
 

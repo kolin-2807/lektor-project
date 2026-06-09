@@ -1,6 +1,11 @@
 from google.auth.transport.requests import Request
 
-from users.google_oauth import bypass_broken_local_proxy, credentials_from_dict, credentials_to_dict
+from users.google_oauth import (
+    bypass_broken_local_proxy,
+    credentials_from_dict,
+    credentials_to_dict,
+    ensure_google_credentials_ready,
+)
 
 
 def get_google_credentials(connection):
@@ -14,5 +19,7 @@ def get_google_credentials(connection):
             credentials.refresh(Request())
         connection.credentials_json = credentials_to_dict(credentials)
         connection.save(update_fields=["credentials_json", "updated_at"])
+
+    ensure_google_credentials_ready(credentials)
 
     return credentials

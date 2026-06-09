@@ -47,8 +47,30 @@ RU_ORDINAL_COURSES = {
     "четвертый": 4,
 }
 
+KK_COURSE_ORDINAL_LABELS = {
+    1: "бірінші курсты",
+    2: "екінші курсты",
+    3: "үшінші курсты",
+    4: "төртінші курсты",
+}
+
+RU_COURSE_ORDINAL_LABELS = {
+    1: "первый курс",
+    2: "второй курс",
+    3: "третий курс",
+    4: "четвертый курс",
+}
+
+
+def _format_course_reference(course_number: int | None, is_russian: bool) -> str:
+    if not course_number:
+        return ""
+    if is_russian:
+        return RU_COURSE_ORDINAL_LABELS.get(course_number, f"{course_number} курс")
+    return KK_COURSE_ORDINAL_LABELS.get(course_number, f"{course_number}-курсты")
+
 COURSE_PATTERNS = (
-    re.compile(r"\b(\d{1,2})\s*(?:курс|курса|курсты|курске|курска|course)\b"),
+    re.compile(r"\b(\d{1,2})(?:\s*[-–]?\s*(?:ші|шы))?\s*(?:курс|курса|курсты|курске|курска|course)\b"),
     re.compile(r"\b(?:курс|курса|курсты|курске|курска|course)\s*(\d{1,2})\b"),
 )
 
@@ -681,7 +703,7 @@ def _build_natural_action_reply(action: str, metadata: dict[str, Any], is_russia
         if action == "generate_slides":
             return "Хорошо, подготовлю слайды."
         if action == "open_course" and course_number:
-            return f"Хорошо, открою {course_number} курс."
+            return f"Хорошо, открою {_format_course_reference(course_number, is_russian=True)}."
         return action_map.get(action, "")
 
     action_map = {
@@ -709,7 +731,7 @@ def _build_natural_action_reply(action: str, metadata: dict[str, Any], is_russia
     if action == "generate_slides":
         return "Жарайды, слайд дайындаймын."
     if action == "open_course" and course_number:
-        return f"Жарайды, {course_number}-курсты ашамын."
+        return f"Жарайды, {_format_course_reference(course_number, is_russian=False)} ашамын."
     return action_map.get(action, "")
 
 
@@ -1323,8 +1345,8 @@ def detect_assistant_intent(user_text: str, context: dict[str, Any] | None = Non
             course_number=course_number,
             reply=_reply(
                 parsed_context,
-                f"{course_number}-курсты ашамын.",
-                f"Открываю {course_number} курс.",
+                f"{_format_course_reference(course_number, is_russian=False)} ашамын.",
+                f"Открываю {_format_course_reference(course_number, is_russian=True)}.",
             ),
             confidence=0.96,
         )

@@ -33,6 +33,20 @@ def _get_session_connection(request):
     return get_active_google_drive_connection(request)
 
 
+def _merge_saved_google_credentials(existing_connection, new_payload: dict) -> dict:
+    merged = dict(new_payload or {})
+    saved_payload = dict(getattr(existing_connection, "credentials_json", {}) or {}) if existing_connection else {}
+
+    for key in ("refresh_token", "client_id", "client_secret", "token_uri", "id_token"):
+        if not str(merged.get(key) or "").strip() and str(saved_payload.get(key) or "").strip():
+            merged[key] = saved_payload[key]
+
+    if not merged.get("scopes") and saved_payload.get("scopes"):
+        merged["scopes"] = saved_payload["scopes"]
+
+    return merged
+
+
 @ensure_csrf_cookie
 @api_view(["GET"])
 def drive_status(request):
@@ -63,6 +77,8 @@ def drive_connect(request):
     return_to = request.GET.get("return_to", "").strip()
     auth_params = {
         "access_type": "offline",
+        "prompt": "consent",
+        "include_granted_scopes": "true",
     }
     if login_hint:
         auth_params["login_hint"] = login_hint
@@ -158,11 +174,18 @@ def drive_callback(request):
             )
         )
 
+    existing_connection = GoogleDriveConnection.objects.filter(google_email__iexact=email).first()
+    credentials_payload = credentials_to_dict(credentials)
+    credentials_payload = _merge_saved_google_credentials(existing_connection, credentials_payload)
+
+    if not str(credentials_payload.get("refresh_token") or "").strip():
+        logger.warning("Google OAuth credentials for %s were stored without a refresh token", email)
+
     connection, _ = GoogleDriveConnection.objects.update_or_create(
         google_email=email,
         defaults={
             "google_name": userinfo.get("name", ""),
-            "credentials_json": credentials_to_dict(credentials),
+            "credentials_json": credentials_payload,
         },
     )
 

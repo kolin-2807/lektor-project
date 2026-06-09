@@ -1,16 +1,22 @@
 import os
 from unittest.mock import patch
 
-from django.test import RequestFactory, SimpleTestCase
+from django.test import Client, RequestFactory, SimpleTestCase, TestCase
 
 from .google_oauth import (
+    GoogleOAuthCredentialsError,
     SESSION_FRONTEND_SUCCESS_URL_KEY,
+    SESSION_OAUTH_CODE_VERIFIER_KEY,
+    SESSION_OAUTH_STATE_KEY,
     build_frontend_redirect_url,
+    credentials_from_dict,
+    ensure_google_credentials_ready,
     exchange_google_oauth_code,
     fetch_google_userinfo,
     get_frontend_success_url,
     get_oauth_redirect_uri,
 )
+from .models import GoogleDriveConnection
 
 
 class GoogleOAuthRuntimeUrlTests(SimpleTestCase):
@@ -195,3 +201,123 @@ class GoogleOAuthRuntimeUrlTests(SimpleTestCase):
             redirect_url,
             "http://127.0.0.1:5500/?drive=connected",
         )
+
+
+class GoogleOAuthCredentialParsingTests(SimpleTestCase):
+    def test_accepts_stored_credentials_without_refresh_token_while_token_is_valid(self):
+        credentials = credentials_from_dict(
+            {
+                "token": "access-token",
+                "client_id": "client-id",
+                "client_secret": "client-secret",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "scopes": ["openid", "https://www.googleapis.com/auth/drive.file"],
+                "expiry": "2999-01-01T00:00:00Z",
+            }
+        )
+
+        self.assertEqual(credentials.token, "access-token")
+        self.assertIsNone(credentials.refresh_token)
+        self.assertEqual(credentials.client_id, "client-id")
+
+    def test_requires_reconnect_when_expired_credentials_have_no_refresh_token(self):
+        credentials = credentials_from_dict(
+            {
+                "token": "expired-access-token",
+                "client_id": "client-id",
+                "client_secret": "client-secret",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "scopes": ["openid", "https://www.googleapis.com/auth/drive.file"],
+                "expiry": "2000-01-01T00:00:00Z",
+            }
+        )
+
+        with self.assertRaises(GoogleOAuthCredentialsError):
+            ensure_google_credentials_ready(credentials)
+
+
+class GoogleDriveOauthViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    @patch("users.views.build_google_drive_flow")
+    @patch("users.views.is_google_drive_oauth_ready", return_value=True)
+    def test_drive_connect_requests_consent_and_offline_access(self, _mocked_ready, mocked_build_flow):
+        observed = {}
+
+        class DummyFlow:
+            code_verifier = "verifier-123"
+
+            def authorization_url(self, **kwargs):
+                observed.update(kwargs)
+                return "https://accounts.google.com/o/oauth2/auth", "oauth-state-1"
+
+        mocked_build_flow.return_value = DummyFlow()
+
+        response = self.client.get("/api/users/drive/connect/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(observed["access_type"], "offline")
+        self.assertEqual(observed["prompt"], "consent")
+        self.assertEqual(observed["include_granted_scopes"], "true")
+
+    @patch("users.views.credentials_to_dict")
+    @patch("users.views.fetch_google_userinfo")
+    @patch("users.views.exchange_google_oauth_code")
+    @patch("users.views.build_google_drive_flow")
+    @patch("users.views.is_google_drive_oauth_ready", return_value=True)
+    def test_drive_callback_preserves_existing_refresh_token(
+        self,
+        _mocked_ready,
+        mocked_build_flow,
+        _mocked_exchange,
+        mocked_fetch_userinfo,
+        mocked_credentials_to_dict,
+    ):
+        existing = GoogleDriveConnection.objects.create(
+            google_email="teacher@example.com",
+            google_name="Teacher",
+            credentials_json={
+                "token": "old-access-token",
+                "refresh_token": "saved-refresh-token",
+                "client_id": "client-id",
+                "client_secret": "client-secret",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "scopes": ["openid", "https://www.googleapis.com/auth/drive.file"],
+            },
+        )
+
+        class DummyFlow:
+            credentials = object()
+
+        mocked_build_flow.return_value = DummyFlow()
+        mocked_fetch_userinfo.return_value = {
+            "email": "teacher@example.com",
+            "name": "Teacher Updated",
+        }
+        mocked_credentials_to_dict.return_value = {
+            "token": "new-access-token",
+            "client_id": "client-id",
+            "client_secret": "client-secret",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "scopes": ["openid", "https://www.googleapis.com/auth/drive.file"],
+        }
+
+        session = self.client.session
+        session[SESSION_OAUTH_STATE_KEY] = "oauth-state-2"
+        session[SESSION_OAUTH_CODE_VERIFIER_KEY] = "verifier-456"
+        session.save()
+
+        response = self.client.get(
+            "/api/users/drive/callback/",
+            {
+                "state": "oauth-state-2",
+                "code": "oauth-code-2",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        existing.refresh_from_db()
+        self.assertEqual(existing.google_name, "Teacher Updated")
+        self.assertEqual(existing.credentials_json["token"], "new-access-token")
+        self.assertEqual(existing.credentials_json["refresh_token"], "saved-refresh-token")

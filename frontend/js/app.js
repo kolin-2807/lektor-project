@@ -380,6 +380,8 @@ Object.assign(UI_TEXT.kaz, {
   slidesTemplateClassic: "Академиялық шаблон",
   slidesTemplateMinimal: "Корпоративтік шаблон",
   slidesTemplateFocus: "Минималистік шаблон",
+  slidesTemplatePreviewBadge: "Preview",
+  slidesTemplatePreviewNote: "Жақында",
   slidesReadyMeta: ({ count, subject }) => `${count} слайд · ${subject}`,
   slidesResetting: "Презентация өшіріліп жатыр...",
   slidesResettingTitle: "Презентация жаңартылуға дайындалып жатыр",
@@ -414,6 +416,8 @@ Object.assign(UI_TEXT.rus, {
   slidesTemplateClassic: "Академический шаблон",
   slidesTemplateMinimal: "Корпоративный шаблон",
   slidesTemplateFocus: "Минималистский шаблон",
+  slidesTemplatePreviewBadge: "Preview",
+  slidesTemplatePreviewNote: "Скоро",
   slidesReadyMeta: ({ count, subject }) => `${count} слайдов · ${subject}`,
   slidesResetting: "Презентация удаляется...",
   slidesResettingTitle: "Готовим презентацию к пересозданию",
@@ -626,6 +630,8 @@ UI_TEXT.eng = {
   slidesTemplateClassic: "Academic template",
   slidesTemplateMinimal: "Corporate template",
   slidesTemplateFocus: "Minimalist template",
+  slidesTemplatePreviewBadge: "Preview",
+  slidesTemplatePreviewNote: "Coming soon",
   slidesReadyMeta: ({ count, subject }) => `${count} slides · ${subject}`,
   slidesResetting: "Removing the presentation...",
   slidesResettingTitle: "Preparing to regenerate the presentation",
@@ -904,7 +910,78 @@ const publicTestSubmitBtn = document.getElementById("publicTestSubmitBtn");
 const publicTestResultCard = document.getElementById("publicTestResultCard");
 
 const TEST_SAVE_FEEDBACK_WINDOW_MS = 2200;
-const SLIDE_TEMPLATE_IDS = ["ilector-academic", "ilector-minimal", "ilector-focus"];
+const DEFAULT_SLIDE_TEMPLATE_CATALOG = [
+  {
+    id: "ilector-academic",
+    sourceType: "built_in",
+    tone: "academic",
+    previewVariant: "standard",
+    previewTitle: "Presentation",
+    labels: {
+      kaz: "Academic Template",
+      rus: "Academic Template",
+      eng: "Academic template",
+    },
+  },
+  {
+    id: "ilector-minimal",
+    sourceType: "built_in",
+    tone: "minimal",
+    previewVariant: "standard",
+    previewTitle: "Presentation",
+    labels: {
+      kaz: "Corporate Template",
+      rus: "Corporate Template",
+      eng: "Corporate template",
+    },
+  },
+  {
+    id: "ilector-focus",
+    sourceType: "built_in",
+    tone: "focus",
+    previewVariant: "cover",
+    previewTitle: "Presentation",
+    labels: {
+      kaz: "Minimalist Template",
+      rus: "Minimalist Template",
+      eng: "Minimalist template",
+    },
+  },
+];
+const PREVIEW_ONLY_SLIDE_TEMPLATE_CATALOG = [
+  {
+    id: "preview-atlas-board",
+    sourceType: "preview_only",
+    previewOnly: true,
+    tone: "executive",
+    previewSkin: "atlas",
+    previewVariant: "standard",
+    previewTitle: "Roadmap",
+    labels: {
+      kaz: "Atlas Board",
+      rus: "Atlas Board",
+      eng: "Atlas Board",
+    },
+  },
+];
+const BUILT_IN_SLIDE_TEMPLATE_LABEL_OVERRIDES = Object.freeze({
+  "ilector-academic": {
+    kaz: "Academic Template",
+    rus: "Academic Template",
+    eng: "Academic Template",
+  },
+  "ilector-minimal": {
+    kaz: "Corporate Template",
+    rus: "Corporate Template",
+    eng: "Corporate Template",
+  },
+  "ilector-focus": {
+    kaz: "Minimalist Template",
+    rus: "Minimalist Template",
+    eng: "Minimalist Template",
+  },
+});
+const SUPPORTED_SLIDE_TEMPLATE_TONES = new Set(["academic", "minimal", "focus", "executive", "research"]);
 
 let recognition = null;
 let isListening = false;
@@ -964,6 +1041,10 @@ let driveConnection = {
   google_email: "",
   google_name: "",
 };
+let slideTemplateCatalog = DEFAULT_SLIDE_TEMPLATE_CATALOG.map((template) => ({
+  ...template,
+  labels: { ...template.labels },
+}));
 let isAuthSubmitting = false;
 let isMaterialUploading = false;
 
@@ -1019,6 +1100,107 @@ function roleText(kazText, rusText, engText = rusText) {
 
 function getRoleLabel(role = selectedRole) {
   return ROLE_LABELS[role] || ROLE_LABELS.kaz;
+}
+
+function cloneSlideTemplate(template = {}) {
+  const normalizedId = String(template?.id || "").trim();
+  const labelOverride = BUILT_IN_SLIDE_TEMPLATE_LABEL_OVERRIDES[normalizedId] || null;
+  return {
+    ...template,
+    previewOnly: Boolean(
+      template?.previewOnly
+      || template?.preview_only
+      || template?.sourceType === "preview_only"
+      || template?.source_type === "preview_only"
+    ),
+    previewSkin: String(template?.previewSkin || template?.preview_skin || template?.tone || "academic").trim() || "academic",
+    labels: {
+      kaz: String(labelOverride?.kaz || template?.labels?.kaz || template?.label || template?.id || "Template"),
+      rus: String(labelOverride?.rus || template?.labels?.rus || template?.label || template?.id || "Template"),
+      eng: String(labelOverride?.eng || template?.labels?.eng || template?.label || template?.id || "Template"),
+    },
+  };
+}
+
+function getDefaultSlideTemplateId() {
+  return slideTemplateCatalog[0]?.id || DEFAULT_SLIDE_TEMPLATE_CATALOG[0].id;
+}
+
+function getSlideTemplateById(templateId = "") {
+  const normalizedId = String(templateId || "").trim();
+  return slideTemplateCatalog.find((template) => template.id === normalizedId) || null;
+}
+
+function getLocalizedSlideTemplateLabel(template) {
+  const labels = template?.labels || {};
+  return labels[selectedRole] || labels.kaz || template?.label || template?.id || "Template";
+}
+
+function getSlidesPickerTemplateCatalog() {
+  const liveTemplates = slideTemplateCatalog.length
+    ? slideTemplateCatalog.map(cloneSlideTemplate)
+    : DEFAULT_SLIDE_TEMPLATE_CATALOG.map(cloneSlideTemplate);
+  const seenIds = new Set(liveTemplates.map((template) => template.id));
+  for (const previewTemplate of PREVIEW_ONLY_SLIDE_TEMPLATE_CATALOG) {
+    if (seenIds.has(previewTemplate.id)) {
+      continue;
+    }
+    liveTemplates.push(cloneSlideTemplate(previewTemplate));
+    seenIds.add(previewTemplate.id);
+  }
+  return liveTemplates;
+}
+
+function normalizeSlideTemplateCatalog(rawTemplates) {
+  if (!Array.isArray(rawTemplates) || !rawTemplates.length) {
+    return DEFAULT_SLIDE_TEMPLATE_CATALOG.map(cloneSlideTemplate);
+  }
+
+  const normalizedCatalog = [];
+  const seenIds = new Set();
+  for (const rawTemplate of rawTemplates) {
+    const templateId = String(rawTemplate?.id || rawTemplate?.template_id || "").trim();
+    if (!templateId || seenIds.has(templateId)) {
+      continue;
+    }
+
+    const rawTone = String(rawTemplate?.tone || "").trim();
+    const tone = SUPPORTED_SLIDE_TEMPLATE_TONES.has(rawTone) ? rawTone : "academic";
+    const previewVariant = String(rawTemplate?.preview_variant || rawTemplate?.previewVariant || "standard").trim() === "cover"
+      ? "cover"
+      : "standard";
+
+    normalizedCatalog.push(cloneSlideTemplate({
+      id: templateId,
+      sourceType: String(rawTemplate?.source_type || rawTemplate?.sourceType || "built_in").trim() || "built_in",
+      tone,
+      previewVariant,
+      previewSkin: String(rawTemplate?.preview_skin || rawTemplate?.previewSkin || tone).trim() || tone,
+      previewTitle: String(rawTemplate?.preview_title || rawTemplate?.previewTitle || "Presentation").trim() || "Presentation",
+      labels: rawTemplate?.labels,
+      label: rawTemplate?.label,
+    }));
+    seenIds.add(templateId);
+  }
+
+  return normalizedCatalog.length ? normalizedCatalog : DEFAULT_SLIDE_TEMPLATE_CATALOG.map(cloneSlideTemplate);
+}
+
+async function loadSlideTemplateCatalog() {
+  try {
+    const payload = await fetchJSON(`${API_BASE}/materials/slide-templates/`);
+    slideTemplateCatalog = normalizeSlideTemplateCatalog(payload?.templates);
+    if (!getSlideTemplateById(slidesConfig.templateId)) {
+      slidesConfig = clampSlidesConfig({
+        ...slidesConfig,
+        templateId: getDefaultSlideTemplateId(),
+      });
+      saveStoredSlidesConfig();
+    }
+  } catch (error) {
+    console.warn("Slides template catalog load error:", error);
+    slideTemplateCatalog = DEFAULT_SLIDE_TEMPLATE_CATALOG.map(cloneSlideTemplate);
+  }
 }
 
 function isSlidesBusy() {
@@ -1490,7 +1672,8 @@ function clampTestConfig(questionCount, durationMinutes) {
 function clampSlidesConfig(value) {
   const source = typeof value === "object" && value !== null ? value : { slideCount: value };
   const parsedSlideCount = Number.parseInt(String(source.slideCount ?? "").trim(), 10);
-  const templateId = SLIDE_TEMPLATE_IDS.includes(source.templateId) ? source.templateId : "ilector-academic";
+  const requestedTemplateId = String(source.templateId ?? "").trim();
+  const templateId = getSlideTemplateById(requestedTemplateId)?.id || requestedTemplateId || getDefaultSlideTemplateId();
 
   return {
     slideCount: Math.max(4, Math.min(Number.isFinite(parsedSlideCount) ? parsedSlideCount : 7, 12)),
@@ -1537,7 +1720,7 @@ function loadStoredSlidesConfig() {
     }
   } catch (error) {
     console.error("Slides config restore error:", error);
-    slidesConfig = clampSlidesConfig({ slideCount: 7, templateId: "ilector-academic" });
+    slidesConfig = clampSlidesConfig({ slideCount: 7, templateId: getDefaultSlideTemplateId() });
   }
 
   syncSlidesConfigInput();
@@ -3667,7 +3850,7 @@ function mapMaterialFromApi(item) {
     slidesDownloadUrl: item.slides_download_url || "",
     slidesPresentationId: item.slides_presentation_id || "",
     slidesCount: Number(item.slides_count) || 0,
-    slidesTemplateId: item.slides_template_id || "ilector-academic",
+    slidesTemplateId: item.slides_template_id || getDefaultSlideTemplateId(),
     createdAt: item.created_at || "",
     mimeType: item.mime_type || "",
     originalFilename: item.original_filename || "",
@@ -4310,20 +4493,19 @@ function buildSlidesSettingsCard() {
   const material = getSelectedMaterial();
   const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
   const actionLabel = hasSlides ? t("updateSlides") : t("buildSlides");
-  const templateOptions = [
-    { id: "ilector-academic", label: t("slidesTemplateClassic"), tone: "academic", previewTitle: "Presentation" },
-    { id: "ilector-minimal", label: t("slidesTemplateMinimal"), tone: "minimal", previewTitle: "Presentation" },
-    { id: "ilector-focus", label: t("slidesTemplateFocus"), tone: "focus", previewTitle: "Presentation" },
-  ];
+  const selectedTemplateId = getSlideTemplateById(slidesConfig.templateId)?.id || getDefaultSlideTemplateId();
+  const templateOptions = getSlidesPickerTemplateCatalog();
   const templateCards = templateOptions.map((template) => {
-    const isSelected = slidesConfig.templateId === template.id;
-    const isMinimalistCover = template.id === "ilector-focus";
+    const isSelected = selectedTemplateId === template.id;
+    const isMinimalistCover = template.previewVariant === "cover" || template.tone === "focus";
+    const previewSkin = String(template.previewSkin || template.tone || "academic").trim() || "academic";
+    const isPreviewOnly = Boolean(template.previewOnly);
     const previewMarkup = isMinimalistCover
       ? `
         <span class="slides-template-preview slides-template-cover-preview" aria-hidden="true">
           <span class="slides-template-cover-line"></span>
-          <strong>Presentation</strong>
-          <small>Presentation</small>
+          <strong>${escapeHtml(template.previewTitle || "Presentation")}</strong>
+          <small>${escapeHtml(template.previewTitle || "Presentation")}</small>
           <em>iLector</em>
         </span>
       `
@@ -4341,9 +4523,24 @@ function buildSlidesSettingsCard() {
           <span class="slides-template-preview-footer">iLector</span>
         </span>
       `;
+    const cardClassName = [
+      "slides-template-card",
+      `slides-template-${previewSkin}`,
+      isSelected ? "is-selected" : "",
+      isPreviewOnly ? "is-preview-only" : "",
+    ].filter(Boolean).join(" ");
+
+    if (isPreviewOnly) {
+      return `
+      <div class="${cardClassName}" aria-disabled="true">
+        ${previewMarkup}
+        <span class="slides-template-name">${escapeHtml(getLocalizedSlideTemplateLabel(template))}</span>
+      </div>
+    `;
+    }
 
     return `
-      <label class="slides-template-card slides-template-${template.tone} ${isSelected ? "is-selected" : ""}">
+      <label class="${cardClassName}">
         <input
           type="radio"
           name="slidesTemplate"
@@ -4351,7 +4548,7 @@ function buildSlidesSettingsCard() {
           ${isSelected ? "checked" : ""}
         />
         ${previewMarkup}
-        <span class="slides-template-name">${escapeHtml(template.label)}</span>
+        <span class="slides-template-name">${escapeHtml(getLocalizedSlideTemplateLabel(template))}</span>
       </label>
     `;
   }).join("");
@@ -5619,7 +5816,7 @@ const LOCAL_ASSISTANT_MATERIAL_TYPE_ALIASES = [
   ["lab", "lab"],
 ];
 const LOCAL_ASSISTANT_COURSE_PATTERNS = [
-  /(\d{1,2})\s*(?:курс|курсты|курсқа|курса|course)\b/u,
+  /(\d{1,2})(?:\s*[-–]?\s*(?:ші|шы))?\s*(?:курс|курсты|курсқа|курса|course)\b/u,
 ];
 const LOCAL_ASSISTANT_QUESTION_COUNT_PATTERNS = [
   /(\d{1,2})\s*(?:сұрақ|сурак|сұрақтан|сурактан|вопрос(?:а|ов)?|question)\b/u,
@@ -5775,6 +5972,41 @@ function pickFirstLocalAssistantMaterialByType(context, materialType = "") {
   return null;
 }
 
+function formatAssistantCourseReference(number, locale = "kaz") {
+  if (!number) {
+    return "";
+  }
+
+  const courseLabels = {
+    kaz: {
+      1: "бірінші курсты",
+      2: "екінші курсты",
+      3: "үшінші курсты",
+      4: "төртінші курсты",
+    },
+    rus: {
+      1: "первый курс",
+      2: "второй курс",
+      3: "третий курс",
+      4: "четвертый курс",
+    },
+    eng: {
+      1: "the first course",
+      2: "the second course",
+      3: "the third course",
+      4: "the fourth course",
+    },
+  };
+
+  if (locale === "rus") {
+    return courseLabels.rus[number] || `${number} курс`;
+  }
+  if (locale === "eng") {
+    return courseLabels.eng[number] || `course ${number}`;
+  }
+  return courseLabels.kaz[number] || `${number}-курсты`;
+}
+
 function buildLocalAssistantActionReply(action, language, payload = {}) {
   const localReply = (kazakhText, russianText, englishText = russianText) =>
     selectLocalizedAssistantReply(language, kazakhText, russianText, englishText);
@@ -5786,9 +6018,9 @@ function buildLocalAssistantActionReply(action, language, payload = {}) {
 
   if (action === "open_course" && courseNumber) {
     return localReply(
-      `Жарайды, ${courseNumber}-курсты ашамын.`,
-      `Хорошо, открою ${courseNumber} курс.`,
-      `Okay, I will open course ${courseNumber}.`,
+      `Жарайды, ${formatAssistantCourseReference(courseNumber, "kaz")} ашамын.`,
+      `Хорошо, открою ${formatAssistantCourseReference(courseNumber, "rus")}.`,
+      `Okay, I will open ${formatAssistantCourseReference(courseNumber, "eng")}.`,
     );
   }
 
@@ -6816,7 +7048,7 @@ function buildAssistantSpeechReply(assistantData, fallbackText = "") {
   };
 
   if (assistantData.action === "open_course" && courseNumber) {
-    return `Жарайды, ${courseNumber}-курсты ашамын.`;
+    return `Жарайды, ${formatAssistantCourseReference(courseNumber, "kaz")} ашамын.`;
   }
 
   if (assistantData.action === "open_subject" && subjectTitle) {
@@ -8931,6 +9163,7 @@ async function bootstrapApp() {
     return;
   }
 
+  await loadSlideTemplateCatalog();
   await loadCoursesFromApi();
   initSpeechRecognition();
   setVoiceState("idle", t("voiceReady"));
