@@ -1065,8 +1065,9 @@ class AssistantTranscriptionTests(SimpleTestCase):
         AZURE_SPEECH_STT_LOCALES=["kk-KZ"],
         AZURE_SPEECH_STT_TIMEOUT_SECONDS=60,
     )
+    @patch("ai_services.stt_service.shutil.which", return_value=None)
     @patch("ai_services.stt_service.requests.post")
-    def test_transcribes_audio_with_azure_fast_transcription(self, mocked_post):
+    def test_transcribes_audio_with_azure_fast_transcription(self, mocked_post, _mocked_which):
         response = Mock(ok=True)
         response.json.return_value = {"combinedPhrases": [{"text": "Сәлем, жүйе"}]}
         mocked_post.return_value = response
@@ -1098,6 +1099,53 @@ class AssistantTranscriptionTests(SimpleTestCase):
         self.assertEqual(json.loads(call_args.kwargs["data"]["definition"]), {"locales": ["kk-KZ"]})
         self.assertEqual(call_args.kwargs["files"]["audio"][0], "voice.webm")
         self.assertEqual(call_args.kwargs["files"]["audio"][2], "audio/webm")
+
+    @override_settings(
+        AZURE_SPEECH_KEY="azure-key",
+        AZURE_SPEECH_REGION="swedencentral",
+        AZURE_SPEECH_STT_API_VERSION="2025-10-15",
+        AZURE_SPEECH_STT_LOCALES=["kk-KZ"],
+        AZURE_SPEECH_STT_TIMEOUT_SECONDS=60,
+    )
+    @patch("ai_services.stt_service.requests.post")
+    @patch("ai_services.stt_service.subprocess.run")
+    @patch("ai_services.stt_service.shutil.which", return_value="ffmpeg")
+    def test_normalizes_browser_audio_before_upload(self, _mocked_which, mocked_run, mocked_post):
+        response = Mock(ok=True)
+        response.json.return_value = {"combinedPhrases": [{"text": "Сәлем"}]}
+        mocked_post.return_value = response
+
+        normalized_output = {"path": ""}
+
+        def fake_run(command, check, capture_output):
+            normalized_output["path"] = command[-1]
+            with open(command[-1], "wb") as converted_audio:
+                converted_audio.write(b"wav-audio")
+            return Mock()
+
+        mocked_run.side_effect = fake_run
+
+        temp_path = ""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as audio_file:
+            temp_path = audio_file.name
+            audio_file.write(b"audio-bytes")
+
+        try:
+            transcript = transcribe_audio(
+                temp_path,
+                filename="voice.webm",
+                content_type="audio/webm",
+                locale="kk-KZ",
+            )
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        self.assertEqual(transcript, "Сәлем")
+        call_args = mocked_post.call_args
+        self.assertEqual(call_args.kwargs["files"]["audio"][0], "voice.wav")
+        self.assertEqual(call_args.kwargs["files"]["audio"][2], "audio/wav")
+        self.assertFalse(os.path.exists(normalized_output["path"]))
 
     @override_settings(AZURE_SPEECH_KEY="", AZURE_SPEECH_REGION="")
     def test_raises_when_azure_transcription_is_not_configured(self):

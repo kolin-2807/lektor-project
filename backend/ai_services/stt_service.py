@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import requests
@@ -100,6 +103,71 @@ def _build_error_message(response: requests.Response) -> str:
     return " ".join(str(response.text or "").split()).strip()
 
 
+def _should_normalize_audio(upload_name: str, upload_content_type: str | None = None) -> bool:
+    suffix = Path(upload_name).suffix.lower()
+    normalized_content_type = str(upload_content_type or "").split(";", 1)[0].strip().lower()
+
+    if suffix in {".wav", ".wave"}:
+        return False
+
+    if normalized_content_type in {"audio/wav", "audio/wave", "audio/x-wav"}:
+        return False
+
+    return True
+
+
+def _normalize_audio_for_azure(
+    audio_path: Path,
+    *,
+    upload_name: str,
+    upload_content_type: str | None = None,
+) -> tuple[Path, str, str]:
+    resolved_content_type = (
+        upload_content_type
+        or mimetypes.guess_type(upload_name)[0]
+        or "application/octet-stream"
+    )
+
+    if not _should_normalize_audio(upload_name, resolved_content_type):
+        return audio_path, upload_name, resolved_content_type
+
+    ffmpeg_path = shutil.which("ffmpeg")
+    if not ffmpeg_path:
+        return audio_path, upload_name, resolved_content_type
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as normalized_audio:
+        normalized_path = Path(normalized_audio.name)
+
+    try:
+        subprocess.run(
+            [
+                ffmpeg_path,
+                "-y",
+                "-i",
+                str(audio_path),
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                str(normalized_path),
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        normalized_path.unlink(missing_ok=True)
+        raise STTServiceError(
+            "Voice audio could not be prepared for transcription.",
+            code="audio_preparation_failed",
+            http_status=400,
+            provider="local",
+        ) from exc
+
+    normalized_name = f"{Path(upload_name).stem or 'voice'}.wav"
+    return normalized_path, normalized_name, "audio/wav"
+
+
 def transcribe_audio(
     file_path: str,
     *,
@@ -114,12 +182,17 @@ def transcribe_audio(
             provider="azure",
         )
 
-    audio_path = Path(file_path)
-    upload_name = Path(filename or audio_path.name or "voice.webm").name
+    original_audio_path = Path(file_path)
+    upload_name = Path(filename or original_audio_path.name or "voice.webm").name
     upload_content_type = (
         content_type
         or mimetypes.guess_type(upload_name)[0]
         or "application/octet-stream"
+    )
+    audio_path, upload_name, upload_content_type = _normalize_audio_for_azure(
+        original_audio_path,
+        upload_name=upload_name,
+        upload_content_type=upload_content_type,
     )
     definition = {
         "locales": [_resolve_locale(locale)],
@@ -154,6 +227,9 @@ def transcribe_audio(
             retryable=True,
             provider="azure",
         ) from exc
+    finally:
+        if audio_path != original_audio_path:
+            audio_path.unlink(missing_ok=True)
 
     if not response.ok:
         status_code = response.status_code

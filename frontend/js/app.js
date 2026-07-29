@@ -1063,6 +1063,7 @@ let voiceHasDetectedSpeech = false;
 let voiceCaptureMaxTimerId = 0;
 let voiceCaptureNoSpeechTimerId = 0;
 let voiceRecognitionSilenceTimerId = 0;
+let voiceRecognitionNoSpeechTimerId = 0;
 let voiceRecognitionLastTranscript = "";
 let voiceRecognitionHasSpeech = false;
 let voiceRecognitionFallbackPending = false;
@@ -1072,10 +1073,11 @@ let assistantSpeechAbortController = null;
 let assistantSpeechObjectUrl = "";
 let isAssistantSpeechAudioUnlocked = false;
 
-const VOICE_ACTIVITY_THRESHOLD = 0.018;
+const VOICE_ACTIVITY_THRESHOLD = 0.01;
 const VOICE_SILENCE_STOP_MS = 2200;
 const VOICE_INITIAL_NO_SPEECH_STOP_MS = 6000;
 const VOICE_CAPTURE_MAX_MS = 12000;
+const VOICE_RECOGNITION_NO_SPEECH_FALLBACK_MS = 7000;
 const SILENT_AUDIO_DATA_URI = "data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAA";
 const VOICE_RECORDER_MIME_TYPES = [
   "audio/webm;codecs=opus",
@@ -6528,7 +6530,7 @@ function beginVoiceDraftSession() {
     return;
   }
 
-  voiceDraftRestoreValue = "";
+  voiceDraftRestoreValue = voiceInput?.value || lastManualVoiceInputValue || "";
   hasActiveVoiceDraft = true;
 }
 
@@ -6579,8 +6581,18 @@ function stopVoiceRecognitionSilenceTimer() {
   voiceRecognitionSilenceTimerId = 0;
 }
 
+function stopVoiceRecognitionNoSpeechTimer() {
+  if (!voiceRecognitionNoSpeechTimerId) {
+    return;
+  }
+
+  clearTimeout(voiceRecognitionNoSpeechTimerId);
+  voiceRecognitionNoSpeechTimerId = 0;
+}
+
 function resetVoiceRecognitionSession() {
   stopVoiceRecognitionSilenceTimer();
+  stopVoiceRecognitionNoSpeechTimer();
   voiceRecognitionLastTranscript = "";
   voiceRecognitionHasSpeech = false;
   voiceRecognitionFallbackPending = false;
@@ -6596,7 +6608,9 @@ function isTouchVoiceDevice() {
 }
 
 function shouldUseRecorderFirstForVoice() {
-  return Boolean(window.MediaRecorder && canUseMicrophoneApi() && isTouchVoiceDevice());
+  // Prefer live browser speech recognition whenever it exists.
+  // Recorder fallback stays only for browsers that do not expose SpeechRecognition.
+  return Boolean(window.MediaRecorder && canUseMicrophoneApi() && !recognition);
 }
 
 function canUseMicrophoneApi() {
@@ -6655,9 +6669,10 @@ async function requestVoiceMicrophoneStream() {
 
   return navigator.mediaDevices.getUserMedia({
     audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
+      channelCount: { ideal: 1 },
+      echoCancellation: { ideal: false },
+      noiseSuppression: { ideal: false },
+      autoGainControl: { ideal: false },
     },
   });
 }
@@ -6755,11 +6770,7 @@ async function submitVoiceInput(customText, options = {}) {
   }
 
   if (source === "voice") {
-    if (voiceInput) {
-      voiceInput.value = "";
-    }
     setVoiceState("idle", t("voiceAcknowledged"));
-    speakAssistantReply(t("voiceAcknowledged"));
     resetVoiceDraftSession();
   }
 
@@ -7224,23 +7235,27 @@ async function speakAssistantReply(text) {
 function stopVoiceCapture() {
   isVoiceCaptureCancelled = false;
   stopVoiceRecognitionSilenceTimer();
+  stopVoiceRecognitionNoSpeechTimer();
+  let stopped = false;
 
   if (recognition && isListening) {
     recognition.stop();
-    return true;
+    stopped = true;
   }
 
   if (mediaRecorder && mediaRecorder.state === "recording") {
     mediaRecorder.stop();
-    return true;
+    stopped = true;
   }
 
-  return false;
+  return stopped;
 }
 
 function cancelVoiceCapture() {
   isVoiceCaptureCancelled = true;
   stopVoiceRecognitionSilenceTimer();
+  stopVoiceRecognitionNoSpeechTimer();
+  let stopped = false;
 
   if (recognition && isListening) {
     if (typeof recognition.abort === "function") {
@@ -7248,15 +7263,15 @@ function cancelVoiceCapture() {
     } else {
       recognition.stop();
     }
-    return true;
+    stopped = true;
   }
 
   if (mediaRecorder && mediaRecorder.state === "recording") {
     mediaRecorder.stop();
-    return true;
+    stopped = true;
   }
 
-  return false;
+  return stopped;
 }
 
 async function startMediaRecorderCapture(existingStream = null) {
@@ -7318,6 +7333,7 @@ async function startMediaRecorderCapture(existingStream = null) {
       if (voiceInput) {
         voiceInput.value = mergedText;
       }
+      voiceDraftRestoreValue = mergedText;
 
       setVoiceState("idle", t("voiceLiveCaptured", { text: capturedText }));
       await submitVoiceInput(mergedText, { source: "voice" });
@@ -7361,27 +7377,9 @@ async function toggleListening(event) {
   }
 
   try {
-    let microphoneStream = null;
-    try {
-      microphoneStream = await requestVoiceMicrophoneStream();
-      setVoiceState("listening", t("voiceListening"));
-    } catch (permissionError) {
-      if (!recognition) {
-        throw permissionError;
-      }
-      console.warn("Microphone permission preflight failed, trying speech recognition:", permissionError);
-    }
-
-    if (microphoneStream && shouldUseRecorderFirstForVoice()) {
-      await startMediaRecorderCapture(microphoneStream);
-      microphoneStream = null;
-      return;
-    }
-
-    if (recognition) {
+    if (!shouldUseRecorderFirstForVoice() && recognition) {
       try {
-        stopMediaStream(microphoneStream);
-        microphoneStream = null;
+        setVoiceState("listening", t("voiceListening"));
         recognition.start();
         return;
       } catch (recognitionError) {
@@ -7389,10 +7387,10 @@ async function toggleListening(event) {
       }
     }
 
+    let microphoneStream = null;
     try {
-      if (!microphoneStream) {
-        microphoneStream = await requestVoiceMicrophoneStream();
-      }
+      microphoneStream = await requestVoiceMicrophoneStream();
+      setVoiceState("listening", t("voiceListening"));
       await startMediaRecorderCapture(microphoneStream);
       microphoneStream = null;
     } finally {
@@ -7509,11 +7507,35 @@ function initSpeechRecognition() {
     isListening = true;
     resetVoiceRecognitionSession();
     setVoiceState("listening", t("voiceListening"));
+
+    voiceRecognitionNoSpeechTimerId = window.setTimeout(() => {
+      voiceRecognitionNoSpeechTimerId = 0;
+
+      if (!recognition || !isListening || isVoiceCaptureCancelled || voiceRecognitionHasSpeech) {
+        return;
+      }
+
+      voiceRecognitionFallbackPending = Boolean(window.MediaRecorder && canUseMicrophoneApi());
+      if (voiceRecognitionFallbackPending) {
+        stopVoiceCapture();
+      }
+    }, VOICE_RECOGNITION_NO_SPEECH_FALLBACK_MS);
+  };
+
+  recognition.onspeechstart = () => {
+    voiceRecognitionHasSpeech = true;
+    stopVoiceRecognitionNoSpeechTimer();
+    setVoiceState("listening", t("voiceListening"));
+  };
+
+  recognition.onsoundstart = () => {
+    stopVoiceRecognitionNoSpeechTimer();
   };
 
   recognition.onerror = (event) => {
     isListening = false;
     stopVoiceRecognitionSilenceTimer();
+    stopVoiceRecognitionNoSpeechTimer();
     if (isVoiceCaptureCancelled) {
       setVoiceState("idle", t("voiceReady"));
       resetVoiceDraftSession();
@@ -7522,7 +7544,7 @@ function initSpeechRecognition() {
       return;
     }
 
-    voiceRecognitionFallbackPending = shouldFallbackToRecorderAfterRecognitionError(event.error);
+    voiceRecognitionFallbackPending = voiceRecognitionFallbackPending || shouldFallbackToRecorderAfterRecognitionError(event.error);
     const permissionDenied = ["not-allowed", "permission-denied"].includes(event.error);
     const message = voiceRecognitionFallbackPending
       ? t("voiceListening")
@@ -7537,6 +7559,7 @@ function initSpeechRecognition() {
     if (voiceCore) {
       voiceCore.classList.remove("listening");
     }
+
     const completeTranscript = String(voiceRecognitionLastTranscript || "").trim();
     const shouldSubmitTranscript = !isVoiceCaptureCancelled && completeTranscript;
     const shouldStartRecorderFallback = !isVoiceCaptureCancelled && !completeTranscript && voiceRecognitionFallbackPending;
@@ -7557,6 +7580,7 @@ function initSpeechRecognition() {
 
     if (shouldSubmitTranscript) {
       try {
+        voiceDraftRestoreValue = completeTranscript;
         setVoiceState("idle", t("voiceLiveCaptured", { text: completeTranscript }));
         await submitVoiceInput(completeTranscript, { source: "voice" });
       } finally {
@@ -7576,6 +7600,8 @@ function initSpeechRecognition() {
     if (isVoiceCaptureCancelled) {
       return;
     }
+
+    stopVoiceRecognitionNoSpeechTimer();
 
     let finalParts = [];
     let interimParts = [];
@@ -9151,6 +9177,12 @@ async function bootstrapApp() {
     return;
   }
 
+  // Voice transcription should be ready even if Drive is not connected.
+  initSpeechRecognition();
+  if (recognition || (window.MediaRecorder && canUseMicrophoneApi())) {
+    setVoiceState("idle", t("voiceReady"));
+  }
+
   handleDriveReturnParams();
   const status = await loadDriveStatus();
 
@@ -9165,8 +9197,6 @@ async function bootstrapApp() {
 
   await loadSlideTemplateCatalog();
   await loadCoursesFromApi();
-  initSpeechRecognition();
-  setVoiceState("idle", t("voiceReady"));
 }
 
 bootstrapApp();

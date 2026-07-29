@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 from django.test import Client, RequestFactory, SimpleTestCase, TestCase
@@ -201,6 +202,22 @@ class GoogleOAuthRuntimeUrlTests(SimpleTestCase):
             redirect_url,
             "http://127.0.0.1:5500/?drive=connected",
         )
+
+
+class FrontendEntryRouteTests(SimpleTestCase):
+    def _read_stream(self, response):
+        return b"".join(response.streaming_content)
+
+    def test_root_and_legacy_landing_routes_serve_index_html(self):
+        expected_html = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_bytes()
+
+        for route in ("/", "/index.html", "/landing.html"):
+            with self.subTest(route=route):
+                response = self.client.get(route)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["Content-Type"], "text/html")
+                self.assertEqual(self._read_stream(response), expected_html)
 
 
 class GoogleOAuthCredentialParsingTests(SimpleTestCase):

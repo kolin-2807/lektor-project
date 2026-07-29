@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import include, path, re_path
 
-from .frontend_views import frontend_asset, frontend_index, frontend_landing
+from .frontend_views import frontend_asset, frontend_index
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -11,6 +11,6 @@ urlpatterns = [
     path("api/results/", include("results.urls")),
     re_path(r"^(?P<asset_kind>css|js|assets)/(?P<asset_path>.+)$", frontend_asset),
     path("index.html", frontend_index),
-    path("landing.html", frontend_landing),
-    path("", frontend_landing),
+    path("landing.html", frontend_index),
+    path("", frontend_index),
 ]
