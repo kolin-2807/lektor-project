@@ -9,11 +9,12 @@ from urllib.parse import urlencode, urlparse
 from django.conf import settings
 
 try:
-    from google.auth.transport.requests import AuthorizedSession
+    from google.auth.transport.requests import AuthorizedSession, Request as GoogleAuthRequest
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import Flow
 except ImportError:  # pragma: no cover - optional dependency in some environments
     AuthorizedSession = None
+    GoogleAuthRequest = None
     Credentials = None
     Flow = None
 
@@ -33,6 +34,10 @@ OAUTH_SCOPES = [
 
 DEFAULT_GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
 GOOGLE_DRIVE_FULL_SCOPE = "https://www.googleapis.com/auth/drive"
+GOOGLE_DRIVE_REFRESH_ERROR_MESSAGE = (
+    "Google Drive байланысын жаңарту мүмкін болмады. Интернетті тексеріңіз немесе "
+    "Google Drive-қа қайта кіріп қосылыңыз."
+)
 
 SESSION_CONNECTION_KEY = "google_drive_connection_id"
 SESSION_OAUTH_STATE_KEY = "google_drive_oauth_state"
@@ -341,6 +346,24 @@ def ensure_google_credentials_ready(credentials):
         raise GoogleOAuthCredentialsError(
             "Google Drive connection expired. Reconnect Google Drive and grant access again."
         )
+
+    return credentials
+
+
+def refresh_google_credentials(credentials):
+    ensure_google_credentials_ready(credentials)
+
+    if not getattr(credentials, "expired", False) or not getattr(credentials, "refresh_token", None):
+        return credentials
+
+    if GoogleAuthRequest is None:
+        raise RuntimeError("Google OAuth dependencies are not installed.")
+
+    try:
+        with bypass_broken_local_proxy():
+            credentials.refresh(GoogleAuthRequest())
+    except Exception as exc:
+        raise GoogleOAuthCredentialsError(GOOGLE_DRIVE_REFRESH_ERROR_MESSAGE) from exc
 
     return credentials
 

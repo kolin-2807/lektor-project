@@ -32,6 +32,7 @@ from users.models import get_active_google_drive_connection, resolve_google_driv
 
 from .models import Material
 from .serializers import MaterialSerializer
+from .google_drive_service import ensure_file_viewable_by_link, get_drive_service
 from .slide_templates import (
     get_default_slide_template_id,
     get_slide_template_catalog,
@@ -321,6 +322,17 @@ def _format_google_api_error(exc, fallback_message: str) -> str:
     return error_text or fallback_message
 
 
+def _ensure_material_file_viewable(connection, file_id: str):
+    if not connection or not file_id:
+        return False
+
+    try:
+        service = get_drive_service(connection)
+        return ensure_file_viewable_by_link(service, file_id)
+    except Exception:
+        return False
+
+
 def _build_gemini_error_response(exc: GeminiServiceError, fallback_message: str):
     payload = {
         "detail": str(exc) or fallback_message,
@@ -342,7 +354,24 @@ def _build_gemini_error_response(exc: GeminiServiceError, fallback_message: str)
 def _get_material_preview_kind(material) -> str:
     suffix = Path(material.original_filename or material.title or "").suffix.lower()
     normalized_mime = (material.mime_type or "").lower()
+    cloud_url = str(getattr(material, "cloud_url", "") or "").lower()
 
+    if normalized_mime in {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "application/vnd.google-apps.document",
+    } or suffix in {".docx", ".doc"}:
+        return "document"
+    if normalized_mime in {
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.google-apps.presentation",
+    } or suffix in {".pptx", ".ppt"}:
+        return "presentation"
+    if "docs.google.com/document/" in cloud_url:
+        return "document"
+    if "docs.google.com/presentation/" in cloud_url:
+        return "presentation"
     if normalized_mime.startswith("image/") or suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"}:
         return "image"
     if normalized_mime == "application/pdf" or suffix == ".pdf":
@@ -355,6 +384,36 @@ def _get_material_preview_kind(material) -> str:
         return "text"
 
     return "external"
+
+
+def _build_original_preview_url(material) -> str:
+    cloud_url = str(getattr(material, "cloud_url", "") or "").strip()
+    file_id = str(getattr(material, "drive_file_id", "") or "").strip()
+    preview_kind = _get_material_preview_kind(material)
+
+    if cloud_url:
+        if "docs.google.com/" in cloud_url:
+            return cloud_url
+
+        normalized_url = cloud_url.split("?", 1)[0].split("#", 1)[0]
+        if "drive.google.com/file/d/" in normalized_url:
+            return normalized_url.replace("/view", "/preview")
+
+    if file_id:
+        if preview_kind == "document":
+            return f"https://docs.google.com/document/d/{file_id}/preview"
+        if preview_kind == "presentation":
+            return f"https://docs.google.com/presentation/d/{file_id}/preview"
+        return f"https://drive.google.com/file/d/{file_id}/preview"
+
+    return cloud_url
+
+
+def _build_slides_preview_url(material) -> str:
+    preview_url = str(getattr(material, "slides_embed_url", "") or getattr(material, "slides_url", "") or "").strip()
+    if preview_url and "/edit" in preview_url:
+        return preview_url.replace("/edit", "/preview")
+    return preview_url
 
 
 def _parse_assistant_context(raw_context) -> dict:
@@ -487,12 +546,22 @@ def preview_material(request, material_id):
     if auth_error:
         return auth_error
 
+    _ensure_material_file_viewable(connection, material.drive_file_id)
+
     if not material.drive_file_id:
         if material.cloud_url:
             return HttpResponseRedirect(material.cloud_url)
         return Response({"detail": "Material preview is unavailable."}, status=status.HTTP_404_NOT_FOUND)
 
     preview_kind = _get_material_preview_kind(material)
+    if preview_kind in {"document", "presentation"}:
+        preview_url = _build_original_preview_url(material)
+        if preview_url:
+            return HttpResponseRedirect(preview_url)
+        if material.cloud_url:
+            return HttpResponseRedirect(material.cloud_url)
+        return Response({"detail": "Material preview is unavailable."}, status=status.HTTP_404_NOT_FOUND)
+
     if preview_kind == "external":
         if material.cloud_url:
             return HttpResponseRedirect(material.cloud_url)
@@ -503,15 +572,36 @@ def preview_material(request, material_id):
 
         file_bytes = download_material_bytes(connection, material.drive_file_id, material.mime_type)
     except Exception as exc:
+        fallback_url = _build_original_preview_url(material) or material.cloud_url
+        if fallback_url:
+            return HttpResponseRedirect(fallback_url)
         return Response(
             {"detail": _format_google_api_error(exc, "Material preview failed")},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
     filename = Path(material.original_filename or material.title or "material").name
+
     response = HttpResponse(file_bytes, content_type=material.mime_type or "application/octet-stream")
     response["Content-Disposition"] = f"inline; filename*=UTF-8''{quote(filename)}"
     return response
+
+
+@xframe_options_exempt
+@api_view(["GET"])
+def preview_material_slides(request, material_id):
+    material = get_object_or_404(Material, id=material_id)
+    connection, auth_error = _require_google_session(request, owner_email=material.owner_email)
+    if auth_error:
+        return auth_error
+
+    _ensure_material_file_viewable(connection, material.slides_presentation_id)
+
+    preview_url = _build_slides_preview_url(material)
+    if preview_url:
+        return HttpResponseRedirect(preview_url)
+
+    return Response({"detail": "Slides preview is unavailable."}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(["DELETE"])

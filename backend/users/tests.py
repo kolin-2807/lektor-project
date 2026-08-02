@@ -16,6 +16,7 @@ from .google_oauth import (
     fetch_google_userinfo,
     get_frontend_success_url,
     get_oauth_redirect_uri,
+    refresh_google_credentials,
 )
 from .models import GoogleDriveConnection
 
@@ -251,6 +252,22 @@ class GoogleOAuthCredentialParsingTests(SimpleTestCase):
 
         with self.assertRaises(GoogleOAuthCredentialsError):
             ensure_google_credentials_ready(credentials)
+
+
+class GoogleOAuthCredentialRefreshTests(SimpleTestCase):
+    @patch("users.google_oauth.GoogleAuthRequest", return_value=object())
+    def test_wraps_refresh_failures_in_a_friendly_error(self, _mocked_request):
+        class DummyCredentials:
+            expired = True
+            refresh_token = "refresh-token"
+
+            def refresh(self, request):
+                raise ConnectionError("Failed to resolve oauth2.googleapis.com")
+
+        with self.assertRaises(GoogleOAuthCredentialsError) as captured:
+            refresh_google_credentials(DummyCredentials())
+
+        self.assertIn("Google Drive байланысын жаңарту мүмкін болмады", str(captured.exception))
 
 
 class GoogleDriveOauthViewTests(TestCase):

@@ -147,7 +147,17 @@ def drive_callback(request):
         )
 
     credentials = flow.credentials
-    userinfo = fetch_google_userinfo(credentials)
+    try:
+        userinfo = fetch_google_userinfo(credentials)
+    except Exception:
+        logger.exception("Google Drive userinfo lookup failed")
+        return HttpResponseRedirect(
+            build_frontend_redirect_url(
+                request,
+                drive="error",
+                message="Google Drive байланысын тексеру мүмкін болмады. Интернетті тексеріп, қайта қосылып көріңіз.",
+            )
+        )
     email = userinfo.get("email", "").strip()
     expected_email = request.session.get(SESSION_EXPECTED_GOOGLE_EMAIL_KEY, "").strip().lower()
 

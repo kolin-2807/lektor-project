@@ -3849,6 +3849,7 @@ function mapMaterialFromApi(item) {
     resultsSheetUrl: item.results_sheet_url || "",
     slidesUrl: item.slides_url || "",
     slidesEmbedUrl: item.slides_embed_url || "",
+    slidesPreviewUrl: item.slides_presentation_id ? `${API_BASE}/materials/${item.id}/slides-preview/` : "",
     slidesDownloadUrl: item.slides_download_url || "",
     slidesPresentationId: item.slides_presentation_id || "",
     slidesCount: Number(item.slides_count) || 0,
@@ -4299,6 +4300,8 @@ function getPreviewKindFromUrl(url) {
   const clean = String(url || "").toLowerCase().split("?")[0].split("#")[0];
   const ext = clean.split(".").pop() || "";
 
+  if (clean.includes("docs.google.com/document/")) return "document";
+  if (clean.includes("docs.google.com/presentation/")) return "presentation";
   if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
   if (ext === "pdf") return "pdf";
   if (["mp4", "webm", "ogg", "mov"].includes(ext)) return "video";
@@ -4311,6 +4314,18 @@ function getPreviewKind(item) {
   const name = String(item?.originalFilename || item?.title || "").toLowerCase();
   const ext = name.split("?")[0].split("#")[0].split(".").pop() || "";
 
+  if (
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/msword" ||
+    mime === "application/vnd.google-apps.document" ||
+    ["docx", "doc"].includes(ext)
+  ) return "document";
+  if (
+    mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    mime === "application/vnd.ms-powerpoint" ||
+    mime === "application/vnd.google-apps.presentation" ||
+    ["pptx", "ppt"].includes(ext)
+  ) return "presentation";
   if (mime.startsWith("image/") || ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(ext)) return "image";
   if (mime === "application/pdf" || ext === "pdf") return "pdf";
   if (mime.startsWith("video/") || ["mp4", "webm", "ogg", "mov"].includes(ext)) return "video";
@@ -4389,7 +4404,7 @@ function renderMaterialPreview() {
   const inlinePreviewUrl = item.previewUrl || item.fileUrl;
 
   if (item.fileUrl) {
-    if (kind === "pdf" || kind === "text") {
+    if (kind === "pdf" || kind === "text" || kind === "document" || kind === "presentation") {
       previewInner = `<iframe src="${inlinePreviewUrl}" loading="lazy"></iframe>`;
     } else if (kind === "image") {
       previewInner = `<img src="${inlinePreviewUrl}" alt="${escapeHtml(item.title)}" />`;
@@ -4493,7 +4508,7 @@ function buildSlidesEmptyCard(title, text, extraClass = "") {
 
 function buildSlidesSettingsCard() {
   const material = getSelectedMaterial();
-  const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
+  const hasSlides = Boolean(material?.slidesPreviewUrl || material?.slidesEmbedUrl || material?.slidesUrl);
   const actionLabel = hasSlides ? t("updateSlides") : t("buildSlides");
   const selectedTemplateId = getSlideTemplateById(slidesConfig.templateId)?.id || getDefaultSlideTemplateId();
   const templateOptions = getSlidesPickerTemplateCatalog();
@@ -4652,7 +4667,7 @@ function renderSlidesPreview() {
   }
 
   const material = getSelectedMaterial();
-  const hasSlides = Boolean(material?.slidesEmbedUrl || material?.slidesUrl);
+  const hasSlides = Boolean(material?.slidesPreviewUrl || material?.slidesEmbedUrl || material?.slidesUrl);
   syncSlidesActionButtons(material, hasSlides);
 
   if (!material) {
@@ -4708,7 +4723,7 @@ function renderSlidesPreview() {
     <div class="slides-preview-shell">
       <div class="slides-embed-shell">
         <iframe
-          src="${material.slidesEmbedUrl || material.slidesUrl}"
+          src="${material.slidesPreviewUrl || material.slidesEmbedUrl || material.slidesUrl}"
           loading="lazy"
           allowfullscreen
           referrerpolicy="no-referrer-when-downgrade"
@@ -7969,7 +7984,7 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
     return;
   }
 
-  if (!force && (currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl)) {
+  if (!force && (currentMaterial.slidesPreviewUrl || currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl)) {
     renderSlidesPreview();
     return;
   }
@@ -7982,7 +7997,7 @@ async function generateSlidesForSelectedMaterial({ force = false, slideCount = n
 
   if (
     force &&
-    (currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl) &&
+    (currentMaterial.slidesPreviewUrl || currentMaterial.slidesEmbedUrl || currentMaterial.slidesUrl) &&
     currentMaterial.slidesCount &&
     currentMaterial.slidesCount !== slidesConfig.slideCount
   ) {

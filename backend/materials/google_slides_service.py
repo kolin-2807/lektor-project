@@ -11,6 +11,7 @@ from users.google_oauth import (
     ensure_google_credentials_ready,
     has_google_scope,
 )
+from .google_drive_service import ensure_file_viewable_by_link
 from .slide_templates import get_slide_template_definition, is_master_slide_template
 
 
@@ -1906,6 +1907,7 @@ def create_presentation_from_outline(
             raise ValueError("Google Slides template copy failed.")
 
         _move_file_to_folder(drive_service, presentation_id, folder_id)
+        ensure_file_viewable_by_link(drive_service, presentation_id)
         _fill_master_template_content(
             slides_service=slides_service,
             presentation_id=presentation_id,
@@ -1946,6 +1948,7 @@ def create_presentation_from_outline(
             ).execute()
 
         _move_file_to_folder(drive_service, presentation_id, folder_id)
+        ensure_file_viewable_by_link(drive_service, presentation_id)
 
         base_url = f"https://docs.google.com/presentation/d/{presentation_id}"
         return {
@@ -1971,6 +1974,7 @@ def create_presentation_from_outline(
             ).execute()
 
         _move_file_to_folder(drive_service, presentation_id, folder_id)
+        ensure_file_viewable_by_link(drive_service, presentation_id)
 
         base_url = f"https://docs.google.com/presentation/d/{presentation_id}"
         return {
@@ -1996,6 +2000,7 @@ def create_presentation_from_outline(
             ).execute()
 
         _move_file_to_folder(drive_service, presentation_id, folder_id)
+        ensure_file_viewable_by_link(drive_service, presentation_id)
 
         base_url = f"https://docs.google.com/presentation/d/{presentation_id}"
         return {
@@ -2206,6 +2211,7 @@ def create_presentation_from_outline(
         ).execute()
 
     _move_file_to_folder(drive_service, presentation_id, folder_id)
+    ensure_file_viewable_by_link(drive_service, presentation_id)
 
     base_url = f"https://docs.google.com/presentation/d/{presentation_id}"
     return {

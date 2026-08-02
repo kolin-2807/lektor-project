@@ -1,4 +1,5 @@
 import io
+import re
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
@@ -7,7 +8,6 @@ try:
     from PyPDF2 import PdfReader
 except ImportError:  # pragma: no cover - optional dependency in some environments
     PdfReader = None
-from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
@@ -16,10 +16,17 @@ from users.google_oauth import (
     credentials_from_dict,
     credentials_to_dict,
     ensure_google_credentials_ready,
+    refresh_google_credentials,
 )
 
 
 SUPPORTED_DRIVE_LANGUAGES = {"kaz", "rus", "eng"}
+
+WORD_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+PPTX_NS = {
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+}
 
 SLIDES_FOLDER_LABELS = {
     "kaz": "Слайд",
@@ -45,12 +52,33 @@ def _escape_drive_query(value: str) -> str:
     return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
+
+
+def _collect_xml_text(node) -> str:
+    parts = []
+    for child in node.iter():
+        local_name = _xml_local_name(child.tag)
+        if local_name == "t" and child.text:
+            parts.append(child.text)
+        elif local_name == "br":
+            parts.append("\n")
+        elif local_name == "tab":
+            parts.append("\t")
+    return "".join(parts).strip()
+
+
+def _slide_sort_key(name: str):
+    match = re.search(r"slide(\d+)\.xml$", name, flags=re.IGNORECASE)
+    return (int(match.group(1)) if match else 10**9, name)
+
+
 def get_drive_service(connection):
     credentials = credentials_from_dict(connection.credentials_json)
 
-    if credentials.expired and credentials.refresh_token:
-        with bypass_broken_local_proxy():
-            credentials.refresh(Request())
+    if getattr(credentials, "expired", False) and getattr(credentials, "refresh_token", None):
+        refresh_google_credentials(credentials)
         connection.credentials_json = credentials_to_dict(credentials)
         connection.save(update_fields=["credentials_json", "updated_at"])
 
@@ -174,6 +202,8 @@ def upload_material_file(connection, discipline, category: str, uploaded_file):
             fields="id, name, mimeType, webViewLink, webContentLink",
         ).execute()
 
+    ensure_file_viewable_by_link(service, created.get("id", ""))
+
     return {
         "file_id": created.get("id", ""),
         "folder_id": category_folder_id,
@@ -193,6 +223,36 @@ def delete_material_file(connection, file_id: str):
         service.files().delete(fileId=file_id).execute()
 
 
+def ensure_file_viewable_by_link(service, file_id: str) -> bool:
+    if not file_id:
+        return False
+
+    try:
+        with bypass_broken_local_proxy():
+            existing_permissions = service.permissions().list(
+                fileId=file_id,
+                fields="permissions(id,type,role,allowFileDiscovery)",
+            ).execute()
+
+        for permission in existing_permissions.get("permissions", []):
+            if permission.get("type") == "anyone" and permission.get("role") in {"reader", "writer", "commenter"}:
+                return True
+
+        with bypass_broken_local_proxy():
+            service.permissions().create(
+                fileId=file_id,
+                body={
+                    "type": "anyone",
+                    "role": "reader",
+                    "allowFileDiscovery": False,
+                },
+                fields="id",
+            ).execute()
+        return True
+    except Exception:
+        return False
+
+
 def download_material_bytes(connection, file_id: str, mime_type: str = "") -> bytes:
     if not file_id:
         return b""
@@ -202,6 +262,11 @@ def download_material_bytes(connection, file_id: str, mime_type: str = "") -> by
 
     if mime_type == "application/vnd.google-apps.document":
         request = service.files().export_media(fileId=file_id, mimeType="text/plain")
+    elif mime_type == "application/vnd.google-apps.presentation":
+        request = service.files().export_media(
+            fileId=file_id,
+            mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
     else:
         request = service.files().get_media(fileId=file_id)
 
@@ -227,22 +292,43 @@ def _extract_docx_text(content: bytes) -> str:
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         xml_bytes = archive.read("word/document.xml")
     root = ElementTree.fromstring(xml_bytes)
+    paragraphs = []
+
+    for paragraph in root.findall(".//w:p", WORD_NS):
+        paragraph_text = _collect_xml_text(paragraph)
+        if paragraph_text:
+            paragraphs.append(paragraph_text)
+
+    if paragraphs:
+        return "\n\n".join(paragraphs)
+
     return "\n".join(node.strip() for node in root.itertext() if node and node.strip())
 
 
-def _extract_pptx_text(content: bytes) -> str:
+def _extract_pptx_slide_texts(content: bytes) -> list[str]:
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         slide_files = sorted(
-            name for name in archive.namelist()
-            if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+            [
+                name for name in archive.namelist()
+                if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+            ],
+            key=_slide_sort_key,
         )
-        chunks = []
+        slide_texts = []
         for slide_name in slide_files:
             root = ElementTree.fromstring(archive.read(slide_name))
-            slide_text = [node.strip() for node in root.itertext() if node and node.strip()]
-            if slide_text:
-                chunks.append("\n".join(slide_text))
-    return "\n\n".join(chunks)
+            paragraphs = []
+            for paragraph in root.findall(".//a:p", PPTX_NS):
+                paragraph_text = _collect_xml_text(paragraph)
+                if paragraph_text:
+                    paragraphs.append(paragraph_text)
+            slide_texts.append("\n".join(paragraphs).strip())
+    return slide_texts
+
+
+def _extract_pptx_text(content: bytes) -> str:
+    slide_texts = _extract_pptx_slide_texts(content)
+    return "\n\n".join(text for text in slide_texts if text.strip())
 
 
 def _extract_pdf_text(content: bytes) -> str:

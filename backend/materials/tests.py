@@ -1,6 +1,8 @@
 import json
+import io
 import os
 import tempfile
+import zipfile
 from unittest.mock import Mock, patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -28,7 +30,7 @@ from materials.google_slides_service import (
     _master_template_requests,
 )
 from materials.slide_templates import get_slide_template_definition
-from materials.views import _build_gemini_error_response, _has_sufficient_material_text
+from materials.views import _build_gemini_error_response, _get_material_preview_kind, _has_sufficient_material_text
 
 
 class AssistantIntentServiceTests(SimpleTestCase):
@@ -503,6 +505,170 @@ class MaterialTextExtractionTests(SimpleTestCase):
         )
 
         self.assertEqual(extracted_text, "Slides outline in plain text")
+
+    def test_pptx_text_is_extracted_by_paragraphs_not_by_individual_runs(self):
+        pptx_bytes = io.BytesIO()
+        slide1_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p>
+            <a:r><a:t>Жоба</a:t></a:r>
+            <a:r><a:t> тақырыбы</a:t></a:r>
+          </a:p>
+          <a:p>
+            <a:r><a:t>Білім беру процесін сүйемелдеу үшін</a:t></a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>
+"""
+        slide2_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p>
+            <a:r><a:t>Келесі слайд</a:t></a:r>
+          </a:p>
+        </p:txBody>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+</p:sld>
+"""
+
+        with zipfile.ZipFile(pptx_bytes, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("ppt/slides/slide1.xml", slide1_xml)
+            archive.writestr("ppt/slides/slide2.xml", slide2_xml)
+
+        extracted_text = extract_material_text(
+            pptx_bytes.getvalue(),
+            mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            original_filename="deck.pptx",
+        )
+
+        self.assertIn("Жоба тақырыбы", extracted_text)
+        self.assertIn("Білім беру процесін сүйемелдеу үшін", extracted_text)
+        self.assertIn("Келесі слайд", extracted_text)
+        self.assertIn("\n\n", extracted_text)
+        self.assertNotIn("Жоба\n", extracted_text)
+
+
+class MaterialPreviewKindTests(SimpleTestCase):
+    def test_recognizes_docx_and_pptx_as_special_preview_types(self):
+        docx_material = Mock(
+            title="Lecture notes",
+            original_filename="Lecture notes.docx",
+            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        pptx_material = Mock(
+            title="Lecture slides",
+            original_filename="Lecture slides.pptx",
+            mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+
+        self.assertEqual(_get_material_preview_kind(docx_material), "document")
+        self.assertEqual(_get_material_preview_kind(pptx_material), "presentation")
+
+    def test_recognizes_google_docs_urls_when_metadata_is_missing(self):
+        document_material = Mock(
+            title="Lecture notes",
+            original_filename="",
+            mime_type="",
+            cloud_url="https://docs.google.com/document/d/example/edit",
+        )
+        presentation_material = Mock(
+            title="Lecture slides",
+            original_filename="",
+            mime_type="",
+            cloud_url="https://docs.google.com/presentation/d/example/edit",
+        )
+
+        self.assertEqual(_get_material_preview_kind(document_material), "document")
+        self.assertEqual(_get_material_preview_kind(presentation_material), "presentation")
+
+
+class MaterialPreviewResponseTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.course, _ = Course.objects.get_or_create(number=3)
+        self.discipline = Discipline.objects.create(
+            course=self.course,
+            title="Business Models",
+            language="kaz",
+            owner_email="teacher@example.com",
+        )
+        self.material = Material.objects.create(
+            discipline=self.discipline,
+            title="Lecture notes",
+            category="lecture",
+            cloud_url="https://docs.google.com/document/d/example/edit",
+            drive_file_id="drive-file-123",
+            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            original_filename="Lecture notes.docx",
+            owner_email="teacher@example.com",
+        )
+
+    @patch("materials.views._require_google_session", return_value=(Mock(google_email="teacher@example.com"), None))
+    def test_preview_material_redirects_docx_to_original_viewer(self, _mocked_session):
+        response = self.client.get(f"/api/materials/{self.material.id}/preview/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://docs.google.com/document/d/example/edit")
+
+    @patch("materials.views._require_google_session", return_value=(Mock(google_email="teacher@example.com"), None))
+    def test_preview_material_redirects_pptx_to_original_viewer(self, _mocked_session):
+        self.material.mime_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        self.material.original_filename = "Lecture slides.pptx"
+        self.material.cloud_url = "https://docs.google.com/presentation/d/example/edit?usp=drivesdk"
+        self.material.save(update_fields=["mime_type", "original_filename", "cloud_url"])
+
+        response = self.client.get(f"/api/materials/{self.material.id}/preview/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://docs.google.com/presentation/d/example/edit?usp=drivesdk")
+
+
+class MaterialSlidesPreviewResponseTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.course, _ = Course.objects.get_or_create(number=3)
+        self.discipline = Discipline.objects.create(
+            course=self.course,
+            title="Business Models",
+            language="kaz",
+            owner_email="teacher@example.com",
+        )
+        self.material = Material.objects.create(
+            discipline=self.discipline,
+            title="Lecture slides",
+            category="lecture",
+            cloud_url="https://docs.google.com/presentation/d/example/edit",
+            drive_file_id="drive-file-123",
+            slides_presentation_id="presentation-123",
+            slides_url="https://docs.google.com/presentation/d/presentation-123/edit",
+            slides_embed_url="https://docs.google.com/presentation/d/presentation-123/embed",
+            owner_email="teacher@example.com",
+        )
+
+    @patch("materials.views._require_google_session", return_value=(Mock(google_email="teacher@example.com"), None))
+    def test_slides_preview_redirects_to_google_preview(self, _mocked_session):
+        response = self.client.get(f"/api/materials/{self.material.id}/slides-preview/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://docs.google.com/presentation/d/presentation-123/embed")
 
 
 class SlideTemplateCatalogTests(SimpleTestCase):

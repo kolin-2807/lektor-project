@@ -1,11 +1,4 @@
-from google.auth.transport.requests import Request
-
-from users.google_oauth import (
-    bypass_broken_local_proxy,
-    credentials_from_dict,
-    credentials_to_dict,
-    ensure_google_credentials_ready,
-)
+from users.google_oauth import credentials_from_dict, credentials_to_dict, refresh_google_credentials
 
 
 def get_google_credentials(connection):
@@ -14,12 +7,9 @@ def get_google_credentials(connection):
 
     credentials = credentials_from_dict(connection.credentials_json)
 
-    if credentials.expired and credentials.refresh_token:
-        with bypass_broken_local_proxy():
-            credentials.refresh(Request())
+    if getattr(credentials, "expired", False) and getattr(credentials, "refresh_token", None):
+        refresh_google_credentials(credentials)
         connection.credentials_json = credentials_to_dict(credentials)
         connection.save(update_fields=["credentials_json", "updated_at"])
-
-    ensure_google_credentials_ready(credentials)
 
     return credentials
